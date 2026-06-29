@@ -4,7 +4,7 @@
 
 一个用于原神角色、天赋和武器养成材料规划的 Chrome 侧边栏扩展。
 
-当前版本：**v1.2.11**
+当前版本：**v1.2.12**
 
 > 本项目为非官方工具，与米哈游、HoYoverse、Nanoka 或 Lunaris 无隶属或合作关系。
 
@@ -17,6 +17,8 @@
 - 根据当前目标计算摩拉、经验材料、角色突破材料、天赋材料和武器突破材料缺口。
 - 使用一套全局背包数据，角色与武器的同名材料会自动合并。
 - 自动保存已选对象、目标等级和背包数量。
+- 每个背包数量输入框提供上下微调按钮，每次增加或减少 1。
+- 支持 `38*2`、`100+25` 等算式；点击微调按钮时会先计算当前表达式，再进行加减。
 - 支持配置导入和导出。
 - 合并正式服与最新数据；仅存在于最新数据中的对象显示“前瞻”标记。
 - 材料图片按 `Nanoka → Lunaris → 品质色占位` 的顺序读取。
@@ -87,9 +89,11 @@
 ├── background.js       # 后台数据与图片请求
 ├── sidepanel.html      # 侧边栏页面
 ├── app.js              # 界面、状态与交互逻辑
+├── stepper.js          # 背包数量微调按钮逻辑
 ├── core.mjs            # 养成计算核心
 ├── hakushin.mjs        # Nanoka 数据解析与合并
-├── styles.css          # 页面样式
+├── styles.css          # 页面主样式
+├── stepper.css         # 数量微调按钮样式
 └── icons/              # 扩展图标
 ```
 
@@ -102,16 +106,17 @@
 ```bash
 node --check background.js
 node --check app.js
+node --check stepper.js
 node --check core.mjs
 node --check hakushin.mjs
 python -m json.tool manifest.json
 ```
 
-推送形如 `v1.2.11` 的标签后，GitHub Actions 会校验标签与 `manifest.json` 版本一致，随后自动生成 ZIP、SHA-256 文件并发布 Release。也可以在 Actions 页面手动运行 `Build and publish release`。
+推送形如 `v1.2.12` 的标签后，GitHub Actions 会校验标签与 `manifest.json` 版本一致，随后自动生成 ZIP、SHA-256 文件并发布 Release。也可以在 Actions 页面手动运行 `Build and publish release`。
 
 ## 当前状态与后续方向
 
-当前阶段已经完成基础规划、全局背包、正式服与前瞻数据合并、材料图标备用链路和配置导入导出。
+当前阶段已经完成基础规划、全局背包、正式服与前瞻数据合并、材料图标备用链路、数量微调按钮和配置导入导出。
 
 正在评估的方向包括：
 
@@ -119,7 +124,7 @@ python -m json.tool manifest.json
 - 账号与跨设备数据同步。
 - 在用户明确授权的前提下，研究米游社养成计算器相关数据接入。
 
-以上功能尚未包含在 v1.2.11 中。
+以上功能尚未包含在 v1.2.12 中。
 
 ## 反馈
 
