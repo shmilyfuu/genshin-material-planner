@@ -131,10 +131,8 @@ Please include the following information:
 - Error message or screenshot.
 - Relevant errors from the extension service worker console in `chrome://extensions/`.
 
-## License
+## Copyright and Use
 
-This project is released under the **GNU General Public License v3.0 only (GPL-3.0-only)**. See [LICENSE](LICENSE) for the complete terms.
+This repository does not provide an open-source license. Except where applicable law expressly permits otherwise, copying, modification, redistribution, or reuse in another project requires permission from the copyright holder.
 
-You may use, study, modify, and redistribute the project. Distributed modified or derivative versions must provide the corresponding source code, retain the license notices, and remain under GPL-compatible terms as required by GPL-3.0.
-
-Copyright remains with the project contributors. Third-party names, data, and images remain subject to their respective owners' terms.
+Third-party names, data, and images remain subject to their respective owners' terms.
