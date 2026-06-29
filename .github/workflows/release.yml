@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           ROOT="dist/${PACKAGE}"
           mkdir -p "${ROOT}/icons"
-          cp manifest.json background.js sidepanel.html app.js core.mjs hakushin.mjs styles.css README.md README_EN.md "${ROOT}/"
+          cp manifest.json background.js sidepanel.html app.js core.mjs hakushin.mjs styles.css stepper.js stepper.css README.md README_EN.md "${ROOT}/"
           cp icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png "${ROOT}/icons/"
           (
             cd dist

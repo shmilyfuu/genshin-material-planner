@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Added compact up/down controls to every inventory quantity field.
+- Each click increases or decreases the evaluated value by 1.
+- Values are clamped at 0 and arithmetic expressions remain supported.
+- Button changes continue to trigger automatic calculation and local saving.
+
 ## 1.2.11
 
 - Set the global inventory material icon area to 45 px high.
