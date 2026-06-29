@@ -4,7 +4,7 @@
 
 A Chrome side panel extension for planning character, talent, and weapon upgrade materials in Genshin Impact.
 
-Current version: **v1.2.11**
+Current version: **v1.2.12**
 
 > This is an unofficial project and is not affiliated with or endorsed by HoYoverse, miHoYo, Nanoka, or Lunaris.
 
@@ -17,6 +17,8 @@ Current version: **v1.2.11**
 - Calculate shortages for Mora, EXP materials, character ascension materials, talent materials, and weapon ascension materials.
 - Use one global inventory; shared character and weapon materials are merged automatically.
 - Automatically save selected entries, target levels, and inventory values.
+- Use compact up/down controls beside every inventory field to increase or decrease the value by 1.
+- Arithmetic expressions such as `38*2` and `100+25` remain supported; a step button evaluates the current expression before adjusting it.
 - Import and export planner configuration.
 - Merge live and latest data; entries found only in the latest dataset are marked as preview content.
 - Load material images in this order: `Nanoka → Lunaris → rarity-colored placeholder`.
@@ -73,7 +75,7 @@ The extension requests the following permissions:
 - `https://static.nanoka.cc/*`: read Nanoka data and images.
 - `https://api.lunaris.moe/*`: load backup material images when Nanoka has no matching image.
 
-Version v1.2.11 does not include HoYoLAB/Miyoushe login, cookie access, or cloud account synchronization.
+Version v1.2.12 does not include HoYoLAB/Miyoushe login, cookie access, or cloud account synchronization.
 
 ## Local Data
 
@@ -87,9 +89,11 @@ Planner state is stored in `chrome.storage.local`. This release has no dedicated
 ├── background.js       # Background data and image requests
 ├── sidepanel.html      # Side panel page
 ├── app.js              # UI, state, and interaction logic
+├── stepper.js          # Inventory stepper controls
 ├── core.mjs            # Upgrade calculation core
 ├── hakushin.mjs        # Nanoka parsing and live/latest merging
-├── styles.css          # UI styles
+├── styles.css          # Main UI styles
+├── stepper.css         # Stepper control styles
 └── icons/              # Extension icons
 ```
 
@@ -102,16 +106,17 @@ Suggested validation commands:
 ```bash
 node --check background.js
 node --check app.js
+node --check stepper.js
 node --check core.mjs
 node --check hakushin.mjs
 python -m json.tool manifest.json
 ```
 
-Pushing a tag such as `v1.2.11` starts GitHub Actions. The workflow verifies that the tag matches the version in `manifest.json`, builds the ZIP and SHA-256 files, and publishes a GitHub Release. The `Build and publish release` workflow can also be started manually from the Actions page.
+Pushing a tag such as `v1.2.12` starts GitHub Actions. The workflow verifies that the tag matches the version in `manifest.json`, builds the ZIP and SHA-256 files, and publishes a GitHub Release. The `Build and publish release` workflow can also be started manually from the Actions page.
 
 ## Current Status and Possible Next Steps
 
-The current stage includes the core planner, global inventory, live/latest data merging, backup material images, and configuration import/export.
+The current stage includes the core planner, global inventory, live/latest data merging, backup material images, inventory stepper controls, and configuration import/export.
 
 Areas under evaluation include:
 
@@ -119,7 +124,7 @@ Areas under evaluation include:
 - Account-based cross-device synchronization.
 - Research into Miyoushe enhancement-calculator data integration with explicit user authorization.
 
-These features are not included in v1.2.11.
+These features are not included in v1.2.12.
 
 ## Reporting Issues
 
