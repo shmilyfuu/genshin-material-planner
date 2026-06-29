@@ -30,11 +30,21 @@ Current version: **v1.2.11**
 
 Changes to external data structures or service endpoints may temporarily affect lists, details, or images.
 
+## Releases
+
+Stable builds are published through GitHub Releases. Each release contains:
+
+- A ZIP archive ready to be loaded as an unpacked extension.
+- A matching SHA-256 checksum file.
+- Automatically generated release notes.
+
+Check that the archive name and version match before extracting it to a permanent directory.
+
 ## Installation
 
 The extension is currently distributed as an unpacked Chrome extension.
 
-1. Download the repository source or the latest archive.
+1. Download the latest ZIP archive from GitHub Releases, or download the repository source.
 2. Extract it to a permanent directory.
 3. Open `chrome://extensions/` in Chrome.
 4. Enable **Developer mode**.
@@ -49,7 +59,7 @@ Minimum supported Chrome version: **114**.
 Unpacked extensions are not updated automatically by Chrome. To upgrade:
 
 1. Back up or export the current configuration.
-2. Replace the existing extension files with the new version.
+2. Download the new ZIP from Releases and replace the files in the existing extension directory.
 3. Open `chrome://extensions/` and click **Reload** for the extension.
 
 The project keeps a fixed extension ID and storage key, so existing configuration will normally remain available after an in-place update. Exporting a backup first is still recommended.
@@ -97,6 +107,8 @@ node --check hakushin.mjs
 python -m json.tool manifest.json
 ```
 
+Pushing a tag such as `v1.2.11` starts GitHub Actions. The workflow verifies that the tag matches the version in `manifest.json`, builds the ZIP and SHA-256 files, and publishes a GitHub Release. The `Build and publish release` workflow can also be started manually from the Actions page.
+
 ## Current Status and Possible Next Steps
 
 The current stage includes the core planner, global inventory, live/latest data merging, backup material images, and configuration import/export.
@@ -121,4 +133,8 @@ Please include the following information:
 
 ## License
 
-No open-source license has been selected for this repository yet. Until a license is added, the source code remains under default copyright protection.
+This project is released under the **GNU General Public License v3.0 only (GPL-3.0-only)**. See [LICENSE](LICENSE) for the complete terms.
+
+You may use, study, modify, and redistribute the project. Distributed modified or derivative versions must provide the corresponding source code, retain the license notices, and remain under GPL-compatible terms as required by GPL-3.0.
+
+Copyright remains with the project contributors. Third-party names, data, and images remain subject to their respective owners' terms.
