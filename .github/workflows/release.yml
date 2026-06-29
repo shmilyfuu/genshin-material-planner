@@ -17,7 +17,6 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -30,7 +29,6 @@ jobs:
         run: |
           set -euo pipefail
           MANIFEST_VERSION="$(jq -r '.version' manifest.json)"
-
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             TAG="${GITHUB_REF_NAME}"
           elif [[ -n "${{ inputs.tag }}" ]]; then
@@ -38,12 +36,10 @@ jobs:
           else
             TAG="v${MANIFEST_VERSION}"
           fi
-
           if [[ "${TAG}" != "v${MANIFEST_VERSION}" ]]; then
             echo "Tag ${TAG} does not match manifest version v${MANIFEST_VERSION}." >&2
             exit 1
           fi
-
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${MANIFEST_VERSION}" >> "$GITHUB_OUTPUT"
           echo "package=genshin-material-planner-v${MANIFEST_VERSION}" >> "$GITHUB_OUTPUT"
@@ -70,10 +66,8 @@ jobs:
           set -euo pipefail
           ROOT="dist/${PACKAGE}"
           mkdir -p "${ROOT}/icons"
-
-          cp manifest.json background.js sidepanel.html app.js core.mjs hakushin.mjs styles.css LICENSE README.md README_EN.md "${ROOT}/"
+          cp manifest.json background.js sidepanel.html app.js core.mjs hakushin.mjs styles.css README.md README_EN.md "${ROOT}/"
           cp icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png "${ROOT}/icons/"
-
           (
             cd dist
             zip -r "${PACKAGE}.zip" "${PACKAGE}"
@@ -90,16 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release upload "${TAG}" \
-              "dist/${PACKAGE}.zip" \
-              "dist/${PACKAGE}.zip.sha256" \
-              --clobber
+            gh release upload "${TAG}" "dist/${PACKAGE}.zip" "dist/${PACKAGE}.zip.sha256" --clobber
           else
-            gh release create "${TAG}" \
-              "dist/${PACKAGE}.zip" \
-              "dist/${PACKAGE}.zip.sha256" \
-              --verify-tag \
-              --title "全能养成规划面板 v${VERSION}" \
-              --generate-notes \
-              --latest
+            gh release create "${TAG}" "dist/${PACKAGE}.zip" "dist/${PACKAGE}.zip.sha256" --verify-tag --title "全能养成规划面板 v${VERSION}" --generate-notes --latest
           fi
