@@ -6,9 +6,14 @@ on:
       - main
     paths:
       - '.github/workflows/bootstrap-gpl-release.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: bootstrap-gpl-release
+  cancel-in-progress: false
 
 jobs:
   bootstrap:
@@ -20,12 +25,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install the complete GPL-3.0 license text
+      - name: Install the complete GPL-3.0-only license text
         shell: bash
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 \
-            'https://www.gnu.org/licenses/gpl-3.0.txt' \
+            'https://raw.githubusercontent.com/spdx/license-list-data/main/text/GPL-3.0-only.txt' \
             --output LICENSE
 
           git config user.name 'github-actions[bot]'
@@ -33,7 +38,7 @@ jobs:
           git add LICENSE
 
           if ! git diff --cached --quiet; then
-            git commit -m 'Add complete GPL-3.0 license text'
+            git commit -m 'Add complete GPL-3.0-only license text'
             git push origin HEAD:main
           fi
 
