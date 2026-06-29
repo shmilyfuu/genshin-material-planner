@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>全能养成规划面板</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-copy">
+      <h1>全能养成规划面板</h1>
+      <p>数据源：Nanoka，图片备用：Lunaris</p>
+    </div>
+    <div class="toolbar" aria-label="数据工具">
+      <button id="importButton" class="button button-secondary" type="button">导入</button>
+      <button id="exportButton" class="button button-secondary" type="button">导出</button>
+      <button id="clearButton" class="button button-danger" type="button">清空</button>
+      <input id="importFile" type="file" accept="application/json,.json" hidden>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card source-card" aria-labelledby="sourceTitle">
+      <div class="source-head">
+        <div>
+          <h2 id="sourceTitle">养成对象</h2>
+          <p id="sourceStatus">正在读取 Nanoka 数据…</p>
+          <p id="sourceMeta" class="source-meta">数据源：Nanoka</p>
+          <p id="imageSourceStatus" class="source-meta image-source-status" data-tone="error" hidden></p>
+        </div>
+        <button id="syncButton" class="button button-secondary" type="button">重新同步</button>
+      </div>
+      <div class="source-columns">
+        <section class="picker-group" aria-labelledby="characterPickerTitle">
+          <div class="picker-head">
+            <h3 id="characterPickerTitle">角色</h3>
+            <span class="picker-hint">可选手动模式</span>
+          </div>
+          <label>
+            <span>搜索角色</span>
+            <input id="characterSearch" type="search" placeholder="输入角色名称筛选">
+          </label>
+          <div class="picker-filters">
+            <label>
+              <span>属性筛选</span>
+              <select id="characterElementFilter"></select>
+            </label>
+            <label>
+              <span>星级筛选</span>
+              <select id="characterRarityFilter"></select>
+            </label>
+          </div>
+          <label>
+            <span>角色选择</span>
+            <select id="characterSelect"></select>
+          </label>
+          <div id="characterCard" class="profile-card" hidden></div>
+          <p id="characterWarning" class="source-warning" hidden></p>
+        </section>
+
+        <section class="picker-group" aria-labelledby="weaponPickerTitle">
+          <div class="picker-head">
+            <h3 id="weaponPickerTitle">武器</h3>
+            <span class="picker-hint">可选手动模式</span>
+          </div>
+          <label>
+            <span>搜索武器</span>
+            <input id="weaponSearch" type="search" placeholder="输入武器名称筛选">
+          </label>
+          <div class="picker-filters">
+            <label>
+              <span>类型筛选</span>
+              <select id="weaponTypeFilter"></select>
+            </label>
+            <label>
+              <span>星级筛选</span>
+              <select id="weaponRarityFilter"></select>
+            </label>
+          </div>
+          <label>
+            <span>武器选择</span>
+            <select id="weaponSelect"></select>
+          </label>
+          <div id="weaponCard" class="profile-card" hidden></div>
+          <p id="weaponWarning" class="source-warning" hidden></p>
+        </section>
+      </div>
+    </section>
+
+    <details class="card target-card" open>
+      <summary>
+        <span class="summary-title">养成目标</span>
+        <span class="summary-hint">设置当前等级与目标等级</span>
+      </summary>
+      <div class="card-body target-body">
+        <section class="target-group">
+          <h2>角色与天赋</h2>
+          <div id="characterSelectors" class="selector-list"></div>
+        </section>
+        <section class="target-group">
+          <h2>武器</h2>
+          <div id="weaponSelectors" class="selector-list"></div>
+          <p class="target-note">当武器与角色使用同一套材料时，会自动合并到同一组背包输入框中。</p>
+        </section>
+      </div>
+    </details>
+
+    <section class="card result-card" aria-labelledby="resultTitle">
+      <div class="result-header">
+        <div>
+          <h2 id="resultTitle">缺口计算结果</h2>
+          <p id="saveStatus">已读取本地数据</p>
+        </div>
+      </div>
+      <div id="resultContent" class="result-content" aria-live="polite"></div>
+    </section>
+
+    <details class="card inventory-card" open>
+      <summary>
+        <span class="summary-title">我的全局背包</span>
+        <span class="summary-hint">支持 38*2、100+25 等算式</span>
+      </summary>
+      <div class="card-body inventory-body">
+        <details class="inventory-group" open>
+          <summary>基础与专属材料</summary>
+          <div id="basicInventory" class="input-grid"></div>
+        </details>
+
+        <details class="inventory-group" open>
+          <summary>角色培养素材（全局共享）</summary>
+          <div id="cultInventory" class="input-grid"></div>
+        </details>
+
+        <details class="inventory-group" open>
+          <summary>天赋与角色突破</summary>
+          <div id="talentInventory" class="input-grid"></div>
+        </details>
+
+        <details class="inventory-group" open>
+          <summary>武器突破材料</summary>
+          <div id="weaponInventory" class="input-grid"></div>
+          <div id="independentWeaponMaterials" class="independent-materials"></div>
+        </details>
+      </div>
+    </details>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="confirmDialog" class="dialog-backdrop" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogDescription">
+      <h2 id="dialogTitle">清空全部数据</h2>
+      <p id="dialogDescription">背包数量、目标等级与已选对象都会恢复到初始状态。</p>
+      <div class="dialog-actions">
+        <button id="cancelClearButton" class="button button-secondary" type="button">取消</button>
+        <button id="confirmClearButton" class="button button-danger" type="button">确认清空</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
