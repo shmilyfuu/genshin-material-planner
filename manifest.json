@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "全能养成规划面板",
+  "short_name": "养成规划面板",
+  "version": "1.2.11",
+  "description": "原神角色与武器养成材料规划侧边栏，支持 Nanoka 数据、Lunaris 图片备用、全局背包与缺口计算。",
+  "minimum_chrome_version": "114",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkyc0tnVEa3jNvhel81sAF+u6bFNSCrz5sWezJbR7mqL6D7hLiJam6cQWyCcKFbggFl2NIhVEG7YAJc13q+AlxNllMNf0X4b0d1GhO1IaXQP3l8XutFuFipATYCv6Ku665kkzCehtEE0nPE6d8nynNpbXxgyKHEK/CWdaD/ALF7FB/deJ0ckSbUUbH8iKnsXz6RZo5sLu8CxS9I0O+Flg8dmVNm4GeNkx0HuULeeThiuYmHsJFQgcl2uq27AkQwvBjYrrOHy2yO4T4yD6ZSyo+aEuqyhU9cm3T2on9MB8j1B56p9QD+Q5sSkzgVChmaQTaFXCWP2Hzape/s40lXb4EQIDAQAB",
+  "permissions": [
+    "sidePanel",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://static.nanoka.cc/*",
+    "https://api.lunaris.moe/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "打开全能养成规划面板",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; img-src 'self' data: blob: https://static.nanoka.cc https://api.lunaris.moe"
+  }
+}
