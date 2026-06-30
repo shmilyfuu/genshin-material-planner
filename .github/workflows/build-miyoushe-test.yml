@@ -17,6 +17,22 @@ on:
       - 'stepper.css'
       - 'miyoushe-*.js'
       - 'icons/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build-miyoushe-test.yml'
+      - 'manifest.json'
+      - 'background.js'
+      - 'sidepanel.html'
+      - 'app.js'
+      - 'core.mjs'
+      - 'hakushin.mjs'
+      - 'styles.css'
+      - 'stepper.js'
+      - 'stepper.css'
+      - 'miyoushe-*.js'
+      - 'icons/**'
   workflow_dispatch:
 
 permissions:
