@@ -1,3 +1,5 @@
+importScripts('miyoushe-core.js', 'miyoushe-session-network.js', 'miyoushe-qr-session.js', 'miyoushe-official-login.js', 'miyoushe-roles.js', 'miyoushe-sync.js');
+
 const BASE_URL = 'https://static.nanoka.cc';
 const LUNARIS_BASE_URL = 'https://api.lunaris.moe/data/assets/items';
 const NANOKA_TEST_URL = `${BASE_URL}/assets/gi/UI_ItemIcon_202.webp`;
@@ -37,7 +39,7 @@ async function writeCache(path, value) {
   });
 }
 
-async function fetchJson(path, { force = false, maxAge = 24 * 60 * 60 * 1000 } = {}) {
+async function fetchNanokaJson(path, { force = false, maxAge = 24 * 60 * 60 * 1000 } = {}) {
   const cached = await readCache(path);
   if (!force && cached && Date.now() - cached.savedAt < maxAge) {
     return { ok: true, data: cached.value, source: 'cache', savedAt: cached.savedAt };
@@ -231,7 +233,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ok: false, error: '非法请求路径' });
     return false;
   }
-  fetchJson(path, {
+  fetchNanokaJson(path, {
     force: Boolean(message.force),
     maxAge: Number.isFinite(message.maxAge) ? message.maxAge : undefined
   }).then(sendResponse).catch((error) => sendResponse({ ok: false, error: String(error) }));
