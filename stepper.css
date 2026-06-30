@@ -70,3 +70,22 @@
   outline: 2px solid rgba(79, 70, 229, 0.42);
   outline-offset: -2px;
 }
+
+/* Miyoushe import experiment */
+.mys-card { display: grid; gap: 12px; }
+.mys-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.mys-head h2 { margin: 0; }
+.mys-subtitle, .mys-notice, .mys-limitation { color: #64748b; font-size: 12px; line-height: 1.55; }
+.mys-notice { padding: 8px 10px; border: 1px solid rgba(148, 163, 184, .32); border-radius: 8px; background: rgba(248, 250, 252, .72); }
+.mys-actions, .mys-role-area { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+.mys-role-area label, .mys-result-area > label { display: grid; flex: 1; gap: 5px; min-width: 180px; color: #475569; font-size: 12px; }
+.mys-role-area select, .mys-result-area select { width: 100%; }
+.mys-status { min-height: 18px; font-size: 12px; line-height: 1.5; }
+.mys-status-info { color: #475569; }
+.mys-status-success { color: #047857; }
+.mys-status-error { color: #b91c1c; }
+.mys-qr-box, .mys-result-area, .mys-character-detail { display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(148, 163, 184, .35); border-radius: 8px; background: rgba(248, 250, 252, .68); }
+.mys-qr-link { color: #4f46e5; font-size: 12px; overflow-wrap: anywhere; }
+.mys-character-detail { padding: 8px; background: rgba(255, 255, 255, .78); font-size: 12px; }
+.mys-result-summary { font-size: 12px; font-weight: 600; }
+@media (max-width: 420px) { .mys-actions, .mys-role-area { align-items: stretch; flex-direction: column; } }
