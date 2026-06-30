@@ -9,3 +9,4 @@ Licensed under the MIT License.
 Source: https://github.com/kazuhikoarase/qrcode-generator
 
 The bundled source file retains its original copyright and license notice.
+The library is bundled locally and does not rely on an external image service.
