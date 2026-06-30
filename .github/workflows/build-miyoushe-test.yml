@@ -1,0 +1,74 @@
+name: Build Miyoushe test package
+
+on:
+  push:
+    branches:
+      - miyoushe-import
+    paths:
+      - '.github/workflows/build-miyoushe-test.yml'
+      - 'manifest.json'
+      - 'background.js'
+      - 'sidepanel.html'
+      - 'app.js'
+      - 'core.mjs'
+      - 'hakushin.mjs'
+      - 'styles.css'
+      - 'stepper.js'
+      - 'stepper.css'
+      - 'miyoushe-*.js'
+      - 'icons/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out test branch
+        uses: actions/checkout@v4
+
+      - name: Validate source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m json.tool manifest.json >/dev/null
+          node --check background.js
+          node --check app.js
+          node --check stepper.js
+          node --check miyoushe-core.js
+          node --check miyoushe-session-network.js
+          node --check miyoushe-qr-session.js
+          node --check miyoushe-official-login.js
+          node --check miyoushe-roles.js
+          node --check miyoushe-sync.js
+          node --check miyoushe-ui-helpers.js
+          node --check miyoushe-ui-view.js
+          node --check miyoushe.js
+
+      - name: Build unpacked extension and ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE='genshin-material-planner-miyoushe-test-v1.3.0'
+          ROOT="dist/${PACKAGE}"
+          mkdir -p "${ROOT}/icons"
+
+          cp manifest.json background.js sidepanel.html app.js core.mjs hakushin.mjs styles.css stepper.js stepper.css "${ROOT}/"
+          cp miyoushe-core.js miyoushe-session-network.js miyoushe-qr-session.js miyoushe-official-login.js miyoushe-roles.js miyoushe-sync.js miyoushe-ui-helpers.js miyoushe-ui-view.js miyoushe.js "${ROOT}/"
+          cp icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png "${ROOT}/icons/"
+
+          cd dist
+          zip -r "${PACKAGE}.zip" "${PACKAGE}"
+          sha256sum "${PACKAGE}.zip" > "${PACKAGE}.zip.sha256"
+
+      - name: Upload test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: genshin-material-planner-miyoushe-test-v1.3.0
+          path: |
+            dist/genshin-material-planner-miyoushe-test-v1.3.0.zip
+            dist/genshin-material-planner-miyoushe-test-v1.3.0.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
