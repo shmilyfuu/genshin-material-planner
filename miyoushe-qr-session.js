@@ -1,3 +1,4 @@
+const MYS_QR_STATE_KEY = 'miyousheQrState';
 let currentQrDeviceId = '';
 
 async function createQrLogin() {
@@ -16,11 +17,19 @@ async function createQrLogin() {
     body
   });
   if (payload.retcode !== 0 || !payload.data?.url || !payload.data?.ticket) throw apiError(payload, '无法创建米游社二维码登录');
+  await chrome.storage.session.set({
+    [MYS_QR_STATE_KEY]: { ticket: payload.data.ticket, deviceId: currentQrDeviceId }
+  });
   return { url: payload.data.url, ticket: payload.data.ticket, deviceId: device.deviceId };
 }
 
 async function queryQrLogin(ticket) {
   if (!ticket) throw new Error('二维码登录票据不存在。');
+  if (!currentQrDeviceId) {
+    const stored = await chrome.storage.session.get(MYS_QR_STATE_KEY);
+    const state = stored[MYS_QR_STATE_KEY];
+    if (state?.ticket === ticket) currentQrDeviceId = state.deviceId || '';
+  }
   if (!currentQrDeviceId) throw new Error('二维码登录设备标识不存在，请重新生成二维码。');
   const body = JSON.stringify({ ticket });
   const { payload } = await fetchJson(MYS_ENDPOINTS.queryQr, {
@@ -53,6 +62,8 @@ async function queryQrLogin(ticket) {
   };
   await enrichSessionTokens(session);
   await chrome.storage.session.set({ [MYS_SESSION_KEY]: session });
+  await chrome.storage.session.remove(MYS_QR_STATE_KEY);
+  currentQrDeviceId = '';
   return { status: 'Confirmed', session: publicSession(session) };
 }
 
