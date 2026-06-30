@@ -16,6 +16,8 @@ on:
       - 'stepper.js'
       - 'stepper.css'
       - 'miyoushe-*.js'
+      - 'vendor/**'
+      - 'THIRD_PARTY_NOTICES.md'
       - 'icons/**'
   pull_request:
     branches:
@@ -32,6 +34,8 @@ on:
       - 'stepper.js'
       - 'stepper.css'
       - 'miyoushe-*.js'
+      - 'vendor/**'
+      - 'THIRD_PARTY_NOTICES.md'
       - 'icons/**'
   workflow_dispatch:
 
@@ -67,13 +71,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PACKAGE='genshin-material-planner-miyoushe-test-v1.3.0'
+          PACKAGE='genshin-material-planner-miyoushe-test-v1.3.1'
           ROOT="dist/${PACKAGE}"
-          mkdir -p "${ROOT}/icons"
+          mkdir -p "${ROOT}/icons" "${ROOT}/vendor"
 
           cp manifest.json background.js sidepanel.html app.js core.mjs hakushin.mjs styles.css stepper.js stepper.css "${ROOT}/"
           cp miyoushe-core.js miyoushe-session-network.js miyoushe-qr-session.js miyoushe-official-login.js miyoushe-roles.js miyoushe-sync.js miyoushe-ui-helpers.js miyoushe-ui-view.js miyoushe.js "${ROOT}/"
           cp icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png "${ROOT}/icons/"
+          cp vendor/qrcode-generator.js "${ROOT}/vendor/"
+          cp THIRD_PARTY_NOTICES.md "${ROOT}/"
 
           cd dist
           zip -r "${PACKAGE}.zip" "${PACKAGE}"
@@ -82,9 +88,9 @@ jobs:
       - name: Upload test package
         uses: actions/upload-artifact@v4
         with:
-          name: genshin-material-planner-miyoushe-test-v1.3.0
+          name: genshin-material-planner-miyoushe-test-v1.3.1
           path: |
-            dist/genshin-material-planner-miyoushe-test-v1.3.0.zip
-            dist/genshin-material-planner-miyoushe-test-v1.3.0.zip.sha256
+            dist/genshin-material-planner-miyoushe-test-v1.3.1.zip
+            dist/genshin-material-planner-miyoushe-test-v1.3.1.zip.sha256
           if-no-files-found: error
           retention-days: 14
