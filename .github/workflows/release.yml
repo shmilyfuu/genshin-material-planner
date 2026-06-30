@@ -1,113 +1,115 @@
-name: Build and publish release
+name: Assemble Miyoushe test extension
 
 on:
   push:
-    tags:
-      - 'v*'
     branches:
-      - main
+      - miyoushe-import
     paths:
       - '.github/workflows/release.yml'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag, for example v1.2.12. Leave empty to use manifest.json.'
-        required: false
-        type: string
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  assemble:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out repository
+      - name: Check out branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Resolve and validate version
-        id: version
+      - name: Wire experimental files into extension
         shell: bash
         run: |
           set -euo pipefail
-          MANIFEST_VERSION="$(jq -r '.version' manifest.json)"
+          python - <<'PY'
+          import json
+          from pathlib import Path
 
-          if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
-            TAG="${GITHUB_REF_NAME}"
-          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${{ inputs.tag }}" ]]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="v${MANIFEST_VERSION}"
-          fi
+          manifest_path = Path('manifest.json')
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          permissions = list(dict.fromkeys([
+              *manifest.get('permissions', []),
+              'cookies',
+              'declarativeNetRequestWithHostAccess',
+          ]))
+          manifest['permissions'] = permissions
+          hosts = list(dict.fromkeys([
+              *manifest.get('host_permissions', []),
+              'https://user.mihoyo.com/*',
+              'https://passport-api.mihoyo.com/*',
+              'https://api-takumi.mihoyo.com/*',
+              'https://api-takumi-record.mihoyo.com/*',
+              'https://public-data-api.mihoyo.com/*',
+          ]))
+          manifest['host_permissions'] = hosts
+          manifest['background'] = {'service_worker': 'background.js'}
+          manifest['side_panel'] = {'default_path': 'sidepanel.html'}
+          manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
-          if [[ "${TAG}" != "v${MANIFEST_VERSION}" ]]; then
-            echo "Tag ${TAG} does not match manifest version v${MANIFEST_VERSION}." >&2
-            exit 1
-          fi
+          background_path = Path('background.js')
+          background = background_path.read_text(encoding='utf-8')
+          import_line = "importScripts('miyoushe-core.js', 'miyoushe-session-network.js', 'miyoushe-qr-session.js', 'miyoushe-official-login.js', 'miyoushe-roles.js', 'miyoushe-sync.js');\n\n"
+          if not background.startswith(import_line):
+              background_path.write_text(import_line + background, encoding='utf-8')
 
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${MANIFEST_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "package=genshin-material-planner-v${MANIFEST_VERSION}" >> "$GITHUB_OUTPUT"
+          panel_path = Path('sidepanel.html')
+          panel = panel_path.read_text(encoding='utf-8')
+          marker = '  <script type="module" src="app.js"></script>\n'
+          addition = marker + '  <script type="module" src="miyoushe.js"></script>\n'
+          if 'src="miyoushe.js"' not in panel:
+              if marker not in panel:
+                  raise SystemExit('app.js script marker not found')
+              panel = panel.replace(marker, addition, 1)
+              panel_path.write_text(panel, encoding='utf-8')
 
-      - name: Ensure release tag exists
+          styles_path = Path('styles.css')
+          styles = styles_path.read_text(encoding='utf-8')
+          appendix = r'''
+
+/* Miyoushe import experiment */
+.mys-card { display: grid; gap: 12px; }
+.mys-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.mys-head h2 { margin: 0; }
+.mys-subtitle, .mys-notice, .mys-limitation { color: #64748b; font-size: 12px; line-height: 1.55; }
+.mys-notice { padding: 8px 10px; border: 1px solid rgba(148, 163, 184, .32); border-radius: 8px; background: rgba(248, 250, 252, .72); }
+.mys-actions, .mys-role-area { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+.mys-role-area label, .mys-result-area > label { display: grid; flex: 1; gap: 5px; min-width: 180px; color: #475569; font-size: 12px; }
+.mys-role-area select, .mys-result-area select { width: 100%; }
+.mys-status { min-height: 18px; font-size: 12px; line-height: 1.5; }
+.mys-status-info { color: #475569; }
+.mys-status-success { color: #047857; }
+.mys-status-error { color: #b91c1c; }
+.mys-qr-box, .mys-result-area, .mys-character-detail { display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(148, 163, 184, .35); border-radius: 8px; background: rgba(248, 250, 252, .68); }
+.mys-qr-link { color: #4f46e5; font-size: 12px; overflow-wrap: anywhere; }
+.mys-character-detail { padding: 8px; background: rgba(255, 255, 255, .78); font-size: 12px; }
+.mys-result-summary { font-size: 12px; font-weight: 600; }
+@media (max-width: 420px) { .mys-actions, .mys-role-area { align-items: stretch; flex-direction: column; } }
+'''
+          if '/* Miyoushe import experiment */' not in styles:
+              styles_path.write_text(styles.rstrip() + appendix + '\n', encoding='utf-8')
+          PY
+
+          node --check background.js
+          node --check miyoushe-core.js
+          node --check miyoushe-session-network.js
+          node --check miyoushe-qr-session.js
+          node --check miyoushe-official-login.js
+          node --check miyoushe-roles.js
+          node --check miyoushe-sync.js
+          node --check miyoushe-ui-helpers.js
+          node --check miyoushe-ui-view.js
+          node --check miyoushe.js
+          python -m json.tool manifest.json >/dev/null
+
+      - name: Restore normal release workflow and commit
         shell: bash
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
-          git fetch --tags --force
-
-          if ! git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "${TAG}" -m "Release ${TAG}"
-            git push origin "${TAG}"
-          fi
-
-          git checkout --detach "${TAG}"
-
-      - name: Build extension archive
-        shell: bash
-        env:
-          PACKAGE: ${{ steps.version.outputs.package }}
-        run: |
-          set -euo pipefail
-          ROOT="dist/${PACKAGE}"
-          mkdir -p "${ROOT}/icons"
-
-          cp manifest.json background.js sidepanel.html app.js core.mjs hakushin.mjs styles.css stepper.js stepper.css README.md README_EN.md "${ROOT}/"
-          cp icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png "${ROOT}/icons/"
-
-          (
-            cd dist
-            zip -r "${PACKAGE}.zip" "${PACKAGE}"
-            sha256sum "${PACKAGE}.zip" > "${PACKAGE}.zip.sha256"
-          )
-
-      - name: Publish GitHub Release
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
-          PACKAGE: ${{ steps.version.outputs.package }}
-        run: |
-          set -euo pipefail
-
-          if gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release upload "${TAG}" \
-              "dist/${PACKAGE}.zip" \
-              "dist/${PACKAGE}.zip.sha256" \
-              --clobber
-          else
-            gh release create "${TAG}" \
-              "dist/${PACKAGE}.zip" \
-              "dist/${PACKAGE}.zip.sha256" \
-              --verify-tag \
-              --title "全能养成规划面板 v${VERSION}" \
-              --generate-notes \
-              --latest
-          fi
+          git checkout origin/main -- .github/workflows/release.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Wire Miyoushe import experiment into test extension'
+          git push origin HEAD:miyoushe-import
