@@ -85,7 +85,7 @@
 .mys-status-success { color: #047857; }
 .mys-status-error { color: #b91c1c; }
 .mys-qr-box, .mys-result-area, .mys-character-detail { display: grid; gap: 8px; padding: 10px; border: 1px solid rgba(148, 163, 184, .35); border-radius: 8px; background: rgba(248, 250, 252, .68); }
-.mys-qr-link { color: #4f46e5; font-size: 12px; overflow-wrap: anywhere; }
+.mys-qr-image { display: block; width: min(240px, 100%); height: auto; margin: 2px auto; border: 8px solid #fff; border-radius: 8px; image-rendering: pixelated; }
 .mys-character-detail { padding: 8px; background: rgba(255, 255, 255, .78); font-size: 12px; }
 .mys-result-summary { font-size: 12px; font-weight: 600; }
 @media (max-width: 420px) { .mys-actions, .mys-role-area { align-items: stretch; flex-direction: column; } }

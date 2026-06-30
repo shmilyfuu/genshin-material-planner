@@ -31,14 +31,13 @@ export function createMiyoushePanel() {
 
   const qrBox = createElement('div', 'mys-qr-box');
   qrBox.hidden = true;
-  const qrLink = createElement('a', 'mys-qr-link', '打开扫码链接');
-  qrLink.target = '_blank';
-  qrLink.rel = 'noreferrer';
+  const qrImage = createElement('img', 'mys-qr-image');
+  qrImage.alt = '米游社扫码登录二维码';
   const qrCheckButton = createElement('button', 'button button-secondary', '检查扫码状态');
   qrCheckButton.type = 'button';
   qrBox.append(
-    createElement('p', '', '已生成扫码登录链接。使用米游社打开后，返回这里检查扫码状态。'),
-    qrLink,
+    createElement('p', '', '请使用手机米游社扫描下方二维码。这个地址用于生成二维码，不能直接在浏览器中打开。'),
+    qrImage,
     qrCheckButton
   );
 
@@ -114,7 +113,7 @@ export function createMiyoushePanel() {
   }
 
   return {
-    card, logoutButton, qrButton, qrBox, qrLink, qrCheckButton,
+    card, logoutButton, qrButton, qrBox, qrImage, qrCheckButton,
     status, roleArea, roleSelect, syncButton, resultArea, characterSelect, applyButton,
     renderRoles, renderCharacterDetail, renderSyncData
   };

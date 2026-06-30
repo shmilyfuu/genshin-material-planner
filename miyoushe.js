@@ -35,9 +35,19 @@ function startController() {
       return;
     }
     qrTicket = response.qr.ticket;
-    ui.qrLink.href = response.qr.url;
-    ui.qrBox.hidden = false;
-    setStatus(ui.status, '扫码链接已生成。');
+    try {
+      const qrFactory = globalThis.qrcode;
+      if (typeof qrFactory !== 'function') throw new Error('二维码组件未加载。');
+      qrFactory.stringToBytes = qrFactory.stringToBytesFuncs['UTF-8'];
+      const qr = qrFactory(0, 'M');
+      qr.addData(response.qr.url, 'Byte');
+      qr.make();
+      ui.qrImage.src = qr.createDataURL(5, 20);
+      ui.qrBox.hidden = false;
+      setStatus(ui.status, '二维码已生成，请使用手机米游社扫码。');
+    } catch (error) {
+      setStatus(ui.status, `二维码生成失败：${String(error?.message || error)}`, 'error');
+    }
   });
 
   ui.qrCheckButton.addEventListener('click', async () => {

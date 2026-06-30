@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "全能养成规划面板（米游社测试）",
   "short_name": "养成规划·米游社测试",
-  "version": "1.3.0",
-  "description": "原神角色与武器养成材料规划侧边栏实验分支，增加国服米游社账号数据同步测试。",
+  "version": "1.3.1",
+  "description": "原神角色与武器养成材料规划侧边栏实验分支，修正米游社扫码登录二维码显示，并测试国服账号数据同步。",
   "minimum_chrome_version": "114",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuJKoWpG3Bei6ltxDkjrpLKopjWilnzibZlCLXGC3oNHY4HtgBBlmhgdB2mfFyhg2/fwVVvZlm0OoWnTcs2cXjnz8FL9vRenfpaiESXdSIlCrechF6rP2/FMMgod1lz888vAxCntOoJkySWqI0t4hu/wMynm8O0m4H61ppyFzIhKi5tUJT8LMklkHKguwupuox+TEDFQtVxru5K/ffBuipQqUi28WVKfcGISmNuyh9USNFS/iAC4Gfa5hBHXIQiszWNAJ5yoET4FZSWQDviUU3k08xFrZM4Tl/Qsr34AXoUhTssIUHBOiqfR3IwWUVOySKgHE18Cy/pLuZ4griT3G9QIDAQAB",
   "permissions": [
