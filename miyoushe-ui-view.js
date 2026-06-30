@@ -21,15 +21,13 @@ export function createMiyoushePanel() {
   const notice = createElement(
     'p',
     'mys-notice',
-    '第一阶段通过米哈游官方登录页或扫码登录建立会话。账号密码只在官方页面输入，扩展不读取密码；登录令牌仅保存在当前浏览器会话。'
+    '第一阶段先用扫码登录验证国服米游社会话与角色接口；登录令牌仅保存在当前浏览器会话。账号密码直登与短信验证将在接口验证通过后继续接入。'
   );
 
   const loginActions = createElement('div', 'mys-actions');
-  const officialLoginButton = createElement('button', 'button button-primary', '打开官方登录页');
-  const readLoginButton = createElement('button', 'button button-secondary', '读取登录状态');
-  const qrButton = createElement('button', 'button button-secondary', '扫码备用登录');
-  for (const button of [officialLoginButton, readLoginButton, qrButton]) button.type = 'button';
-  loginActions.append(officialLoginButton, readLoginButton, qrButton);
+  const qrButton = createElement('button', 'button button-primary', '扫码登录米游社');
+  qrButton.type = 'button';
+  loginActions.append(qrButton);
 
   const qrBox = createElement('div', 'mys-qr-box');
   qrBox.hidden = true;
@@ -116,7 +114,7 @@ export function createMiyoushePanel() {
   }
 
   return {
-    card, logoutButton, officialLoginButton, readLoginButton, qrButton, qrBox, qrLink, qrCheckButton,
+    card, logoutButton, qrButton, qrBox, qrLink, qrCheckButton,
     status, roleArea, roleSelect, syncButton, resultArea, characterSelect, applyButton,
     renderRoles, renderCharacterDetail, renderSyncData
   };
