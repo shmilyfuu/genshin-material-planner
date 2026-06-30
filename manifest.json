@@ -8,7 +8,8 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuJKoWpG3Bei6ltxDkjrpLKopjWilnzibZlCLXGC3oNHY4HtgBBlmhgdB2mfFyhg2/fwVVvZlm0OoWnTcs2cXjnz8FL9vRenfpaiESXdSIlCrechF6rP2/FMMgod1lz888vAxCntOoJkySWqI0t4hu/wMynm8O0m4H61ppyFzIhKi5tUJT8LMklkHKguwupuox+TEDFQtVxru5K/ffBuipQqUi28WVKfcGISmNuyh9USNFS/iAC4Gfa5hBHXIQiszWNAJ5yoET4FZSWQDviUU3k08xFrZM4Tl/Qsr34AXoUhTssIUHBOiqfR3IwWUVOySKgHE18Cy/pLuZ4griT3G9QIDAQAB",
   "permissions": [
     "sidePanel",
-    "storage"
+    "storage",
+    "declarativeNetRequestWithHostAccess"
   ],
   "host_permissions": [
     "https://static.nanoka.cc/*",
