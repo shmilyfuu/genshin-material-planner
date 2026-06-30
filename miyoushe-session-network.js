@@ -1,17 +1,29 @@
 function cookieHeader(session, kind = 'all') {
   const pairs = [];
+  const cookieMap = session.cookieMap || {};
+  const appendCookie = (name, fallback = '') => {
+    const value = cookieMap[name] || fallback;
+    if (value) pairs.push(`${name}=${value}`);
+  };
+
   if (kind === 'stoken' || kind === 'all') {
-    if (session.stuid) pairs.push(`stuid=${session.stuid}`);
-    if (session.stoken) pairs.push(`stoken=${session.stoken}`);
-    if (session.mid) pairs.push(`mid=${session.mid}`);
+    appendCookie('stuid', session.stuid);
+    appendCookie('stoken_v2');
+    appendCookie('stoken', session.stoken);
+    appendCookie('mid', session.mid);
   }
   if (kind === 'record' || kind === 'all') {
-    if (session.accountId) pairs.push(`account_id=${session.accountId}`);
-    if (session.cookieToken) pairs.push(`cookie_token=${session.cookieToken}`);
-    if (session.ltuid) pairs.push(`ltuid=${session.ltuid}`);
-    if (session.ltoken) pairs.push(`ltoken=${session.ltoken}`);
+    appendCookie('account_id_v2');
+    appendCookie('account_id', session.accountId);
+    appendCookie('account_mid_v2');
+    appendCookie('cookie_token_v2');
+    appendCookie('cookie_token', session.cookieToken);
+    appendCookie('ltuid_v2');
+    appendCookie('ltuid', session.ltuid);
+    appendCookie('ltoken_v2');
+    appendCookie('ltoken', session.ltoken);
   }
-  return pairs.join('; ');
+  return [...new Set(pairs)].join('; ');
 }
 
 async function requestWithCookies(url, session, kind, options = {}) {
@@ -69,10 +81,11 @@ async function enrichSessionTokens(session) {
     origin: 'https://app.mihoyo.com',
     referer: 'https://app.mihoyo.com/'
   });
-  if (ltokenResult.payload.retcode !== 0 || !ltokenResult.payload.data?.ltoken) {
+  const ltokenData = ltokenResult.payload.data || {};
+  if (ltokenResult.payload.retcode !== 0 || !(ltokenData.ltoken || ltokenData.ltoken_v2)) {
     throw apiError(ltokenResult.payload, '无法获取 LToken');
   }
-  session.ltoken = ltokenResult.payload.data.ltoken;
+  session.ltoken = ltokenData.ltoken || ltokenData.ltoken_v2;
   session.ltuid = session.stuid;
 
   const cookieResult = await requestWithCookies(MYS_ENDPOINTS.getCookieToken, session, 'stoken', {
@@ -81,10 +94,11 @@ async function enrichSessionTokens(session) {
     origin: 'https://app.mihoyo.com',
     referer: 'https://app.mihoyo.com/'
   });
-  if (cookieResult.payload.retcode !== 0 || !cookieResult.payload.data?.cookie_token) {
+  const cookieData = cookieResult.payload.data || {};
+  if (cookieResult.payload.retcode !== 0 || !(cookieData.cookie_token || cookieData.cookie_token_v2)) {
     throw apiError(cookieResult.payload, '无法获取 Cookie Token');
   }
-  session.cookieToken = cookieResult.payload.data.cookie_token;
-  session.accountId = cookieResult.payload.data.uid || session.stuid;
+  session.cookieToken = cookieData.cookie_token || cookieData.cookie_token_v2;
+  session.accountId = cookieData.uid || cookieData.account_id || session.stuid;
   return session;
 }
