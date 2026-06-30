@@ -1,5 +1,8 @@
+let currentQrDeviceId = '';
+
 async function createQrLogin() {
   const device = await getDeviceProfile();
+  currentQrDeviceId = randomId(53);
   const body = '{}';
   const { payload } = await fetchJson(MYS_ENDPOINTS.createQr, {
     method: 'POST',
@@ -8,7 +11,7 @@ async function createQrLogin() {
       Accept: 'application/json',
       'x-rpc-app_id': 'ddxf5dufpuyo',
       'x-rpc-client_type': '3',
-      'x-rpc-device_id': randomId(53)
+      'x-rpc-device_id': currentQrDeviceId
     },
     body
   });
@@ -18,6 +21,7 @@ async function createQrLogin() {
 
 async function queryQrLogin(ticket) {
   if (!ticket) throw new Error('二维码登录票据不存在。');
+  if (!currentQrDeviceId) throw new Error('二维码登录设备标识不存在，请重新生成二维码。');
   const body = JSON.stringify({ ticket });
   const { payload } = await fetchJson(MYS_ENDPOINTS.queryQr, {
     method: 'POST',
@@ -26,12 +30,13 @@ async function queryQrLogin(ticket) {
       Accept: 'application/json',
       'x-rpc-app_id': 'ddxf5dufpuyo',
       'x-rpc-client_type': '3',
-      'x-rpc-device_id': randomId(53)
+      'x-rpc-device_id': currentQrDeviceId
     },
     body
   });
   if (payload.retcode !== 0) throw apiError(payload, '查询二维码状态失败');
-  if (payload.data?.status !== 'Confirmed') return { status: payload.data?.status || 'Pending' };
+  const status = String(payload.data?.status || 'Pending');
+  if (status.toLowerCase() !== 'confirmed') return { status };
 
   const token = payload.data.tokens?.find((row) => Number(row.token_type) === 1)?.token;
   if (!token || !payload.data.user_info?.aid) throw new Error('二维码已确认，但返回数据缺少登录令牌。');
