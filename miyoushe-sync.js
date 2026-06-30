@@ -105,10 +105,6 @@ async function handleMiyousheMessage(message) {
       const selected = await chrome.storage.local.get(MYS_SELECTED_UID_KEY);
       return { ok: true, session: publicSession(session), roles, selectedUid: selected[MYS_SELECTED_UID_KEY] || '' };
     }
-    case 'miyoushe:open-official-login':
-      return { ok: true, result: await openOfficialLoginPage() };
-    case 'miyoushe:import-official-login':
-      return { ok: true, session: await importOfficialLoginSession() };
     case 'miyoushe:qr-create':
       return { ok: true, qr: await createQrLogin() };
     case 'miyoushe:qr-query':
