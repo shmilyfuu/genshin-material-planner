@@ -26,28 +26,6 @@ function startController() {
     return true;
   }
 
-  ui.officialLoginButton.addEventListener('click', async () => {
-    setBusy(ui.officialLoginButton, true, '正在打开…');
-    const response = await send({ type: 'miyoushe:open-official-login' });
-    setBusy(ui.officialLoginButton, false, '');
-    if (!response?.ok) {
-      setStatus(ui.status, response?.error || '无法打开官方登录页。', 'error');
-      return;
-    }
-    setStatus(ui.status, '请在新标签页完成米哈游通行证登录，然后点击“读取登录状态”。');
-  });
-
-  ui.readLoginButton.addEventListener('click', async () => {
-    setBusy(ui.readLoginButton, true, '正在读取…');
-    const response = await send({ type: 'miyoushe:import-official-login' });
-    setBusy(ui.readLoginButton, false, '');
-    if (!response?.ok) {
-      setStatus(ui.status, response?.error || '没有读取到登录状态。', 'error');
-      return;
-    }
-    await loadRolesAndStatus(response.session?.accountLabel || '');
-  });
-
   ui.qrButton.addEventListener('click', async () => {
     setBusy(ui.qrButton, true, '正在生成…');
     const response = await send({ type: 'miyoushe:qr-create' });
