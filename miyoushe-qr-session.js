@@ -50,7 +50,14 @@ async function queryQrLogin(ticket) {
   const token = payload.data.tokens?.find((row) => Number(row.token_type) === 1)?.token;
   if (!token || !payload.data.user_info?.aid) throw new Error('二维码已确认，但返回数据缺少登录令牌。');
   const device = await getDeviceProfile();
-  const deviceFp = await obtainDeviceFp(device);
+  let deviceFp = device.deviceFp || '';
+  if (!deviceFp) {
+    try {
+      deviceFp = await obtainDeviceFp(device);
+    } catch {
+      deviceFp = '';
+    }
+  }
   const session = {
     stuid: String(payload.data.user_info.aid),
     mid: String(payload.data.user_info.mid || ''),
