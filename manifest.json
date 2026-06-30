@@ -1,24 +1,31 @@
 {
   "manifest_version": 3,
-  "name": "全能养成规划面板",
-  "short_name": "养成规划面板",
-  "version": "1.2.12",
-  "description": "原神角色与武器养成材料规划侧边栏，支持材料数量微调按钮、Nanoka 数据、Lunaris 图片备用、全局背包与缺口计算。",
+  "name": "全能养成规划面板（米游社测试）",
+  "short_name": "养成规划·米游社测试",
+  "version": "1.3.0",
+  "description": "原神角色与武器养成材料规划侧边栏实验分支，增加国服米游社账号数据同步测试。",
   "minimum_chrome_version": "114",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkyc0tnVEa3jNvhel81sAF+u6bFNSCrz5sWezJbR7mqL6D7hLiJam6cQWyCcKFbggFl2NIhVEG7YAJc13q+AlxNllMNf0X4b0d1GhO1IaXQP3l8XutFuFipATYCv6Ku665kkzCehtEE0nPE6d8nynNpbXxgyKHEK/CWdaD/ALF7FB/deJ0ckSbUUbH8iKnsXz6RZo5sLu8CxS9I0O+Flg8dmVNm4GeNkx0HuULeeThiuYmHsJFQgcl2uq27AkQwvBjYrrOHy2yO4T4yD6ZSyo+aEuqyhU9cm3T2on9MB8j1B56p9QD+Q5sSkzgVChmaQTaFXCWP2Hzape/s40lXb4EQIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuJKoWpG3Bei6ltxDkjrpLKopjWilnzibZlCLXGC3oNHY4HtgBBlmhgdB2mfFyhg2/fwVVvZlm0OoWnTcs2cXjnz8FL9vRenfpaiESXdSIlCrechF6rP2/FMMgod1lz888vAxCntOoJkySWqI0t4hu/wMynm8O0m4H61ppyFzIhKi5tUJT8LMklkHKguwupuox+TEDFQtVxru5K/ffBuipQqUi28WVKfcGISmNuyh9USNFS/iAC4Gfa5hBHXIQiszWNAJ5yoET4FZSWQDviUU3k08xFrZM4Tl/Qsr34AXoUhTssIUHBOiqfR3IwWUVOySKgHE18Cy/pLuZ4griT3G9QIDAQAB",
   "permissions": [
     "sidePanel",
     "storage"
   ],
   "host_permissions": [
     "https://static.nanoka.cc/*",
-    "https://api.lunaris.moe/*"
+    "https://api.lunaris.moe/*",
+    "https://webapi.account.mihoyo.com/*",
+    "https://passport-api.mihoyo.com/*",
+    "https://api-takumi.mihoyo.com/*",
+    "https://api-takumi-record.mihoyo.com/*",
+    "https://bbs-api.mihoyo.com/*",
+    "https://bbs-api.miyoushe.com/*",
+    "https://public-data-api.mihoyo.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "打开全能养成规划面板",
+    "default_title": "打开全能养成规划面板（米游社测试）",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
