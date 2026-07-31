@@ -1,0 +1,133 @@
+name: Temporary Wuwa WebView2 App Build
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download embedded PaddleOCR extension base
+        uses: actions/download-artifact@v4
+        with:
+          name: wuwa-echo-paddleocr-extension-v0.3.0
+          path: base-artifact
+          repository: shmilyfuu/genshin-material-planner
+          run-id: 30638827964
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract base package
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem base-artifact -Filter "*.zip" -File | Select-Object -First 1
+          if (-not $zip) { throw "Base extension ZIP not found" }
+          Expand-Archive $zip.FullName -DestinationPath base-package -Force
+          $root = Get-ChildItem base-package -Directory | Select-Object -First 1
+          if (-not $root) { throw "Base extension folder not found" }
+          $root.FullName | Set-Content base-root.txt -Encoding UTF8
+
+      - name: Install WebView2 SDK
+        shell: pwsh
+        run: nuget install Microsoft.Web.WebView2 -OutputDirectory packages -ExcludeVersion -NonInteractive
+
+      - name: Build native host
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw "Visual Studio C++ tools not found" }
+          $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
+          $sdk = Resolve-Path "packages\Microsoft.Web.WebView2"
+          $include = Join-Path $sdk "build\native\include"
+          $lib = Join-Path $sdk "build\native\x64"
+          $native = Resolve-Path ".tmp-wuwa-webview2\native"
+          $out = Join-Path (Get-Location) "build-native"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $cmd = @"
+          call "$vcvars"
+          cd /d "$native"
+          cl.exe /nologo /utf-8 /std:c++17 /O2 /EHsc /DUNICODE /D_UNICODE /I"$include" app.cpp /link /SUBSYSTEM:WINDOWS /ENTRY:wWinMainCRTStartup /OUT:"$out\WuwaEchoCalculator.exe" /LIBPATH:"$lib" WebView2LoaderStatic.lib user32.lib gdi32.lib shell32.lib ole32.lib oleaut32.lib shlwapi.lib dwmapi.lib advapi32.lib version.lib runtimeobject.lib
+          mt.exe -nologo -manifest app.manifest -outputresource:"$out\WuwaEchoCalculator.exe";#1
+          "@
+          cmd.exe /d /s /c $cmd
+          if ($LASTEXITCODE -ne 0) { throw "Native build failed with exit code $LASTEXITCODE" }
+
+      - name: Assemble desktop app
+        shell: pwsh
+        run: |
+          $baseRoot = (Get-Content base-root.txt -Raw).Trim()
+          $folder = "artifact\鸣潮声骸计算器_v1.0.0"
+          New-Item -ItemType Directory -Force "$folder\web", "$folder\data" | Out-Null
+          Copy-Item "$baseRoot\*" "$folder\web" -Recurse -Force
+          Copy-Item "build-native\WuwaEchoCalculator.exe" "$folder\鸣潮声骸计算器.exe"
+          Copy-Item ".tmp-wuwa-webview2\web\desktop.css" "$folder\web\desktop.css"
+          Copy-Item ".tmp-wuwa-webview2\web\shim.js" "$folder\web\shim.js"
+          Copy-Item ".tmp-wuwa-webview2\README.txt" "$folder\使用说明.txt"
+
+          $panelPath = "$folder\web\panel.html"
+          $panel = Get-Content $panelPath -Raw
+          $panel = $panel.Replace('<script type="module" crossorigin src="./assets/panel.js"></script>', '<script src="./shim.js"></script><script type="module" crossorigin src="./assets/panel.js"></script>')
+          $panel = $panel.Replace('</head>', '<link rel="stylesheet" href="./desktop.css"></head>')
+          $panel = $panel.Replace('均已放入扩展目录', '均已放入应用目录')
+          Set-Content $panelPath $panel -Encoding UTF8
+
+          $sandboxPath = "$folder\web\ocr-sandbox.html"
+          $sandbox = Get-Content $sandboxPath -Raw
+          $warningFilter = @'
+          <script>
+          (() => {
+            const rawWarn = console.warn.bind(console);
+            console.warn = (...args) => {
+              const text = args.map(String).join(' ');
+              if (text.includes('CleanUnusedInitializersAndNodeArgs') || text.includes('Removing initializer') || text.includes('not used by any node')) return;
+              rawWarn(...args);
+            };
+          })();
+          </script>
+          '@
+          $sandbox = $sandbox.Replace('</head>', "$warningFilter</head>")
+          Set-Content $sandboxPath $sandbox -Encoding UTF8
+
+          @"
+          版本：1.0.0
+          窗口：WebView2 独立应用
+          计分：方案 A
+          最终平均分：五件声骸小计相加 ÷ 5
+          OCR：PP-OCRv5 本地模型
+          "@ | Set-Content "$folder\版本信息.txt" -Encoding UTF8
+
+      - name: Validate package
+        shell: pwsh
+        run: |
+          $folder = "artifact\鸣潮声骸计算器_v1.0.0"
+          if (-not (Test-Path "$folder\鸣潮声骸计算器.exe")) { throw "EXE missing" }
+          if (-not (Test-Path "$folder\web\panel.html")) { throw "panel missing" }
+          if (-not (Test-Path "$folder\web\desktop.css")) { throw "desktop CSS missing" }
+          if (-not (Test-Path "$folder\web\models\PP-OCRv5_mobile_det_onnx_infer.tar")) { throw "detection model missing" }
+          if (-not (Test-Path "$folder\web\models\PP-OCRv5_mobile_rec_onnx_infer.tar")) { throw "recognition model missing" }
+          if (-not (Get-ChildItem "$folder\web\assets" -Filter "*.wasm" -File)) { throw "WASM runtime missing" }
+          Get-Item "$folder\鸣潮声骸计算器.exe" | Format-List Name,Length
+          Get-ChildItem "$folder\web\models" | Format-Table Name,Length
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "artifact\鸣潮声骸计算器_v1.0.0" -DestinationPath "artifact\鸣潮声骸计算器_WebView2独立版_v1.0.0.zip" -CompressionLevel Optimal
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuwa-echo-webview2-app-v1.0.0
+          path: artifact/鸣潮声骸计算器_WebView2独立版_v1.0.0.zip
+          if-no-files-found: error
+          retention-days: 1
