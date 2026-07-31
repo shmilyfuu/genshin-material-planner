@@ -1,0 +1,91 @@
+name: Temporary Wuwa PaddleOCR Extension Build
+
+on:
+  push:
+    branches:
+      - tmp/wuwa-paddleocr-build-20260731
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Reconstruct source package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd .tmp-wuwa-ocr
+          cat source.part* > source.tar.gz.b64
+          base64 -d source.tar.gz.b64 > source.tar.gz
+          echo "48112851b599aabd5c5d99b32ad632fa7f9bd18cbd872a6673f60cae1afab9f6  source.tar.gz" | sha256sum -c -
+          mkdir -p project
+          tar -xzf source.tar.gz -C project
+
+      - name: Install browser OCR dependencies
+        working-directory: .tmp-wuwa-ocr/project
+        run: npm install --no-audit --no-fund
+
+      - name: Download official embedded models
+        working-directory: .tmp-wuwa-ocr/project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/models public/assets
+          curl --fail --location --retry 4 --retry-delay 3 \
+            'https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_det_onnx_infer.tar' \
+            --output public/models/PP-OCRv5_mobile_det_onnx_infer.tar
+          curl --fail --location --retry 4 --retry-delay 3 \
+            'https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/PP-OCRv5_mobile_rec_onnx_infer.tar' \
+            --output public/models/PP-OCRv5_mobile_rec_onnx_infer.tar
+          tar -tf public/models/PP-OCRv5_mobile_det_onnx_infer.tar | grep -q 'inference.onnx'
+          tar -tf public/models/PP-OCRv5_mobile_det_onnx_infer.tar | grep -q 'inference.yml'
+          tar -tf public/models/PP-OCRv5_mobile_rec_onnx_infer.tar | grep -q 'inference.onnx'
+          tar -tf public/models/PP-OCRv5_mobile_rec_onnx_infer.tar | grep -q 'inference.yml'
+          find node_modules/onnxruntime-web/dist -maxdepth 1 -type f \( -name 'ort-wasm*' -o -name '*.wasm' \) -exec cp {} public/assets/ \;
+          test -n "$(find public/assets -maxdepth 1 -type f -name '*.wasm' -print -quit)"
+
+      - name: Build extension
+        working-directory: .tmp-wuwa-ocr/project
+        run: npm run build
+
+      - name: Validate extension package
+        working-directory: .tmp-wuwa-ocr/project
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "JSON.parse(require('fs').readFileSync('dist/manifest.json','utf8')); console.log('manifest ok')"
+          test -f dist/panel.html
+          test -f dist/ocr-sandbox.html
+          test -f dist/models/PP-OCRv5_mobile_det_onnx_infer.tar
+          test -f dist/models/PP-OCRv5_mobile_rec_onnx_infer.tar
+          test -n "$(find dist/assets -maxdepth 1 -type f -name '*.wasm' -print -quit)"
+          du -sh dist
+          find dist -maxdepth 2 -type f -printf '%p %k KB\n' | sort
+
+      - name: Create ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/wuwa_echo_paddleocr_ext_v0.3.0
+          cp -a .tmp-wuwa-ocr/project/dist/. artifact/wuwa_echo_paddleocr_ext_v0.3.0/
+          cd artifact
+          zip -9 -r wuwa_echo_paddleocr_ext_v0.3.0.zip wuwa_echo_paddleocr_ext_v0.3.0
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wuwa-echo-paddleocr-extension-v0.3.0
+          path: artifact/wuwa_echo_paddleocr_ext_v0.3.0.zip
+          if-no-files-found: error
+          retention-days: 1
