@@ -12,6 +12,9 @@ on:
       - 'miyoushe-*.css'
       - 'vendor/**'
       - '.github/workflows/build-miyoushe-auth.yml'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
