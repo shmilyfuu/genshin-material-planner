@@ -209,6 +209,128 @@ function mysAvailableMaterials(response) {
       && Number.isSafeInteger(row.num) && row.num >= 0);
 }
 
+
+function mysBuildInventoryProbeItems(avatars, weapons) {
+  const eligible = avatars.filter(character => {
+    const id = Number(character?.id);
+    return Number.isSafeInteger(id) && id > 0
+      && ![10000005,10000007,10000117,10000118].includes(id)
+      && character.name !== '旅行者'
+      && Array.isArray(character.skill_list)
+      && character.skill_list.some(skill => Number(skill?.max_level) >= 10
+        && Number(skill?.group_id || skill?.id) > 0);
+  });
+  const byCategory = new Map();
+  for (const weapon of weapons) {
+    const category = Number(weapon?.weapon_cat_id);
+    const id = Number(weapon?.id);
+    if (!Number.isSafeInteger(category) || !Number.isSafeInteger(id) || id <= 0) continue;
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category).push(weapon);
+  }
+  const cursor = new Map();
+  return eligible.map(character => {
+    const item = {
+      avatar_id: Number(character.id),
+      avatar_level_current: 1,
+      avatar_level_target: 90,
+      avatar_promote_level: 0,
+      from_user_sync: false,
+      skill_list: character.skill_list
+        .filter(skill => Number(skill?.max_level) >= 10
+          && Number(skill?.group_id || skill?.id) > 0)
+        .map(skill => ({
+          id: Number(skill.group_id || skill.id),
+          level_current: 1,
+          level_target: 10
+        }))
+    };
+    const element = Number(character.element_attr_id);
+    if (Number.isSafeInteger(element) && element > 0) item.element_attr_id = element;
+    const cat = Number(character.weapon_cat_id);
+    const matching = byCategory.get(cat) || [];
+    if (matching.length) {
+      const position = cursor.get(cat) || 0;
+      const weapon = matching[position % matching.length];
+      cursor.set(cat, position + 1);
+      item.weapon = {
+        id: Number(weapon.id),
+        level_current: 1,
+        level_target: Math.min(90, Number(weapon.max_level) || 90)
+      };
+    }
+    return item;
+  });
+}
+
+function mysProbeInventoryRows(response) {
+  if (response?.data?.has_user_info !== true
+    || !Array.isArray(response?.data?.overall_consume)) {
+    throw new Error('米游社未返回带 UID 库存的材料计算结果。');
+  }
+  const remaining = new Map(mysAvailableMaterials(response).map(row => [row.id, row.num]));
+  const result = new Map();
+  for (const row of response.data.overall_consume) {
+    const id = Number(row?.id);
+    const total = Number(row?.num);
+    const lack = Number(row?.lack_num);
+    if (!Number.isSafeInteger(id) || id <= 0
+      || !Number.isSafeInteger(total) || total < 0
+      || !Number.isSafeInteger(lack) || lack < 0 || lack > total) continue;
+    const covered = total - lack;
+    const extra = remaining.get(id) || 0;
+    const value = covered + extra;
+    if (!Number.isSafeInteger(value)) continue;
+    result.set(id, {id, num: value, minimum: !remaining.has(id) && lack === 0});
+  }
+  for (const [id, num] of remaining) {
+    if (!result.has(id)) result.set(id, {id, num, minimum: false});
+  }
+  return [...result.values()];
+}
+
+async function mysProbeInventory(uid, region, avatars, weapons, cookie, headers) {
+  const items = mysBuildInventoryProbeItems(avatars, weapons);
+  if (!items.length) throw new Error('官方角色目录中没有可用于读取背包的养成项目。');
+  const values = new Map();
+  const merge = (response) => {
+    for (const row of mysProbeInventoryRows(response)) {
+      const old = values.get(row.id);
+      if (!old || row.num > old.num || (row.num === old.num && old.minimum && !row.minimum)) {
+        values.set(row.id, row);
+      }
+    }
+  };
+  const request = (batch) => mysCalcPost('/v3/batch_compute',
+    {items: batch, uid, region, lang: 'zh-cn'}, cookie, headers);
+  try {
+    merge(await request(items));
+    return {materials: [...values.values()], completedBatches: 1, totalBatches: 1};
+  } catch (error) {
+    if (items.length <= 30 || String(error?.message || error).includes('UID 库存')) throw error;
+  }
+  let completed = 0;
+  const batches = [];
+  for (let index = 0; index < items.length; index += 30) batches.push(items.slice(index, index + 30));
+  const errors = [];
+  for (const batch of batches) {
+    try {
+      merge(await request(batch));
+      completed++;
+    } catch (error) {
+      errors.push(String(error?.message || error));
+    }
+  }
+  if (completed === 0) {
+    throw new Error('米游社材料探测失败：' + (errors[0] || '未知错误'));
+  }
+  return {
+    materials: [...values.values()],
+    completedBatches: completed,
+    totalBatches: batches.length
+  };
+}
+
 async function mysCalculate(uid, region, plan) {
   const roles = await mysRoles();
   if (!roles.some(role => role.uid === uid && role.region === region)) {
@@ -223,14 +345,19 @@ async function mysCalculate(uid, region, plan) {
 
   const avatars = await mysAllCalculatorAvatars(cookie, headers);
   const weapons = [];
-  if (plan?.weaponId && plan?.config?.weapAsc?.[1] > plan?.config?.weapAsc?.[0]) {
+  try {
     const result = await mysCalcPost('/v1/weapon/list',
       {page: 1, size: 1000, weapon_levels: [1, 2, 3, 4, 5], lang: 'zh-cn'}, cookie, headers);
     if (!Array.isArray(result?.data?.list)) throw new Error('官方武器目录数据格式错误。');
     weapons.push(...result.data.list);
+  } catch (error) {
+    if (plan?.weaponId) {
+      throw new Error('官方武器目录读取失败，无法确认武器状态：' + String(error?.message || error));
+    }
   }
   const hybrid = mysHybridPlan(plan, avatars, weapons);
   const usesOfficial = hybrid.official.character || hybrid.official.weapon;
+  const usesNanoka = hybrid.fallback.character || hybrid.fallback.weapon;
   let materials = [];
   let available = [];
   let itemCount = 0;
@@ -242,9 +369,17 @@ async function mysCalculate(uid, region, plan) {
     available = mysAvailableMaterials(response);
     itemCount = items.length;
   }
+  const probe = usesNanoka
+    ? await mysProbeInventory(uid, region, avatars, weapons, cookie, headers)
+    : {materials: [], completedBatches: 0, totalBatches: 0};
   const latest = await mysReadAccounts();
   if (latest.activeId !== activeId || latest.entries[activeId]?.stoken !== account.stoken) {
     throw new Error('查询期间米游社账号发生切换，请重新计算。');
   }
-  return {uid, region, materials, available, fallback: hybrid.fallback, official: hybrid.official, itemCount};
+  return {
+    uid, region, materials, available,
+    inventoryProbe: probe.materials,
+    probeCoverage: {completed: probe.completedBatches, total: probe.totalBatches},
+    fallback: hybrid.fallback, official: hybrid.official, itemCount
+  };
 }
