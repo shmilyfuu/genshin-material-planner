@@ -20,8 +20,8 @@ export function mapInventoryMaterials({ officialMaterials = [], characterProfile
     const id = parseId(material);
     if (id === null) return;
     const result = reported.get(id);
-    const raw = result?.bagOwned;
-    const effective = result?.estimatedOwned;
+    const raw = result?.calculatorAvailable;
+    const effective = result?.coveredDemand;
     const hasBag = Number.isSafeInteger(raw) && raw >= 0;
     const hasEffective = Number.isSafeInteger(effective) && effective >= 0;
     rows.push({
@@ -30,7 +30,7 @@ export function mapInventoryMaterials({ officialMaterials = [], characterProfile
       current: ownValue(inventory, key, index),
       official: hasBag ? raw : null,
       effective: hasEffective ? effective : null,
-      status: hasBag ? 'bag' : hasEffective ? 'derived' : 'missing'
+      status: hasBag ? 'available' : hasEffective ? 'derived' : 'missing'
     });
   };
 
@@ -61,7 +61,7 @@ export function mapInventoryMaterials({ officialMaterials = [], characterProfile
   }
   return {
     rows,
-    available: rows.filter((row) => row.status === 'bag').length,
+    available: rows.filter((row) => row.status === 'available').length,
     lowerBounds: rows.filter((row) => row.status === 'derived').length,
     missing: rows.filter((row) => row.status === 'missing').length
   };

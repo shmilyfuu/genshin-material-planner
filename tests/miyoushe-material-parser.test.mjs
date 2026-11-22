@@ -8,27 +8,27 @@ function parse(data) {
   const sandbox = { MYS: { takumi: 'https://api-takumi.mihoyo.com' }, result: { data } };
   return vm.runInNewContext(source + '\nmysParseMaterials(result);', sandbox);
 }
-test('背包值与合成后的需求抵扣数分别读取', () => {
+test('分开保留计算器的可用量与合成抵扣量', () => {
   const rows = parse({
     overall_consume: [{ id: 101, name: '材料', num: 30, lack_num: 12 }],
     available_material: [{ id: 101, name: '材料', num: 8 }]
   });
-  assert.equal(rows[0].bagOwned, 8);
-  assert.equal(rows[0].estimatedOwned, 18);
+  assert.equal(rows[0].calculatorAvailable, 8);
+  assert.equal(rows[0].coveredDemand, 18);
   assert.equal(rows[0].total, 30);
   assert.equal(rows[0].lack, 12);
 });
-test('接口不返回背包值时，不伪造库存数量', () => {
+test('未返回可用量时维持未知，避免推算出错误背包总量', () => {
   const rows = parse({ overall_consume: [{ id: 102, num: 40, lack_num: 0 }] });
-  assert.equal(rows[0].bagOwned, null);
-  assert.equal(rows[0].estimatedOwned, 40);
+  assert.equal(rows[0].calculatorAvailable, null);
+  assert.equal(rows[0].coveredDemand, 40);
 });
-test('接口背包记录为零与字段缺失区分', () => {
+test('接口返回零与缺少数据分别解析', () => {
   const rows = parse({
     overall_consume: [{ id: 103, num: 20, lack_num: 20 }],
     available_material: [{ id: 103, num: 0 }, { id: 104, num: 6 }]
   });
-  assert.equal(rows.find(x => x.id === 103).bagOwned, 0);
-  assert.equal(rows.find(x => x.id === 104).bagOwned, 6);
-  assert.equal(rows.find(x => x.id === 104).estimatedOwned, null);
+  assert.equal(rows.find(x => x.id === 103).calculatorAvailable, 0);
+  assert.equal(rows.find(x => x.id === 104).calculatorAvailable, 6);
+  assert.equal(rows.find(x => x.id === 104).coveredDemand, null);
 });

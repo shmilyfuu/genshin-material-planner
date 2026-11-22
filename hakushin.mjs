@@ -177,16 +177,40 @@ export function parseCharacterDetail(raw, fallback = {}) {
   };
 }
 
+// A weapon can contain two different drop families with identical per-tier totals.
+// Resolve each full family by consecutive item IDs and ascending rarity, then check totals.
+function matchWeaponMaterialSeries(items, totals) {
+  const byId = new Map(items
+    .filter((item) => Number.isSafeInteger(Number(item.id)) && Number(item.id) > 0)
+    .map((item) => [Number(item.id), item]));
+  const candidates = [];
+  for (const [start] of byId) {
+    const series = totals.map((_, offset) => byId.get(start + offset));
+    if (series.some((item) => !item)) continue;
+    if (!series.every((item, index) => item.total === totals[index])) continue;
+    if (!series.every((item, index) => index === 0 ||
+      item.rank === 0 || series[index - 1].rank === 0 ||
+      item.rank === series[index - 1].rank + 1)) continue;
+    candidates.push(series);
+  }
+  // Ambiguous or incomplete data must not assign an unrelated material family.
+  return candidates.length === 1 ? candidates[0] : totals.map(() => null);
+}
+
 export function parseWeaponDetail(raw, fallback = {}) {
   const data = raw?.data && raw.data.name ? raw.data : raw;
   if (!data || typeof data !== 'object') throw new Error('武器详情格式无法识别');
   const materials = data.materials || data.upgrade_materials || {};
-  const materialStages = Array.isArray(materials) ? materials : Object.values(materials || {});
+  const materialStages = Array.isArray(materials)
+    ? materials
+    : Array.isArray(materials.ascensions)
+      ? materials.ascensions
+      : Object.values(materials).flatMap((value) => Array.isArray(value) ? value : [value]);
   const asc = aggregateMaterialInfos(materialStages);
 
-  const weapGems = tierSeries(asc, [5, 14, 14, 6], 2);
-  const matA = tierSeries(asc, [23, 27, 41], 2);
-  const matB = tierSeries(asc, [15, 23, 27], 0);
+  const weapGems = matchWeaponMaterialSeries(asc, [5, 14, 14, 6]);
+  const matA = matchWeaponMaterialSeries(asc, [23, 27, 41]);
+  const matB = matchWeaponMaterialSeries(asc, [15, 23, 27]);
   const warnings = [];
   if (nonNull(weapGems).length < 4) warnings.push('武器突破材料识别不完整');
   if (nonNull(matA).length < 3) warnings.push('武器素材 A 识别不完整');

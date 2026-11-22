@@ -120,12 +120,12 @@ function mysParseMaterials(response) {
       name: String(item.name || ('素材 ' + id)),
       total,
       lack,
-      estimatedOwned: total - lack,
-      bagOwned: null
+      coveredDemand: total - lack,
+      calculatorAvailable: null
     });
   }
-  // available_material contains inventory entries associated with the current calculation.
-  // overall_consume represents required amounts and crafting-adjusted deficits.
+  // Both fields are scoped to the requested cultivation calculation.
+  // Available material quantities can reflect allocation; the covered amount includes crafting.
   for (const item of Array.isArray(data.available_material) ? data.available_material : []) {
     const id = Number(item?.id);
     const quantity = Number(item?.num);
@@ -133,9 +133,9 @@ function mysParseMaterials(response) {
       || !Number.isSafeInteger(quantity) || quantity < 0) continue;
     const row = byId.get(id) || {
       id, name: String(item.name || ('素材 ' + id)),
-      total: null, lack: null, estimatedOwned: null, bagOwned: null
+      total: null, lack: null, coveredDemand: null, calculatorAvailable: null
     };
-    row.bagOwned = quantity;
+    row.calculatorAvailable = quantity;
     byId.set(id, row);
   }
   return [...byId.values()].sort((a, b) => a.id - b.id);

@@ -13,6 +13,8 @@ on:
       - 'app.js'
       - 'tests/miyoushe-inventory-map.test.mjs'
       - 'tests/miyoushe-material-parser.test.mjs'
+      - 'tests/hakushin-weapon.test.mjs'
+      - 'hakushin.mjs'
       - 'miyoushe-*.css'
       - 'vendor/**'
       - '.github/workflows/build-miyoushe-auth.yml'
@@ -44,7 +46,7 @@ jobs:
           node --check miyoushe-auth-ui.js
           node --check miyoushe-material-test.js
           node --check miyoushe-inventory-map.mjs
-          node --test tests/miyoushe-inventory-map.test.mjs tests/miyoushe-material-parser.test.mjs
+          node --test tests/miyoushe-inventory-map.test.mjs tests/miyoushe-material-parser.test.mjs tests/hakushin-weapon.test.mjs
           node - <<'NODE'
           const fs = require('fs');
           const network = fs.readFileSync('miyoushe-auth-network.js', 'utf8');
@@ -61,13 +63,13 @@ jobs:
           if (!m.key || !m.host_permissions.includes('https://passport-api.mihoyo.com/*')) throw Error('Missing login configuration');
           if (!fs.readFileSync('sidepanel.html', 'utf8').includes('miyoushe-auth-ui.js')) throw Error('Missing login UI');
           if (!fs.readFileSync('service-worker.js', 'utf8').includes('miyoushe-material-test.js')) throw Error('Missing material probe');
-          if (m.version !== '1.3.4') throw Error('Unexpected version');
+          if (m.version !== '1.3.5') throw Error('Unexpected version');
           NODE
 
       - name: Build test ZIP
         run: |
           set -euo pipefail
-          NAME='genshin-material-planner-miyoushe-mapping-v1.3.4'
+          NAME='genshin-material-planner-miyoushe-mapping-v1.3.5'
           ROOT="dist/$NAME"
           mkdir -p "$ROOT/icons" "$ROOT/vendor"
           cp manifest.json background.js service-worker.js sidepanel.html app.js core.mjs hakushin.mjs miyoushe-inventory-map.mjs styles.css stepper.js stepper.css "$ROOT/"
@@ -82,9 +84,9 @@ jobs:
       - name: Upload test package
         uses: actions/upload-artifact@v4
         with:
-          name: genshin-material-planner-miyoushe-mapping-v1.3.4
+          name: genshin-material-planner-miyoushe-mapping-v1.3.5
           path: |
-            dist/genshin-material-planner-miyoushe-mapping-v1.3.4.zip
-            dist/genshin-material-planner-miyoushe-mapping-v1.3.4.zip.sha256
+            dist/genshin-material-planner-miyoushe-mapping-v1.3.5.zip
+            dist/genshin-material-planner-miyoushe-mapping-v1.3.5.zip.sha256
           if-no-files-found: error
           retention-days: 14

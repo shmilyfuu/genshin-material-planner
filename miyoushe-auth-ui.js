@@ -188,7 +188,7 @@ function mysBuild() {
     const result = response.materials;
     materialsArea.replaceChildren();
     const summary = mysEl('p', 'UID ' + result.uid + ' · 测试 ' + result.avatarCount + ' 名角色、' + result.weaponCount + ' 把武器 · 返回 ' + result.materials.length + ' 种材料');
-    const note = mysEl('p', '背包返回数量来自 available_material，仅覆盖接口本次返回的材料。需求抵扣包含合成换算，只用于养成计算；数据可能存在同步延迟。', 'mys-auth-description');
+    const note = mysEl('p', '接口可用量来自 available_material，已抵扣需求来自 overall_consume。两者均受本次养成目标及材料合成影响，不能直接视为游戏背包总量；数据也可能存在同步延迟。', 'mys-auth-description');
     materialsArea.append(summary, note);
     if (result.weaponWarning) {
       materialsArea.append(mysEl('p', '武器目录读取异常：' + result.weaponWarning, 'mys-auth-description'));
@@ -197,7 +197,7 @@ function mysBuild() {
     const table = mysEl('table', '', 'mys-material-table');
     const head = mysEl('thead');
     const headRow = mysEl('tr');
-    ['材料', '背包返回', '需求抵扣', '本次需求', '仍缺'].forEach((label) => headRow.append(mysEl('th', label)));
+    ['材料', '接口可用量', '已抵扣需求', '本次需求', '仍缺'].forEach((label) => headRow.append(mysEl('th', label)));
     head.append(headRow);
     table.append(head);
     const body = mysEl('tbody');
@@ -205,8 +205,8 @@ function mysBuild() {
       const row = mysEl('tr');
       [
         item.name,
-        item.bagOwned === null ? '—' : String(item.bagOwned),
-        item.estimatedOwned === null ? '—' : String(item.estimatedOwned),
+        item.calculatorAvailable === null ? '—' : String(item.calculatorAvailable),
+        item.coveredDemand === null ? '—' : String(item.coveredDemand),
         item.total === null ? '—' : String(item.total),
         item.lack === null ? '—' : String(item.lack)
       ].forEach((value) => row.append(mysEl('td', value)));
@@ -222,13 +222,13 @@ function mysBuild() {
       section.append(mysEl('p', '请先选择角色或武器，再次读取材料可查看 ID 对应关系。', 'mys-auth-description'));
     } else {
       section.append(mysEl('p',
-        '接口背包 ' + mapped.available + ' 项 · 仅有抵扣数据 ' + mapped.lowerBounds
+        '接口可用量 ' + mapped.available + ' 项 · 仅有抵扣数据 ' + mapped.lowerBounds
         + ' 项 · 未返回 ' + mapped.missing + ' 项', 'mys-auth-description'));
       const wrap = mysEl('div', '', 'mys-material-list');
       const table = mysEl('table', '', 'mys-material-table');
       const head = mysEl('thead');
       const header = mysEl('tr');
-      ['材料', '当前输入', '接口背包', '需求抵扣', '状态'].forEach((label) => header.append(mysEl('th', label)));
+      ['材料', '当前输入', '接口可用量', '已抵扣需求', '状态'].forEach((label) => header.append(mysEl('th', label)));
       head.append(header);
       table.append(head);
       const body = mysEl('tbody');
@@ -237,7 +237,7 @@ function mysBuild() {
         const reference = row.official === null ? '—' : String(row.official);
         const effective = row.effective === null ? '—' : String(row.effective);
         const status = row.status === 'missing' ? '未返回'
-          : row.status === 'derived' ? '仅抵扣数据' : '背包记录';
+          : row.status === 'derived' ? '仅抵扣数据' : '接口可用';
         [row.name, row.current || '—', reference, effective, status]
           .forEach((value) => tr.append(mysEl('td', value)));
         body.append(tr);
