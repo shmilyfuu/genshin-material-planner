@@ -1,5 +1,3 @@
-import './app.js';
-
 const mysEl = (tag, text = '', cls = '') => {
   const el = document.createElement(tag);
   if (text) el.textContent = text;
