@@ -185,8 +185,8 @@ async function mysAuthCommand(message) {
     }
     case 'mys-auth:roles':
       return { roles: await mysRoles() };
-    case 'mys-auth:materials':
-      return { materials: await mysMaterials(String(message.uid || ''), String(message.region || '')) };
+    case 'mys-auth:calculate':
+      return { calculation: await mysCalculate(String(message.uid || ''), String(message.region || ''), message.plan) };
     default:
       throw new Error('未知登录操作。');
   }
