@@ -40,7 +40,7 @@ async function mysCalcPost(path, body, cookie, headers) {
   }
 }
 
-function mysCalcSample(characters, weapons, limit = 20) {
+function mysCalcSample(characters, weapons) {
   const available = characters.filter((character) =>
     Number.isInteger(Number(character.id)) &&
     Number(character.id) > 0 &&
@@ -49,21 +49,9 @@ function mysCalcSample(characters, weapons, limit = 20) {
     ![10000005, 10000007, 10000117, 10000118].includes(Number(character.id)) &&
     character.name !== '旅行者'
   );
-  const buckets = new Map();
-  for (const character of available) {
-    const category = Number(character.weapon_cat_id) || 0;
-    if (!buckets.has(category)) buckets.set(category, []);
-    buckets.get(category).push(character);
-  }
-  const selected = [];
-  const categories = [...buckets.keys()].sort((a, b) => a - b);
-  while (selected.length < limit && categories.some((category) => buckets.get(category).length)) {
-    for (const category of categories) {
-      if (selected.length >= limit) break;
-      const character = buckets.get(category).shift();
-      if (character) selected.push(character);
-    }
-  }
+  // Include the complete eligible roster. A material specific to one omitted character
+  // cannot appear in an unrelated cultivation calculation.
+  const selected = available;
   const weaponsByCategory = new Map();
   for (const weapon of weapons) {
     const category = Number(weapon.weapon_cat_id) || 0;
@@ -141,6 +129,32 @@ function mysParseMaterials(response) {
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
+async function mysCalcAllAvatars(cookie, headers) {
+  const avatars = [];
+  const seen = new Set();
+  const size = 200;
+  for (let page = 1; ; page++) {
+    const response = await mysCalcPost('/v1/avatar/list', {
+      page, size, is_all: true, lang: 'zh-cn'
+    }, cookie, headers);
+    const list = response?.data?.list;
+    if (!Array.isArray(list)) throw new Error('官方角色目录格式异常。');
+    let added = 0;
+    for (const character of list) {
+      const id = Number(character?.id);
+      if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) continue;
+      seen.add(id);
+      avatars.push(character);
+      added++;
+    }
+    if (list.length < size) break;
+    if (!added) throw new Error('官方角色目录分页数据重复，查询已停止。');
+    const total = Number(response?.data?.total);
+    if (Number.isSafeInteger(total) && total > 0 && avatars.length >= total) break;
+  }
+  return avatars;
+}
+
 async function mysMaterials(uid, region) {
   const roles = await mysRoles();
   const role = roles.find((entry) => entry.uid === uid && entry.region === region);
@@ -152,11 +166,8 @@ async function mysMaterials(uid, region) {
   const device = await mysFingerprint(await mysDevice());
   const headers = mysCalcHeaders(device);
 
-  const avatarResponse = await mysCalcPost('/v1/avatar/list', {
-    page: 1, size: 200, is_all: true, lang: 'zh-cn'
-  }, cookie, headers);
-  const avatars = avatarResponse?.data?.list;
-  if (!Array.isArray(avatars)) throw new Error('官方角色目录格式异常。');
+  const avatars = await mysCalcAllAvatars(cookie, headers);
+  if (!avatars.length) throw new Error('官方角色目录为空。');
 
   // Weapon lookup is optional for this read-only validation.
   let weapons = [];

@@ -187,7 +187,7 @@ function mysBuild() {
     const response = await mysSend('materials', { uid: selected.uid, region: selected.region });
     const result = response.materials;
     materialsArea.replaceChildren();
-    const summary = mysEl('p', 'UID ' + result.uid + ' · 测试 ' + result.avatarCount + ' 名角色、' + result.weaponCount + ' 把武器 · 返回 ' + result.materials.length + ' 种材料');
+    const summary = mysEl('p', 'UID ' + result.uid + ' · 目录有效角色 ' + result.avatarCount + ' 名、' + result.weaponCount + ' 把武器 · 返回 ' + result.materials.length + ' 种材料');
     const note = mysEl('p', '接口可用量来自 available_material，已抵扣需求来自 overall_consume。两者均受本次养成目标及材料合成影响，不能直接视为游戏背包总量；数据也可能存在同步延迟。', 'mys-auth-description');
     materialsArea.append(summary, note);
     if (result.weaponWarning) {
