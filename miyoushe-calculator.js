@@ -151,6 +151,64 @@ function mysParseDeficits(response) {
   }).filter(Boolean).sort((a,b) => a.id - b.id);
 }
 
+
+function mysHybridPlan(plan, avatars, weapons) {
+  const charId = String(plan?.characterId || '');
+  const weaponId = String(plan?.weaponId || '');
+  if (!charId && !weaponId) throw new Error('请先选择角色或武器。');
+  const charLevels = mysLevelPair(plan?.config, 'charAsc', 6);
+  const weaponLevels = mysLevelPair(plan?.config, 'weapAsc', 6);
+  const talents = ['talentA', 'talentE', 'talentQ']
+    .map(key => mysLevelPair(plan?.config, key, 9));
+  const activeCharacter = Boolean(charId) && (
+    charLevels[0] < charLevels[1] || talents.some(([a,b]) => a < b)
+  );
+  const activeWeapon = Boolean(weaponId) && weaponLevels[0] < weaponLevels[1];
+  if (!activeCharacter && !activeWeapon) throw new Error('请选择需要升级的角色或武器等级。');
+  const knownCharacter = activeCharacter && avatars.some(row => String(row.id) === charId);
+  const knownWeapon = activeWeapon && weapons.some(row => String(row.id) === weaponId);
+  return {
+    fallback: {character: activeCharacter && !knownCharacter, weapon: activeWeapon && !knownWeapon},
+    official: {character: knownCharacter, weapon: knownWeapon},
+    officialPlan: {
+      characterId: knownCharacter ? charId : '',
+      weaponId: knownWeapon ? weaponId : '',
+      config: plan.config
+    }
+  };
+}
+
+async function mysAllCalculatorAvatars(cookie, headers) {
+  const entries = [];
+  const seen = new Set();
+  const size = 200;
+  for (let page = 1; page <= 10; page++) {
+    const response = await mysCalcPost('/v1/avatar/list',
+      {page, size, is_all: true, lang: 'zh-cn'}, cookie, headers);
+    const list = response?.data?.list;
+    if (!Array.isArray(list)) throw new Error('米游社角色目录格式错误。');
+    let fresh = 0;
+    for (const row of list) {
+      const id = Number(row?.id);
+      if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) continue;
+      entries.push(row);
+      seen.add(id);
+      fresh++;
+    }
+    if (list.length < size) return entries;
+    if (!fresh) throw new Error('米游社角色目录分页重复。');
+    if (Number(response?.data?.total) > 0 && entries.length >= Number(response.data.total)) return entries;
+  }
+  throw new Error('米游社角色目录页数超过预期。');
+}
+
+function mysAvailableMaterials(response) {
+  return (Array.isArray(response?.data?.available_material) ? response.data.available_material : [])
+    .map(row => ({id: Number(row?.id), num: Number(row?.num)}))
+    .filter(row => Number.isSafeInteger(row.id) && row.id > 0
+      && Number.isSafeInteger(row.num) && row.num >= 0);
+}
+
 async function mysCalculate(uid, region, plan) {
   const roles = await mysRoles();
   if (!roles.some(role => role.uid === uid && role.region === region)) {
@@ -163,11 +221,7 @@ async function mysCalculate(uid, region, plan) {
   const device = await mysFingerprint(await mysDevice());
   const headers = mysCalcHeaders(device);
 
-  const characters = await mysCalcPost('/v1/avatar/list',
-    {page: 1, size: 200, is_all: true, lang: 'zh-cn'}, cookie, headers);
-  if (!Array.isArray(characters?.data?.list)) throw new Error('官方角色目录数据格式错误。');
-  // The current calculation requires only the selected character and a compatible weapon carrier.
-  const avatars = characters.data.list;
+  const avatars = await mysAllCalculatorAvatars(cookie, headers);
   const weapons = [];
   if (plan?.weaponId && plan?.config?.weapAsc?.[1] > plan?.config?.weapAsc?.[0]) {
     const result = await mysCalcPost('/v1/weapon/list',
@@ -175,13 +229,22 @@ async function mysCalculate(uid, region, plan) {
     if (!Array.isArray(result?.data?.list)) throw new Error('官方武器目录数据格式错误。');
     weapons.push(...result.data.list);
   }
-  const items = mysCreatePlanItems(plan, avatars, weapons);
-  const response = await mysCalcPost('/v3/batch_compute',
-    {items, uid, region, lang: 'zh-cn'}, cookie, headers);
-  const materials = mysParseDeficits(response);
+  const hybrid = mysHybridPlan(plan, avatars, weapons);
+  const usesOfficial = hybrid.official.character || hybrid.official.weapon;
+  let materials = [];
+  let available = [];
+  let itemCount = 0;
+  if (usesOfficial) {
+    const items = mysCreatePlanItems(hybrid.officialPlan, avatars, weapons);
+    const response = await mysCalcPost('/v3/batch_compute',
+      {items, uid, region, lang: 'zh-cn'}, cookie, headers);
+    materials = mysParseDeficits(response);
+    available = mysAvailableMaterials(response);
+    itemCount = items.length;
+  }
   const latest = await mysReadAccounts();
   if (latest.activeId !== activeId || latest.entries[activeId]?.stoken !== account.stoken) {
     throw new Error('查询期间米游社账号发生切换，请重新计算。');
   }
-  return {uid, region, materials, itemCount: items.length};
+  return {uid, region, materials, available, fallback: hybrid.fallback, official: hybrid.official, itemCount};
 }
