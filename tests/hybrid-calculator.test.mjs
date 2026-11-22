@@ -16,8 +16,8 @@ const char = {materials: {
 }};
 const weapon = {materials: {
   weapGems: [1,2,3,4].map((id,i)=>({id: 400+id, rank: i+2})),
-  matA: [2,3,4].map((id,i)=>({id: 200+id, rank: i+1})),
-  matB: [1,2,3].map((id,i)=>({id: 200+id, rank: i}))
+  matA: [2,3,4].map((id,i)=>({id: 110200+id, rank: i+1})),
+  matB: [1,2,3].map((id,i)=>({id: 110200+id, rank: i}))
 }};
 test('仅前瞻角色：Nanoka 的特产需求计算与 90 级一致', () => {
   const demand=buildNanokaDemand({config:full,characterProfile:char,parts:{character:true}});
