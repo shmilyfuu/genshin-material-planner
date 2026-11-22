@@ -124,6 +124,11 @@
         <span class="summary-hint">支持 38*2、100+25 等算式</span>
       </summary>
       <div class="card-body inventory-body">
+        <div class="calculation-modes" role="group" aria-label="计算方式">
+          <button type="button" data-calc-mode="manual" aria-pressed="true">手动背包</button>
+          <button type="button" data-calc-mode="official" aria-pressed="false">米游社计算</button>
+        </div>
+        <div id="manualInventoryGroups">
         <details class="inventory-group" open>
           <summary>基础与专属材料</summary>
           <div id="basicInventory" class="input-grid"></div>
@@ -144,6 +149,7 @@
           <div id="weaponInventory" class="input-grid"></div>
           <div id="independentWeaponMaterials" class="independent-materials"></div>
         </details>
+        </div>
       </div>
     </details>
   </main>

@@ -58,7 +58,7 @@ export const DEFAULT_STATE = Object.freeze({
     weapAsc: [0, 0]
   },
   inventoryUid: '',
-  accountInventories: {},
+  calculationMode: 'manual',
   inv: {
     gold: '',
     spec: '',
@@ -104,38 +104,7 @@ function normalizeStringArray(value, length) {
 }
 
 
-function normalizeCalculatorQuantity(value) {
-  return value === null || value === undefined
-    ? null
-    : Number.isSafeInteger(value) && value >= 0 ? value : null;
-}
 
-function normalizeAccountInventories(value) {
-  const result = {};
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
-  for (const [uid, profile] of Object.entries(value).slice(0, 16)) {
-    if (!/^\d{6,12}$/.test(uid) || !profile || typeof profile !== 'object') continue;
-    const manual = {};
-    const materials = {};
-    for (const [id, input] of Object.entries(profile.manual || {}).slice(0, 1500)) {
-      if (/^(?:\d{1,12}|slot:[a-zA-Z]+:[0-9]?)$/.test(id)) manual[id] = normalizeString(input);
-    }
-    for (const [id, item] of Object.entries(profile.materials || {}).slice(0, 1500)) {
-      if (!/^\d{1,12}$/.test(id) || !item || typeof item !== 'object') continue;
-      materials[id] = {
-        calculatorAvailable: normalizeCalculatorQuantity(item.calculatorAvailable),
-        coveredDemand: normalizeCalculatorQuantity(item.coveredDemand),
-        total: normalizeCalculatorQuantity(item.total),
-        lack: normalizeCalculatorQuantity(item.lack)
-      };
-    }
-    result[uid] = {
-      manual, materials,
-      updatedAt: Number.isFinite(profile.updatedAt) ? Math.max(0, profile.updatedAt) : 0
-    };
-  }
-  return result;
-}
 
 export function normalizeState(input) {
   const fallback = cloneDefaultState();
@@ -148,7 +117,7 @@ export function normalizeState(input) {
   return {
     schemaVersion: 3,
     inventoryUid: /^\d{6,12}$/.test(String(source.inventoryUid || '')) ? String(source.inventoryUid) : '',
-    accountInventories: normalizeAccountInventories(source.accountInventories),
+    calculationMode: source.calculationMode === 'official' ? 'official' : 'manual',
     source: {
       selectedCharacterId: normalizeString(sourceSettings.selectedCharacterId),
       selectedCharacterName: normalizeString(sourceSettings.selectedCharacterName),

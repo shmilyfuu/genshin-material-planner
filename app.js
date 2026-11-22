@@ -16,7 +16,6 @@ import {
   mergeSourceLists,
   itemIconUrl
 } from './hakushin.mjs';
-import { calculatorAutofill } from './miyoushe-inventory-map.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
@@ -198,103 +197,89 @@ function rarityText(value) {
   return value ? `${value}★` : '';
 }
 
-function inventoryMaterial(definition) {
-  if (definition.key === 'gold') return { id: 202, name: '摩拉' };
-  if (definition.key === 'cult' && definition.index === 3) return getCultMaterial(3);
-  if (['spec', 'boss', 'weekly', 'crown'].includes(definition.key)) return materialAt(definition.key);
-  return materialAt(definition.key, definition.index);
+let officialCalculation = null;
+
+function currentUid() {
+  return state.inventoryUid;
 }
 
-function inventoryItemKey(definition) {
-  const id = Number(inventoryMaterial(definition)?.id);
-  if (Number.isSafeInteger(id) && id > 0) return String(id);
-  return 'slot:' + definition.key + ':' + (definition.index ?? '');
+export function getCalculationMode() {
+  return state.calculationMode === 'official' ? 'official' : 'manual';
 }
 
-function currentAccountInventory() {
-  return state.accountInventories?.[state.inventoryUid] || null;
+export function getCalculationPlan() {
+  return {
+    characterId: state.source.selectedCharacterId,
+    weaponId: state.source.selectedWeaponId,
+    config: structuredClone(state.config)
+  };
 }
 
-function getInventoryValue(definition) {
-  if (!state.inventoryUid) {
-    const value = state.inv[definition.key];
-    return definition.index === undefined ? value : value[definition.index];
-  }
-  const entry = currentAccountInventory();
-  const key = inventoryItemKey(definition);
-  if (entry && Object.hasOwn(entry.manual, key)) return entry.manual[key];
-  const id = Number(inventoryMaterial(definition)?.id);
-  const material = entry?.materials?.[id];
-  return calculatorAutofill(material, definition.key, definition.index ?? null) ?? '';
+function calculationSignature(uid, plan) {
+  return JSON.stringify({uid, plan});
 }
 
-function setInventoryValue(definition, value) {
-  if (!state.inventoryUid) {
-    if (definition.index === undefined) state.inv[definition.key] = value;
-    else state.inv[definition.key][definition.index] = value;
-    return;
-  }
-  const entry = state.accountInventories[state.inventoryUid] ||= {manual: {}, materials: {}, updatedAt: 0};
-  const key = inventoryItemKey(definition);
-  entry.manual[key] = value;
+function currentCalculationSignature() {
+  return calculationSignature(currentUid(), getCalculationPlan());
 }
 
-export function chooseInventoryUid(value) {
-  const uid = /^\d{6,12}$/.test(String(value || '')) ? String(value) : '';
-  if (uid === state.inventoryUid) return;
-  state.inventoryUid = uid;
-  renderInventory();
+export function chooseInventoryUid(uid) {
+  const value = /^\d{6,12}$/.test(String(uid || '')) ? String(uid) : '';
+  if (value === state.inventoryUid) return;
+  state.inventoryUid = value;
+  officialCalculation = null;
   renderResults();
   scheduleSave();
 }
 
-export async function syncAccountMaterials(uid, materials) {
-  if (!uid || uid !== state.inventoryUid) throw new Error('当前 UID 已切换，请重新选择账号。');
-  if (!Array.isArray(materials) || !materials.length) throw new Error('材料列表为空。');
-  const values = {};
-  for (const item of materials) {
-    const id = Number(item?.id);
-    if (!Number.isSafeInteger(id) || id <= 0) continue;
-    const valid = (number) => Number.isSafeInteger(number) && number >= 0;
-    const number = (value) => valid(value) ? value : null;
-    values[id] = {
-      calculatorAvailable: number(item.calculatorAvailable),
-      coveredDemand: number(item.coveredDemand),
-      total: number(item.total),
-      lack: number(item.lack)
-    };
+export function setOfficialCalculation(uid, plan, materials) {
+  if (getCalculationMode() !== 'official' || uid !== currentUid()
+    || calculationSignature(uid, plan) !== currentCalculationSignature()) {
+    throw new Error('账号或培养目标已变更，请重新计算。');
   }
-  if (!Object.keys(values).length) throw new Error('材料 ID 列表为空。');
-  const old = state.accountInventories[uid] || {manual: {}, materials: {}, updatedAt: 0};
-  state.accountInventories[uid] = {manual: {...old.manual}, materials: values, updatedAt: Date.now()};
-  renderInventory();
+  if (!Array.isArray(materials)) throw new Error('官方计算结果格式错误。');
+  officialCalculation = {
+    signature: currentCalculationSignature(),
+    materials,
+    updatedAt: Date.now()
+  };
   renderResults();
-  await persistState();
-  let applied = 0;
-  for (const definition of allInventoryDefinitions()) {
-    if (getInventoryValue(definition) !== '' &&
-      calculatorAutofill(values[Number(inventoryMaterial(definition)?.id)], definition.key, definition.index ?? null) !== null) applied++;
-  }
-  return {received: Object.keys(values).length, applied};
+  return {total: materials.length, missing: materials.filter(m => m.lack > 0).length};
 }
 
-function allInventoryDefinitions() {
-  return [
-    ...['gold', 'spec', 'boss', 'weekly', 'crown'].map((key) => ({key})),
-    ...Object.entries({books: 3, cult: 4, charGems: 4, weapGems: 4, matA: 3, matB: 3})
-      .flatMap(([key, count]) => Array.from({length: count}, (_, index) => ({key, index})))
-  ];
+function refreshCalculationMode() {
+  const official = getCalculationMode() === 'official';
+  const groups = document.getElementById('manualInventoryGroups');
+  if (groups) groups.hidden = official;
+  const auth = document.getElementById('mysAuthCard');
+  if (auth) auth.hidden = !official;
+  const title = document.querySelector('.inventory-card .summary-title');
+  if (title) title.textContent = official ? '米游社计算' : '我的背包';
+  const hint = document.querySelector('.inventory-card .summary-hint');
+  if (hint) hint.textContent = official ? '按当前目标计算材料缺口' : '支持 38*2、100+25 等算式';
+  for (const button of document.querySelectorAll('[data-calc-mode]')) {
+    button.setAttribute('aria-pressed', button.dataset.calcMode === getCalculationMode() ? 'true' : 'false');
+  }
 }
 
-function calculationState() {
-  if (!state.inventoryUid) return state;
-  const inv = structuredClone(cloneDefaultState().inv);
-  for (const definition of allInventoryDefinitions()) {
-    const value = getInventoryValue(definition);
-    if (definition.index === undefined) inv[definition.key] = value;
-    else inv[definition.key][definition.index] = value;
-  }
-  return {...state, inv};
+function chooseCalculationMode(mode) {
+  const target = mode === 'official' ? 'official' : 'manual';
+  if (state.calculationMode === target) return;
+  state.calculationMode = target;
+  officialCalculation = null;
+  refreshCalculationMode();
+  renderResults();
+  scheduleSave();
+}
+
+function getInventoryValue(definition) {
+  const value = state.inv[definition.key];
+  return definition.index === undefined ? value : value[definition.index];
+}
+
+function setInventoryValue(definition, value) {
+  if (definition.index === undefined) state.inv[definition.key] = value;
+  else state.inv[definition.key][definition.index] = value;
 }
 
 function scheduleSave(options = {}) {
@@ -415,11 +400,14 @@ function getCultMaterial(index) {
 }
 
 function resolveDefinition(definition) {
-  const material = inventoryMaterial(definition);
+  const material = definition.key === 'gold' ? { name: '摩拉', icon: itemIconUrl(202) }
+    : definition.key === 'cult' && definition.index === 3 ? getCultMaterial(3)
+    : ['spec', 'boss', 'weekly', 'crown'].includes(definition.key)
+      ? materialAt(definition.key) : materialAt(definition.key, definition.index);
   return {
     ...definition,
     displayLabel: material?.name || definition.label,
-    icon: definition.key === 'gold' ? itemIconUrl(202) : material?.icon || ''
+    icon: material?.icon || ''
   };
 }
 
@@ -475,19 +463,6 @@ function createInventoryInput(definition) {
   updatePreview();
   inputWrap.append(input, preview);
   wrapper.append(iconSlot, labelText, inputWrap);
-  const id = Number(inventoryMaterial(definition)?.id);
-  const official = currentAccountInventory()?.materials?.[id];
-  if (state.inventoryUid && official) {
-    const available = official.calculatorAvailable;
-    const covered = official.coveredDemand;
-    const recommended = calculatorAutofill(official, definition.key, definition.index ?? null);
-    const hint = document.createElement('small');
-    hint.className = 'mys-inventory-hint';
-    hint.textContent = '米游社：可用 ' + (available === null ? '—' : available)
-      + ' · 抵扣 ' + (covered === null ? '—' : covered)
-      + (recommended === null ? ' · 请核对' : ' · 计算参考 ' + recommended);
-    wrapper.append(hint);
-  }
   return wrapper;
 }
 
@@ -595,8 +570,66 @@ function buildTierItem(material, fallbackLabel, fallbackColor) {
   };
 }
 
+function officialMaterialGroups() {
+  const groups = new Map();
+  const add = (material, group) => {
+    if (!material) return;
+    const id = Number(material.id);
+    if (Number.isSafeInteger(id) && id > 0 && !groups.has(id)) groups.set(id, group);
+  };
+  add({id: 202}, '基础与经验材料');
+  for (const key of ['spec', 'boss', 'weekly', 'crown']) add(characterProfile?.materials?.[key], '角色基础材料');
+  for (const key of ['charGems', 'cult']) {
+    for (const material of characterProfile?.materials?.[key] || []) add(material, '角色突破材料');
+  }
+  for (const material of characterProfile?.materials?.books || []) add(material, '天赋材料');
+  for (const key of ['weapGems', 'matA', 'matB']) {
+    for (const material of weaponProfile?.materials?.[key] || []) add(material, '武器突破材料');
+  }
+  return groups;
+}
+
+function renderOfficialResults() {
+  const container = document.getElementById('resultContent');
+  container.replaceChildren();
+  if (!currentUid()) {
+    container.append(createEmptyResult('尚未选择游戏 UID', '请在米游社计算中读取账号对应的游戏 UID。'));
+    return;
+  }
+  if (!officialCalculation || officialCalculation.signature !== currentCalculationSignature()) {
+    container.append(createEmptyResult('等待官方计算结果', '设置养成目标后，点击“计算缺口”读取米游社结果。'));
+    return;
+  }
+  const missing = officialCalculation.materials
+    .filter(item => Number.isSafeInteger(item.lack) && item.lack > 0);
+  if (!missing.length) {
+    container.append(createEmptyResult('官方计算：材料已满足', '当前培养目标所需材料已覆盖。'));
+    return;
+  }
+  const groups = officialMaterialGroups();
+  const buckets = new Map();
+  for (const material of missing) {
+    const group = groups.get(material.id) || '其他材料';
+    if (!buckets.has(group)) buckets.set(group, []);
+    buckets.get(group).push(material);
+  }
+  for (const title of ['基础与经验材料', '角色基础材料', '角色突破材料', '天赋材料', '武器突破材料', '其他材料']) {
+    const items = buckets.get(title);
+    if (!items?.length) continue;
+    const section = createResultSection(title);
+    for (const material of items) {
+      section.rows.append(createResultRow(material.name, material.lack, 'base', itemIconUrl(material.id)));
+    }
+    container.append(section.section);
+  }
+}
+
 function renderResults() {
-  const result = calculateResult(calculationState());
+  if (getCalculationMode() === 'official') {
+    renderOfficialResults();
+    return;
+  }
+  const result = calculateResult(state);
   const container = document.getElementById('resultContent');
   container.replaceChildren();
 
@@ -685,11 +718,16 @@ function refreshAll() {
 
 function bindStaticEvents() {
   document.getElementById('clearButton').addEventListener('click', openClearDialog);
+  for (const button of document.querySelectorAll('[data-calc-mode]')) {
+    button.addEventListener('click', () => chooseCalculationMode(button.dataset.calcMode));
+  }
   document.getElementById('cancelClearButton').addEventListener('click', closeClearDialog);
   document.getElementById('confirmClearButton').addEventListener('click', async () => {
     const uid = state.inventoryUid;
     state = cloneDefaultState();
     state.inventoryUid = uid;
+    officialCalculation = null;
+    refreshCalculationMode();
     characterProfile = null;
     weaponProfile = null;
     refreshAll();
@@ -761,6 +799,8 @@ async function importConfiguration(event) {
       throw new Error('invalid structure');
     }
     state = normalizeState(candidate);
+    officialCalculation = null;
+    refreshCalculationMode();
     refreshAll();
     renderSourceControls();
     await persistState();
@@ -1142,6 +1182,7 @@ async function initialize() {
     state = cloneDefaultState();
     setSaveStatus('读取失败，已使用初始数据');
   }
+  refreshCalculationMode();
   refreshAll();
   renderSourceControls();
   void testImageSources();
