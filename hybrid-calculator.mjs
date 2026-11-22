@@ -212,7 +212,7 @@ export function evaluateNanokaDemand(demand, {
       } else if (inferred) {
         stock = inferred.count;
         source = '米游社推算';
-        verified = !group.family && !inferred.minimum;
+        verified = !group.family && (!inferred.minimum || inferred.count >= row.count);
       }
       return {
         ...row, stock, source, verified,

@@ -68,13 +68,13 @@ jobs:
           if (!fs.readFileSync('sidepanel.html', 'utf8').includes('miyoushe-auth-ui.js')) throw Error('Missing login UI');
           if (!fs.readFileSync('service-worker.js', 'utf8').includes('miyoushe-calculator.js')) throw Error('Missing calculator worker');
           if (!fs.readFileSync('sidepanel.html', 'utf8').includes('data-calc-mode="official"')) throw Error('Missing dual-mode control');
-          if (m.version !== '1.4.3') throw Error('Unexpected version');
+          if (m.version !== '1.4.4') throw Error('Unexpected version');
           NODE
 
       - name: Build test ZIP
         run: |
           set -euo pipefail
-          NAME='genshin-material-planner-hybrid-v1.4.3'
+          NAME='genshin-material-planner-hybrid-v1.4.4'
           ROOT="dist/$NAME"
           mkdir -p "$ROOT/icons" "$ROOT/vendor"
           cp manifest.json background.js service-worker.js sidepanel.html app.js core.mjs hakushin.mjs hybrid-calculator.mjs styles.css stepper.js stepper.css "$ROOT/"
@@ -89,9 +89,9 @@ jobs:
       - name: Upload test package
         uses: actions/upload-artifact@v4
         with:
-          name: genshin-material-planner-hybrid-v1.4.3
+          name: genshin-material-planner-hybrid-v1.4.4
           path: |
-            dist/genshin-material-planner-hybrid-v1.4.3.zip
-            dist/genshin-material-planner-hybrid-v1.4.3.zip.sha256
+            dist/genshin-material-planner-hybrid-v1.4.4.zip
+            dist/genshin-material-planner-hybrid-v1.4.4.zip.sha256
           if-no-files-found: error
           retention-days: 14

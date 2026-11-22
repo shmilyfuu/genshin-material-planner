@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildNanokaDemand, evaluateNanokaDemand} from '../hybrid-calculator.mjs';
+import {buildNanokaDemand, evaluateNanokaDemand, mapManualInventory} from '../hybrid-calculator.mjs';
 
 const none = [0,0];
 const full = {
@@ -91,7 +91,9 @@ test('探测材料填充整个合成系列后直接计算缺口',()=>{
     {id:110203,num:11},{id:110204,num:0}
   ];
   const calculated=evaluateNanokaDemand(demand,{inventoryProbe});
-  assert.ok(calculated.groups.filter(g=>g.rows.some(r=>r.id===110201||r.id===401)).every(g=>g.complete));
+  const tiers=calculated.groups.filter(g=>g.rows.some(r=>r.id===110201||r.id===401));
+  assert.ok(tiers.every(g=>g.covered && !g.complete));
+  assert.ok(tiers.every(g=>g.rows.every(row=>row.lack===null)));
 });
 
 test('混合官方和前瞻目标时优先使用官方计算后的剩余量',()=>{
@@ -105,4 +107,89 @@ test('混合官方和前瞻目标时优先使用官方计算后的剩余量',()=
   assert.equal(rows.find(r=>r.id===202).stock,18000);
   assert.equal(rows.find(r=>r.id===10).stock,47);
   assert.equal(rows.find(r=>r.id===202).source,'官方计算后可用');
+});
+
+
+test('确认的手动背包按材料 ID 优先，重现哲学 83 与探测 76 的差异', () => {
+  const selected = {materials: {
+    books: [
+      {id:301,name:'「魔爱」的教导'},
+      {id:302,name:'「魔爱」的指引'},
+      {id:303,name:'「魔爱」的哲学'}
+    ]
+  }};
+  const mapped=mapManualInventory({
+    inventory: {books:['82','119','4']},
+    characterProfile:selected
+  });
+  assert.deepEqual(mapped.values,{'301':82,'302':119,'303':4});
+  const demand=buildNanokaDemand({
+    config:{...full,talentA:[0,9],talentE:[0,9],talentQ:[0,9],charAsc:[0,0],weapAsc:[0,0]},
+    characterProfile:{
+      materials:{...selected.materials}
+    },
+    parts:{character:true}
+  });
+  const probes=[{id:301,num:82},{id:302,num:119},{id:303,num:11}];
+  const actual=evaluateNanokaDemand(demand,{manualReference:mapped.values,inventoryProbe:probes});
+  const bookGroup=actual.groups.find(group=>group.rows.some(r=>r.id===303));
+  assert.equal(bookGroup.complete,true);
+  assert.equal(bookGroup.rows.find(r=>r.id===303).lack,83);
+  assert.equal(bookGroup.rows.find(r=>r.id===303).different,true);
+  assert.equal(bookGroup.rows.find(r=>r.id===303).stock,4);
+  const estimates=evaluateNanokaDemand(demand,{inventoryProbe:probes});
+  assert.equal(estimates.groups.find(group=>group.rows.some(r=>r.id===303)).complete,false);
+  assert.equal(estimates.groups.find(group=>group.rows.some(r=>r.id===303))
+    .rows.find(r=>r.id===303).probeValue,11);
+});
+
+test('单级材料可由可信推算直接计算，达到需求的下界也可以判断已满足', () => {
+  const demand=buildNanokaDemand({config:full,characterProfile:char,parts:{character:true}});
+  const result=evaluateNanokaDemand(demand,{inventoryProbe:[
+    {id:10,num:47,minimum:false},{id:202,num:15660349,minimum:true}
+  ]});
+  const rows=result.groups.flatMap(group=>group.rows);
+  assert.equal(rows.find(r=>r.id===10).lack,121);
+  assert.equal(rows.find(r=>r.id===202).lack,0);
+});
+
+test('手动 0 可以覆盖探测值，不同材料位置以 ID 校验', () => {
+  const mapped=mapManualInventory({
+    inventory:{weapGems:['0','14','4','0'],matA:['114','32','0']},
+    weaponProfile:weapon
+  });
+  assert.equal(mapped.values['401'],0);
+  assert.equal(mapped.values['403'],4);
+  assert.equal(mapped.values['110204'],0);
+  const demand=buildNanokaDemand({config:full,weaponProfile:weapon,parts:{weapon:true}});
+  const result=evaluateNanokaDemand(demand,{
+    manualReference:mapped.values,
+    inventoryProbe:[{id:401,num:5},{id:403,num:15},{id:110204,num:19}]
+  });
+  const rows=result.groups.flatMap(g=>g.rows);
+  assert.equal(rows.find(r=>r.id===401).stock,0);
+  assert.equal(rows.find(r=>r.id===110204).stock,0);
+});
+
+test('合并的角色武器素材按照同一个 ID 核对', () => {
+  const manual=mapManualInventory({
+    inventory:{cult:['47','36','11','0'],matA:['40','30','20'],matB:['50','60','70']},
+    characterProfile:char,weaponProfile:weapon,
+    mergeRules:{matAIntoCult:true,matBIntoCult:true}
+  });
+  assert.deepEqual(manual.values['110201'],47);
+  assert.deepEqual(manual.values['110202'],36);
+  assert.deepEqual(manual.values['110203'],11);
+  assert.deepEqual(manual.values['110204'],0);
+  assert.equal(manual.conflicts.length,0);
+});
+
+test('相同材料 ID 若输入框数量冲突，跳过该材料，避免采用错误库存', () => {
+  const manual=mapManualInventory({
+    inventory:{cult:['47','36','11'],matB:['1','2','3']},
+    characterProfile:char,weaponProfile:weapon
+  });
+  assert.equal(Object.hasOwn(manual.values,'110201'),false);
+  assert.equal(Object.hasOwn(manual.values,'110202'),false);
+  assert.equal(manual.conflicts.length,3);
 });
