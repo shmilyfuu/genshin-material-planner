@@ -72,12 +72,12 @@ function mysCreatePlanItems(plan, avatars, weapons) {
   const weaponChange = selectedWeapon && weaponLevels[1] > weaponLevels[0];
   if (!charChange && !weaponChange) throw new Error('请选择需要升级的角色或武器等级。');
 
-  const avatar = selectedCharacter
+  const avatar = charChange
     ? avatars.find(row => Number(row?.id) === characterId) : null;
-  if (selectedCharacter && !avatar) throw new Error('米游社计算器暂未收录当前角色，请使用手动背包模式。');
-  const weapon = selectedWeapon
+  if (charChange && !avatar) throw new Error('米游社计算器暂未收录当前角色，请使用手动背包模式。');
+  const weapon = weaponChange
     ? weapons.find(row => Number(row?.id) === weaponId) : null;
-  if (selectedWeapon && !weapon) throw new Error('米游社计算器暂未收录当前武器，请使用手动背包模式。');
+  if (weaponChange && !weapon) throw new Error('米游社计算器暂未收录当前武器，请使用手动背包模式。');
 
   function avatarItem(character, levelRange = [0, 0], talents = []) {
     const item = {
@@ -169,7 +169,7 @@ async function mysCalculate(uid, region, plan) {
   // The current calculation requires only the selected character and a compatible weapon carrier.
   const avatars = characters.data.list;
   const weapons = [];
-  if (plan?.weaponId) {
+  if (plan?.weaponId && plan?.config?.weapAsc?.[1] > plan?.config?.weapAsc?.[0]) {
     const result = await mysCalcPost('/v1/weapon/list',
       {page: 1, size: 1000, weapon_levels: [1, 2, 3, 4, 5], lang: 'zh-cn'}, cookie, headers);
     if (!Array.isArray(result?.data?.list)) throw new Error('官方武器目录数据格式错误。');

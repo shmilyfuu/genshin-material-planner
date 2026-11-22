@@ -1,185 +1,210 @@
-import { chooseInventoryUid, syncAccountMaterials } from './app.js';
+import {
+  chooseInventoryUid,
+  getCalculationMode,
+  getCalculationPlan,
+  setOfficialCalculation
+} from './app.js';
 
-const mysEl = (tag, text = '', cls = '') => {
-  const el = document.createElement(tag);
-  if (text) el.textContent = text;
-  if (cls) el.className = cls;
-  return el;
+const mysEl = (tag, label = '', className = '') => {
+  const element = document.createElement(tag);
+  if (label) element.textContent = label;
+  if (className) element.className = className;
+  return element;
 };
 
 async function mysSend(type, fields = {}) {
-  const response = await chrome.runtime.sendMessage({type: 'mys-auth:' + type, ...fields});
+  const response = await chrome.runtime.sendMessage({ type: 'mys-auth:' + type, ...fields });
   if (!response?.ok) throw new Error(response?.error || '米游社服务无响应。');
   return response;
 }
 
-function mysBuild() {
+function buildMiyoushePanel() {
   const target = document.querySelector('.inventory-body');
   if (!target || document.getElementById('mysAuthCard')) return;
 
   const panel = mysEl('section', '', 'mys-auth');
   panel.id = 'mysAuthCard';
-  panel.append(mysEl('h3', '米游社背包同步', 'mys-auth-title'));
+  panel.hidden = getCalculationMode() !== 'official';
 
   const controls = mysEl('div', '', 'mys-auth-controls');
   const account = mysEl('select');
   account.id = 'mysAccountSelect';
   account.setAttribute('aria-label', '米游社账号');
-  const qrButton = mysEl('button', '添加账号', 'button button-secondary');
+  const addButton = mysEl('button', '添加账号', 'button button-secondary');
   const refreshButton = mysEl('button', '刷新凭证', 'button button-secondary');
   const verifyButton = mysEl('button', '读取 UID', 'button button-secondary');
-  const syncButton = mysEl('button', '同步背包', 'button button-primary');
+  const calculateButton = mysEl('button', '计算缺口', 'button button-primary');
   const removeButton = mysEl('button', '移除账号', 'button button-danger');
-  controls.append(account, qrButton, refreshButton, verifyButton, syncButton, removeButton);
+  [addButton, refreshButton, verifyButton, calculateButton, removeButton].forEach(button => {
+    button.type = 'button';
+  });
+  controls.append(account, addButton, refreshButton, verifyButton, calculateButton, removeButton);
   panel.append(controls);
 
   const qrArea = mysEl('div', '', 'mys-auth-qr');
   qrArea.hidden = true;
-  qrArea.append(mysEl('p', '使用手机米游社扫描二维码，在手机上确认登录。'));
-  const qrImage = mysEl('img');
-  qrImage.alt = '米游社登录二维码';
-  qrImage.width = 220;
-  qrImage.height = 220;
+  qrArea.append(mysEl('p', '使用手机米游社扫描二维码，并确认登录。'));
+  const image = mysEl('img');
+  image.width = 220;
+  image.height = 220;
+  image.alt = '米游社登录二维码';
   const pollButton = mysEl('button', '检查扫码状态', 'button button-secondary');
-  qrArea.append(qrImage, pollButton);
+  pollButton.type = 'button';
+  qrArea.append(image, pollButton);
   panel.append(qrArea);
 
   const uidSelect = mysEl('select');
   uidSelect.hidden = true;
-  uidSelect.setAttribute('aria-label', '游戏 UID');
+  uidSelect.setAttribute('aria-label', '原神 UID');
   panel.append(uidSelect);
+
   const status = mysEl('p', '正在读取本机账号…', 'mys-auth-status');
   status.setAttribute('role', 'status');
   panel.append(status);
-  panel.append(mysEl('p', '材料按 UID 和材料 ID 保存；基础与最低阶材料采用计算参考值，高阶材料可在下方手动填写。', 'mys-auth-description'));
-  target.insertBefore(panel, target.firstChild);
+  panel.append(mysEl('p',
+    '按当前养成目标读取米游社计算结果。Lv.20、40 等突破档位按突破后的一级提交；官方结果包含相应经验与摩拉。',
+    'mys-auth-description'));
 
-  let ticket = '';
+  target.append(panel);
   let roles = [];
-  let currentId = '';
+  let qrTicket = '';
 
-  const message = (value, kind = 'info') => {
-    status.textContent = value;
+  const message = (content, kind = 'info') => {
+    status.textContent = content;
     status.dataset.tone = kind;
   };
 
-  const setAccounts = (accounts) => {
-    account.replaceChildren();
-    const entries = accounts?.entries || [];
-    if (!entries.length) account.append(new Option('尚未添加账号', ''));
-    else {
-      for (const entry of entries) account.append(new Option(entry.label, entry.id));
-      account.value = accounts.activeId || entries[0].id;
-    }
-    currentId = account.value;
-    refreshButton.disabled = removeButton.disabled = verifyButton.disabled = !currentId;
-    uidSelect.hidden = true;
-    uidSelect.replaceChildren();
-    roles = [];
-    syncButton.disabled = true;
+  const refreshButtons = () => {
+    const hasAccount = Boolean(account.value);
+    const hasUid = Boolean(uidSelect.value && roles.some(role => role.uid === uidSelect.value));
+    refreshButton.disabled = verifyButton.disabled = removeButton.disabled = !hasAccount;
+    calculateButton.disabled = !hasAccount || !hasUid;
   };
 
-  const perform = async (button, callback) => {
+  const showAccounts = (accounts) => {
+    account.replaceChildren();
+    const entries = accounts?.entries || [];
+    if (!entries.length) {
+      account.append(new Option('尚未添加账号', ''));
+    } else {
+      for (const entry of entries) {
+        account.append(new Option(entry.label + (entry.hasCookie ? '' : ' · 待刷新'), entry.id));
+      }
+      account.value = accounts.activeId || entries[0].id;
+    }
+    roles = [];
+    uidSelect.replaceChildren();
+    uidSelect.hidden = true;
+    refreshButtons();
+  };
+
+  const perform = async (button, fn) => {
     button.disabled = true;
-    try { await callback(); }
-    catch (error) { message(String(error?.message || error), 'error'); }
-    finally {
-      button.disabled = button === syncButton ? roles.length === 0 : false;
+    try {
+      await fn();
+    } catch (error) {
+      message(String(error?.message || error), 'error');
+    } finally {
+      refreshButtons();
+      if (button === addButton || button === pollButton || button === account) button.disabled = false;
     }
   };
 
   account.addEventListener('change', () => void perform(account, async () => {
-    chooseInventoryUid('');
     const response = await mysSend('switch', {id: account.value});
-    setAccounts(response.accounts);
-    message('已切换账号，请读取对应 UID。');
+    showAccounts(response.accounts);
+    chooseInventoryUid('');
+    message('账号已切换，请读取对应的游戏 UID。');
   }));
 
-  qrButton.addEventListener('click', () => void perform(qrButton, async () => {
-    message('正在请求登录二维码…');
+  addButton.addEventListener('click', () => void perform(addButton, async () => {
+    message('正在生成登录二维码…');
     const response = await mysSend('start-qr');
-    ticket = response.qr.ticket;
-    globalThis.qrcode.stringToBytes = globalThis.qrcode.stringToBytesFuncs['UTF-8'];
-    const code = globalThis.qrcode(0, 'M');
+    qrTicket = response.qr.ticket;
+    const qr = globalThis.qrcode;
+    if (typeof qr !== 'function') throw new Error('二维码组件加载失败。');
+    qr.stringToBytes = qr.stringToBytesFuncs['UTF-8'];
+    const code = qr(0, 'M');
     code.addData(response.qr.url, 'Byte');
     code.make();
-    qrImage.src = code.createDataURL(5, 12);
+    image.src = code.createDataURL(5, 12);
     qrArea.hidden = false;
     message('请扫码并在手机上确认。');
   }));
 
   pollButton.addEventListener('click', () => void perform(pollButton, async () => {
-    if (!ticket) throw new Error('请先生成二维码。');
-    const response = await mysSend('poll-qr', {ticket});
+    if (!qrTicket) throw new Error('请先生成二维码。');
+    const response = await mysSend('poll-qr', {ticket: qrTicket});
     if (response.login.status !== 'Confirmed') {
-      message(response.login.status === 'Scanned' ? '已扫码，等待确认。' : '等待扫码或确认。');
+      const descriptions = {Init: '等待扫码。', Scanned: '已扫码，等待手机确认。', Expired: '二维码已过期，请重新生成。'};
+      message(descriptions[response.login.status] || '等待扫码确认。');
       return;
     }
-    ticket = '';
+    qrTicket = '';
     qrArea.hidden = true;
     chooseInventoryUid('');
-    setAccounts(response.login.accounts);
-    message(response.login.warning || '登录完成，点击读取 UID。', response.login.warning ? 'error' : 'success');
+    showAccounts(response.login.accounts);
+    message(response.login.warning || '登录完成，请读取 UID。',
+      response.login.warning ? 'error' : 'success');
   }));
 
   refreshButton.addEventListener('click', () => void perform(refreshButton, async () => {
-    message('正在刷新账号凭证…');
+    message('正在刷新凭证…');
     const response = await mysSend('refresh', {id: account.value});
-    setAccounts(response.accounts);
+    showAccounts(response.accounts);
     chooseInventoryUid('');
-    message('账号凭证已刷新。', 'success');
+    message('凭证已刷新，请重新读取 UID。', 'success');
   }));
 
   verifyButton.addEventListener('click', () => void perform(verifyButton, async () => {
-    message('正在读取国服原神 UID…');
+    message('正在获取国服原神 UID…');
     const response = await mysSend('roles');
     roles = response.roles;
     uidSelect.replaceChildren();
-    uidSelect.append(new Option('手动背包', ''));
     for (const role of roles) {
       uidSelect.append(new Option((role.nickname || '旅行者') + ' · ' + role.uid, role.uid));
     }
     uidSelect.hidden = roles.length === 0;
-    uidSelect.value = roles[0]?.uid || '';
-    syncButton.disabled = roles.length === 0;
-    chooseInventoryUid(uidSelect.value);
-    message(roles.length ? '已选择 UID ' + roles[0].uid + '，可同步背包。' : '账号未返回国服原神 UID。', roles.length ? 'success' : 'error');
+    chooseInventoryUid(roles[0]?.uid || '');
+    message(roles.length
+      ? '已选择 UID ' + roles[0].uid + '，设置培养目标后点击“计算缺口”。'
+      : '该账号没有返回原神 UID。', roles.length ? 'success' : 'error');
   }));
 
   uidSelect.addEventListener('change', () => {
     chooseInventoryUid(uidSelect.value);
-    syncButton.disabled = !uidSelect.value;
-    message(uidSelect.value ? '已切换到 UID ' + uidSelect.value + '。' : '已切换到手动背包。');
+    refreshButtons();
+    message('已选择 UID ' + uidSelect.value + '。');
   });
 
-  syncButton.addEventListener('click', () => void perform(syncButton, async () => {
-    const selected = roles.find((role) => role.uid === uidSelect.value);
-    if (!selected || !account.value || account.value !== currentId) {
-      throw new Error('请先验证账号并选择 UID。');
-    }
-    message('正在读取米游社材料…');
-    const response = await mysSend('materials', {uid: selected.uid, region: selected.region});
-    const summary = await syncAccountMaterials(selected.uid, response.materials.materials);
-    message('UID ' + selected.uid + ' · 已读取 ' + summary.received
-      + ' 种材料 · 当前对象 ' + summary.applied + ' 项有计算参考值。', 'success');
+  calculateButton.addEventListener('click', () => void perform(calculateButton, async () => {
+    const role = roles.find(item => item.uid === uidSelect.value);
+    if (!role) throw new Error('请先读取 UID。');
+    if (getCalculationMode() !== 'official') throw new Error('请选择米游社计算模式。');
+    const plan = getCalculationPlan();
+    message('正在计算当前培养目标的材料缺口…');
+    const response = await mysSend('calculate', {uid: role.uid, region: role.region, plan});
+    const summary = setOfficialCalculation(role.uid, plan, response.calculation.materials);
+    message('官方计算完成 · ' + summary.total + ' 种需求材料 · '
+      + summary.missing + ' 种材料仍缺。', 'success');
   }));
 
   removeButton.addEventListener('click', () => void perform(removeButton, async () => {
-    if (!account.value || !window.confirm('移除此米游社账号及其登录令牌？')) return;
+    if (!account.value || !window.confirm('移除此米游社账号及登录令牌？')) return;
     const response = await mysSend('remove', {id: account.value});
+    showAccounts(response.accounts);
     chooseInventoryUid('');
-    setAccounts(response.accounts);
     message('账号已移除。', 'success');
   }));
 
-  void mysSend('accounts').then((response) => {
-    setAccounts(response.accounts);
-    message(response.accounts.entries.length ? '已恢复账号，点击读取 UID。' : '尚未添加米游社账号。');
-  }).catch((error) => message(String(error?.message || error), 'error'));
+  void mysSend('accounts').then(response => {
+    showAccounts(response.accounts);
+    message(response.accounts.entries.length ? '已恢复保存的米游社账号。' : '尚未添加米游社账号。');
+  }).catch(error => message(String(error?.message || error), 'error'));
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', mysBuild, {once: true});
+  document.addEventListener('DOMContentLoaded', buildMiyoushePanel, {once: true});
 } else {
-  mysBuild();
+  buildMiyoushePanel();
 }
