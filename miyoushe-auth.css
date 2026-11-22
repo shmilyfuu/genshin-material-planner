@@ -40,3 +40,33 @@
 }
 #manualInventoryGroups { display: contents; }
 #manualInventoryGroups[hidden], #mysAuthCard[hidden] { display: none !important; }
+
+.hybrid-inventory-description {
+  font-size: 12px;
+  color: #d5deea;
+  line-height: 1.6;
+  margin: 0;
+}
+.hybrid-inventory-note {
+  color: #a8b5c8;
+  margin: 0 0 8px;
+  font-size: 11px;
+}
+.hybrid-demand-row { flex-wrap: wrap; }
+.hybrid-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+.hybrid-stock input {
+  width: 76px;
+  min-width: 60px;
+  padding: 5px 6px;
+  border: 1px solid #64748b;
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 5px;
+  font-size: 12px;
+}

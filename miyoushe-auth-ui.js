@@ -62,7 +62,7 @@ function buildMiyoushePanel() {
   status.setAttribute('role', 'status');
   panel.append(status);
   panel.append(mysEl('p',
-    '按当前养成目标读取米游社计算结果。Lv.20、40 等突破档位按突破后的一级提交；官方结果包含相应经验与摩拉。',
+    '官方目录已收录的目标使用米游社缺口；前瞻目标使用 Nanoka 需求。库存未知时可在结果中填写。',
     'mys-auth-description'));
 
   target.append(panel);
@@ -184,9 +184,10 @@ function buildMiyoushePanel() {
     const plan = getCalculationPlan();
     message('正在计算当前培养目标的材料缺口…');
     const response = await mysSend('calculate', {uid: role.uid, region: role.region, plan});
-    const summary = setOfficialCalculation(role.uid, plan, response.calculation.materials);
-    message('官方计算完成 · ' + summary.total + ' 种需求材料 · '
-      + summary.missing + ' 种材料仍缺。', 'success');
+    const summary = setOfficialCalculation(role.uid, plan, response.calculation);
+    message('计算完成 · 米游社缺口 ' + summary.officialMissing + ' 项 · '
+      + 'Nanoka 需求 ' + summary.fallbackCount + ' 项'
+      + (summary.unresolved ? ' · 待补充材料 ' + summary.unresolved + ' 项' : '') + '。', 'success');
   }));
 
   removeButton.addEventListener('click', () => void perform(removeButton, async () => {

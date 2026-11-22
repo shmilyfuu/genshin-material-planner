@@ -59,6 +59,7 @@ export const DEFAULT_STATE = Object.freeze({
   },
   inventoryUid: '',
   calculationMode: 'manual',
+  hybridInventory: {},
   inv: {
     gold: '',
     spec: '',
@@ -106,6 +107,21 @@ function normalizeStringArray(value, length) {
 
 
 
+function normalizeHybridInventory(value) {
+  const result = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
+  for (const [uid, quantities] of Object.entries(value).slice(0, 16)) {
+    if (!/^\d{6,12}$/.test(uid) || !quantities || typeof quantities !== 'object'
+      || Array.isArray(quantities)) continue;
+    const entries = {};
+    for (const [id, count] of Object.entries(quantities).slice(0, 1500)) {
+      if (/^\d{1,12}$/.test(id) && Number.isSafeInteger(count) && count >= 0) entries[id] = count;
+    }
+    result[uid] = entries;
+  }
+  return result;
+}
+
 export function normalizeState(input) {
   const fallback = cloneDefaultState();
   const source = input && typeof input === 'object' ? input : {};
@@ -118,6 +134,7 @@ export function normalizeState(input) {
     schemaVersion: 3,
     inventoryUid: /^\d{6,12}$/.test(String(source.inventoryUid || '')) ? String(source.inventoryUid) : '',
     calculationMode: source.calculationMode === 'official' ? 'official' : 'manual',
+    hybridInventory: normalizeHybridInventory(source.hybridInventory),
     source: {
       selectedCharacterId: normalizeString(sourceSettings.selectedCharacterId),
       selectedCharacterName: normalizeString(sourceSettings.selectedCharacterName),

@@ -16,6 +16,7 @@ import {
   mergeSourceLists,
   itemIconUrl
 } from './hakushin.mjs';
+import {buildNanokaDemand, evaluateNanokaDemand} from './hybrid-calculator.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
@@ -232,19 +233,35 @@ export function chooseInventoryUid(uid) {
   scheduleSave();
 }
 
-export function setOfficialCalculation(uid, plan, materials) {
+export function setOfficialCalculation(uid, plan, result) {
   if (getCalculationMode() !== 'official' || uid !== currentUid()
     || calculationSignature(uid, plan) !== currentCalculationSignature()) {
     throw new Error('账号或培养目标已变更，请重新计算。');
   }
-  if (!Array.isArray(materials)) throw new Error('官方计算结果格式错误。');
+  if (!Array.isArray(result?.materials) || !Array.isArray(result?.available)) {
+    throw new Error('米游社计算结果格式错误。');
+  }
+  const fallback = {
+    character: result.fallback?.character === true,
+    weapon: result.fallback?.weapon === true
+  };
+  const demand = fallback.character || fallback.weapon
+    ? buildNanokaDemand({config: state.config, characterProfile, weaponProfile, parts: fallback})
+    : null;
   officialCalculation = {
     signature: currentCalculationSignature(),
-    materials,
+    materials: result.materials,
+    available: result.available,
+    demand,
     updatedAt: Date.now()
   };
   renderResults();
-  return {total: materials.length, missing: materials.filter(m => m.lack > 0).length};
+  return {
+    officialMissing: result.materials.filter(material => material.lack > 0).length,
+    fallbackCount: demand?.groups.reduce((sum, group) =>
+      sum + group.rows.filter(row => row.count > 0).length, 0) || 0,
+    unresolved: demand?.unrecognized.length || 0
+  };
 }
 
 function refreshCalculationMode() {
@@ -589,6 +606,76 @@ function officialMaterialGroups() {
   return groups;
 }
 
+function appendHybridResults(container, calculation) {
+  const uid = currentUid();
+  const manual = state.hybridInventory[uid] || {};
+  const stock = evaluateNanokaDemand(calculation.demand, {
+    manual, available: calculation.available
+  });
+  const label = document.createElement('p');
+  label.className = 'hybrid-inventory-description';
+  label.textContent = calculation.materials.length
+    ? 'Nanoka 材料需求 · 米游社已计算部分的材料使用量优先扣除。请输入本次剩余可用数量。'
+    : 'Nanoka 材料需求 · 填写游戏背包实际数量后，可按材料等级计算剩余缺口。';
+  container.append(label);
+  for (const group of stock.groups) {
+    const section = createResultSection(group.title + ' · Nanoka');
+    if (!group.complete) {
+      const note = document.createElement('p');
+      note.className = 'hybrid-inventory-note';
+      note.textContent = '库存尚未全部确认，当前仅展示培养需求。';
+      section.section.append(note);
+    }
+    for (const item of group.rows) {
+      const displayCount = group.complete ? item.lack : item.count;
+      const row = createResultRow(item.name, displayCount, 'base', itemIconUrl(item.id));
+      row.classList.add('hybrid-demand-row');
+      const amount = row.querySelector('strong');
+      amount.textContent = group.complete
+        ? (item.lack ? '缺 × ' + item.lack.toLocaleString() : '已满足')
+        : item.count ? '需 × ' + item.count.toLocaleString() : '合成可用';
+      const editor = document.createElement('label');
+      editor.className = 'hybrid-stock';
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.step = '1';
+      input.inputMode = 'numeric';
+      input.placeholder = '待确认';
+      input.setAttribute('aria-label', item.name + '可用数量');
+      input.value = item.stock === null ? '' : String(item.stock);
+      const stockLabel = document.createElement('span');
+      stockLabel.textContent = item.source === '米游社剩余量'
+        ? '接口剩余' : '可用数量';
+      editor.append(stockLabel, input);
+      input.addEventListener('change', () => {
+        const value = input.value.trim();
+        if (value !== '' && (!/^\d+$/.test(value)
+          || !Number.isSafeInteger(Number(value)) || Number(value) < 0)) {
+          showToast('请输入非负整数库存数量。', 'error');
+          input.value = item.stock === null ? '' : String(item.stock);
+          return;
+        }
+        const existing = state.hybridInventory[uid] ||= {};
+        if (!value) delete existing[item.id];
+        else existing[item.id] = Number(value);
+        renderResults();
+        scheduleSave();
+      });
+      row.append(editor);
+      section.rows.append(row);
+    }
+    container.append(section.section);
+  }
+  for (const missing of stock.unrecognized) {
+    const row = createResultRow(missing.title, missing.count, 'base');
+    row.querySelector('strong').textContent = '需 × ' + missing.count + ' · 材料待实装';
+    const section = createResultSection('材料数据待补充 · Nanoka');
+    section.rows.append(row);
+    container.append(section.section);
+  }
+}
+
 function renderOfficialResults() {
   const container = document.getElementById('resultContent');
   container.replaceChildren();
@@ -602,7 +689,7 @@ function renderOfficialResults() {
   }
   const missing = officialCalculation.materials
     .filter(item => Number.isSafeInteger(item.lack) && item.lack > 0);
-  if (!missing.length) {
+  if (!missing.length && !officialCalculation.demand) {
     container.append(createEmptyResult('官方计算：材料已满足', '当前培养目标所需材料已覆盖。'));
     return;
   }
@@ -616,12 +703,13 @@ function renderOfficialResults() {
   for (const title of ['基础与经验材料', '角色基础材料', '角色突破材料', '天赋材料', '武器突破材料', '其他材料']) {
     const items = buckets.get(title);
     if (!items?.length) continue;
-    const section = createResultSection(title);
+    const section = createResultSection(title + ' · 米游社');
     for (const material of items) {
       section.rows.append(createResultRow(material.name, material.lack, 'base', itemIconUrl(material.id)));
     }
     container.append(section.section);
   }
+  if (officialCalculation.demand) appendHybridResults(container, officialCalculation);
 }
 
 function renderResults() {
