@@ -16,7 +16,7 @@ import {
   mergeSourceLists,
   itemIconUrl
 } from './hakushin.mjs';
-import { mapInventoryMaterials } from './miyoushe-inventory-map.mjs';
+import { calculatorAutofill } from './miyoushe-inventory-map.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
@@ -198,27 +198,104 @@ function rarityText(value) {
   return value ? `${value}★` : '';
 }
 
-export function previewCurrentInventory(officialMaterials) {
-  return mapInventoryMaterials({
-    officialMaterials,
-    characterProfile,
-    weaponProfile,
-    inventory: state.inv,
-    rules: state.source.mergeRules
-  });
+function inventoryMaterial(definition) {
+  if (definition.key === 'gold') return { id: 202, name: '摩拉' };
+  if (definition.key === 'cult' && definition.index === 3) return getCultMaterial(3);
+  if (['spec', 'boss', 'weekly', 'crown'].includes(definition.key)) return materialAt(definition.key);
+  return materialAt(definition.key, definition.index);
+}
+
+function inventoryItemKey(definition) {
+  const id = Number(inventoryMaterial(definition)?.id);
+  if (Number.isSafeInteger(id) && id > 0) return String(id);
+  return 'slot:' + definition.key + ':' + (definition.index ?? '');
+}
+
+function currentAccountInventory() {
+  return state.accountInventories?.[state.inventoryUid] || null;
 }
 
 function getInventoryValue(definition) {
-  const value = state.inv[definition.key];
-  return definition.index === undefined ? value : value[definition.index];
+  if (!state.inventoryUid) {
+    const value = state.inv[definition.key];
+    return definition.index === undefined ? value : value[definition.index];
+  }
+  const entry = currentAccountInventory();
+  const key = inventoryItemKey(definition);
+  if (entry && Object.hasOwn(entry.manual, key)) return entry.manual[key];
+  const id = Number(inventoryMaterial(definition)?.id);
+  const material = entry?.materials?.[id];
+  return calculatorAutofill(material, definition.key, definition.index ?? null) ?? '';
 }
 
 function setInventoryValue(definition, value) {
-  if (definition.index === undefined) {
-    state.inv[definition.key] = value;
-  } else {
-    state.inv[definition.key][definition.index] = value;
+  if (!state.inventoryUid) {
+    if (definition.index === undefined) state.inv[definition.key] = value;
+    else state.inv[definition.key][definition.index] = value;
+    return;
   }
+  const entry = state.accountInventories[state.inventoryUid] ||= {manual: {}, materials: {}, updatedAt: 0};
+  const key = inventoryItemKey(definition);
+  if (value === '') delete entry.manual[key];
+  else entry.manual[key] = value;
+}
+
+export function chooseInventoryUid(value) {
+  const uid = /^\d{6,12}$/.test(String(value || '')) ? String(value) : '';
+  if (uid === state.inventoryUid) return;
+  state.inventoryUid = uid;
+  renderInventory();
+  renderResults();
+  scheduleSave();
+}
+
+export async function syncAccountMaterials(uid, materials) {
+  if (!uid || uid !== state.inventoryUid) throw new Error('当前 UID 已切换，请重新选择账号。');
+  if (!Array.isArray(materials) || !materials.length) throw new Error('材料列表为空。');
+  const values = {};
+  for (const item of materials) {
+    const id = Number(item?.id);
+    if (!Number.isSafeInteger(id) || id <= 0) continue;
+    const valid = (number) => Number.isSafeInteger(number) && number >= 0;
+    const number = (value) => valid(value) ? value : null;
+    values[id] = {
+      calculatorAvailable: number(item.calculatorAvailable),
+      coveredDemand: number(item.coveredDemand),
+      total: number(item.total),
+      lack: number(item.lack)
+    };
+  }
+  if (!Object.keys(values).length) throw new Error('材料 ID 列表为空。');
+  const old = state.accountInventories[uid] || {manual: {}, materials: {}, updatedAt: 0};
+  state.accountInventories[uid] = {manual: {...old.manual}, materials: values, updatedAt: Date.now()};
+  renderInventory();
+  renderResults();
+  await persistState();
+  let applied = 0;
+  for (const definition of allInventoryDefinitions()) {
+    if (getInventoryValue(definition) !== '' &&
+      calculatorAutofill(values[Number(inventoryMaterial(definition)?.id)], definition.key, definition.index ?? null) !== null) applied++;
+  }
+  return {received: Object.keys(values).length, applied};
+}
+
+function allInventoryDefinitions() {
+  return [
+    ...['gold', 'spec', 'boss', 'weekly', 'crown'].map((key) => ({key})),
+    ...Object.entries({books: 3, cult: 4, charGems: 4, weapGems: 4, matA: 3, matB: 3})
+      .flatMap(([key, count]) => Array.from({length: count}, (_, index) => ({key, index})))
+  ];
+}
+
+function calculationState() {
+  if (!state.inventoryUid) return state;
+  const inv = structuredClone(cloneDefaultState().inv);
+  for (const definition of allInventoryDefinitions()) {
+    const value = getInventoryValue(definition);
+    if (definition.index === undefined) inv[definition.key] = value;
+    else inv[definition.key][definition.index] = value;
+  }
+  return {...state, inv};
 }
 
 function scheduleSave(options = {}) {
@@ -339,23 +416,11 @@ function getCultMaterial(index) {
 }
 
 function resolveDefinition(definition) {
-  let material = null;
-  if (definition.key === 'gold') material = { name: definition.label, icon: itemIconUrl(202) };
-  else if (definition.key === 'spec') material = materialAt('spec');
-  else if (definition.key === 'boss') material = materialAt('boss');
-  else if (definition.key === 'weekly') material = materialAt('weekly');
-  else if (definition.key === 'crown') material = materialAt('crown');
-  else if (definition.key === 'books') material = materialAt('books', definition.index);
-  else if (definition.key === 'cult') material = getCultMaterial(definition.index);
-  else if (definition.key === 'charGems') material = materialAt('charGems', definition.index);
-  else if (definition.key === 'weapGems') material = materialAt('weapGems', definition.index);
-  else if (definition.key === 'matA') material = materialAt('matA', definition.index);
-  else if (definition.key === 'matB') material = materialAt('matB', definition.index);
-
+  const material = inventoryMaterial(definition);
   return {
     ...definition,
     displayLabel: material?.name || definition.label,
-    icon: material?.icon || ''
+    icon: definition.key === 'gold' ? itemIconUrl(202) : material?.icon || ''
   };
 }
 
@@ -411,6 +476,19 @@ function createInventoryInput(definition) {
   updatePreview();
   inputWrap.append(input, preview);
   wrapper.append(iconSlot, labelText, inputWrap);
+  const id = Number(inventoryMaterial(definition)?.id);
+  const official = currentAccountInventory()?.materials?.[id];
+  if (state.inventoryUid && official) {
+    const available = official.calculatorAvailable;
+    const covered = official.coveredDemand;
+    const recommended = calculatorAutofill(official, definition.key, definition.index ?? null);
+    const hint = document.createElement('small');
+    hint.className = 'mys-inventory-hint';
+    hint.textContent = '米游社：可用 ' + (available === null ? '—' : available)
+      + ' · 抵扣 ' + (covered === null ? '—' : covered)
+      + (recommended === null ? ' · 请核对' : ' · 计算参考 ' + recommended);
+    wrapper.append(hint);
+  }
   return wrapper;
 }
 
@@ -519,7 +597,7 @@ function buildTierItem(material, fallbackLabel, fallbackColor) {
 }
 
 function renderResults() {
-  const result = calculateResult(state);
+  const result = calculateResult(calculationState());
   const container = document.getElementById('resultContent');
   container.replaceChildren();
 
@@ -610,7 +688,9 @@ function bindStaticEvents() {
   document.getElementById('clearButton').addEventListener('click', openClearDialog);
   document.getElementById('cancelClearButton').addEventListener('click', closeClearDialog);
   document.getElementById('confirmClearButton').addEventListener('click', async () => {
+    const uid = state.inventoryUid;
     state = cloneDefaultState();
+    state.inventoryUid = uid;
     characterProfile = null;
     weaponProfile = null;
     refreshAll();

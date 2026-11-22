@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "全能养成规划面板（米游社测试）",
   "short_name": "养成规划·米游社",
-  "version": "1.3.6",
-  "description": "原神养成规划测试版，支持米游社账号及完整角色目录材料计算核对。",
+  "version": "1.4.0",
+  "description": "原神养成规划面板，支持米游社多账号材料同步与按 UID 计算。",
   "minimum_chrome_version": "114",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0L9uzH+oiehRK/aFZun57TGFtrxSWNatfWIJelR0AgMffj94eV90Qqq2JN3RW7bKtia+OKqBQJF46P2SJyTSloXy2gu0ug+61yS2XHJo/N7/DWhNAigw4py5edVbnmFlPfHwwB54yB1+ob1f3pLz+S2pg6VLV10WrPFUcpOZ2uASkcwXIK6q79p5jIUdEb/6Jp+O788HN9UkIWnfJcUIGkyQbuCPIcZURPbIux2ItCXChddQWwdr4eWkKdPhQvHTyqFhjIoeYAWhgKqY8FKas4n0WB7hHJumrd0vkDp1Z0w4Keqdo877kC7kaI/qI0ITAU29sZW6Cojd5ibHN9BCEwIDAQAB",
   "permissions": [

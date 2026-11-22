@@ -66,3 +66,17 @@ export function mapInventoryMaterials({ officialMaterials = [], characterProfile
     missing: rows.filter((row) => row.status === 'missing').length
   };
 }
+
+export function calculatorAutofill(material, key, index = null) {
+  if (!material || (index !== null && index !== 0)) return null;
+  const available = material.calculatorAvailable;
+  const covered = material.coveredDemand;
+  const lack = material.lack;
+  const valid = (n) => Number.isSafeInteger(n) && n >= 0;
+  if (valid(available) && valid(covered) && Number.isSafeInteger(available + covered)) {
+    return String(available + covered);
+  }
+  // Uncraftable basic materials with a remaining deficit have exhausted their owned supply.
+  if (index === null && valid(covered) && valid(lack) && lack > 0) return String(covered);
+  return null;
+}

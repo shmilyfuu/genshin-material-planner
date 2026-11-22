@@ -1,21 +1,13 @@
-.mys-auth { display: grid; gap: 12px; }
-.mys-auth-title { margin: 0; }
+.mys-auth { display: grid; gap: 9px; border-bottom: 1px solid var(--border-color, #d6dce6); padding-bottom: 14px; margin-bottom: 12px; min-width: 0; }
+.mys-auth-title { margin: 0; font-size: 14px; }
 .mys-auth-description { margin: 0; color: #64748b; font-size: 12px; line-height: 1.6; }
-.mys-auth-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.mys-auth-controls select { flex: 1 1 160px; min-width: 150px; }
+.mys-auth-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.mys-auth-controls select { flex: 1 1 150px; min-width: 150px; }
+.mys-auth > select { max-width: 360px; }
 .mys-auth-qr { display: grid; justify-items: center; gap: 8px; padding: 12px; border: 1px solid #d6dce6; border-radius: 10px; }
 .mys-auth-qr img { width: 220px; max-width: 100%; height: auto; image-rendering: pixelated; background: white; }
 .mys-auth-status { margin: 0; min-height: 18px; font-size: 12px; }
 .mys-auth-status[data-tone="success"] { color: #047857; }
 .mys-auth-status[data-tone="error"] { color: #b91c1c; }
-.mys-auth-roles { display: grid; gap: 4px; padding: 8px; border-radius: 8px; background: rgba(148, 163, 184, .08); }
-.mys-auth-roles p { margin: 0; font-size: 12px; }
-
-.mys-material-results { display: grid; gap: 8px; min-width: 0; }
-.mys-material-results p { margin: 0; font-size: 12px; }
-.mys-material-list { max-height: 340px; overflow: auto; border: 1px solid #d6dce6; border-radius: 8px; }
-.mys-material-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.mys-material-table th, .mys-material-table td { padding: 6px 5px; border-bottom: 1px solid #e2e8f0; text-align: right; white-space: nowrap; }
-.mys-material-table th:first-child, .mys-material-table td:first-child { text-align: left; white-space: normal; min-width: 92px; }
-
+.mys-inventory-hint { display: block; grid-column: 1 / -1; color: #64748b; font-size: 10px; line-height: 1.4; padding-left: 3px; }
 .mys-auth [hidden] { display: none; }
