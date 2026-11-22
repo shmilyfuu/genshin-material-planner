@@ -58,3 +58,17 @@ test('前瞻尚未实装材料如果缺少 ID，报告未识别数量', () => {
   const d=buildNanokaDemand({config:full,characterProfile:incomplete,parts:{character:true}});
   assert.deepEqual(d.unrecognized.map(x=>x.count),[168]);
 });
+
+
+test('每个 UID 的实际库存分别保存，错误输入在恢复时剔除', async () => {
+  const {normalizeState} = await import('../core.mjs');
+  const state = normalizeState({
+    hybridInventory: {
+      '123456789': {'110201':47,'110202':36,'110203':-1},
+      '987654321': {'110201':13}
+    }
+  });
+  assert.equal(state.hybridInventory['123456789']['110201'],47);
+  assert.equal(state.hybridInventory['987654321']['110201'],13);
+  assert.equal(state.hybridInventory['123456789']['110203'],undefined);
+});

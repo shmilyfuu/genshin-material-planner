@@ -253,6 +253,8 @@ export function setOfficialCalculation(uid, plan, result) {
     materials: result.materials,
     available: result.available,
     demand,
+    officialItemCount: Number.isSafeInteger(result.itemCount) ? result.itemCount : 0,
+    manualRemaining: {},
     updatedAt: Date.now()
   };
   renderResults();
@@ -608,14 +610,15 @@ function officialMaterialGroups() {
 
 function appendHybridResults(container, calculation) {
   const uid = currentUid();
-  const manual = state.hybridInventory[uid] || {};
+  const mixed = calculation.officialItemCount > 0;
+  const manual = mixed ? calculation.manualRemaining : (state.hybridInventory[uid] || {});
   const stock = evaluateNanokaDemand(calculation.demand, {
     manual, available: calculation.available
   });
   const label = document.createElement('p');
   label.className = 'hybrid-inventory-description';
-  label.textContent = calculation.materials.length
-    ? 'Nanoka 材料需求 · 米游社已计算部分的材料使用量优先扣除。请输入本次剩余可用数量。'
+  label.textContent = mixed
+    ? 'Nanoka 材料需求 · 请填写米游社已计算部分扣除后的本次剩余库存。'
     : 'Nanoka 材料需求 · 填写游戏背包实际数量后，可按材料等级计算剩余缺口。';
   container.append(label);
   for (const group of stock.groups) {
@@ -646,7 +649,7 @@ function appendHybridResults(container, calculation) {
       input.value = item.stock === null ? '' : String(item.stock);
       const stockLabel = document.createElement('span');
       stockLabel.textContent = item.source === '米游社剩余量'
-        ? '接口剩余' : '可用数量';
+        ? '接口剩余' : mixed ? '本次剩余' : '背包数量';
       editor.append(stockLabel, input);
       input.addEventListener('change', () => {
         const value = input.value.trim();
@@ -656,11 +659,13 @@ function appendHybridResults(container, calculation) {
           input.value = item.stock === null ? '' : String(item.stock);
           return;
         }
-        const existing = state.hybridInventory[uid] ||= {};
+        const existing = mixed
+          ? calculation.manualRemaining
+          : (state.hybridInventory[uid] ||= {});
         if (!value) delete existing[item.id];
         else existing[item.id] = Number(value);
         renderResults();
-        scheduleSave();
+        if (!mixed) scheduleSave();
       });
       row.append(editor);
       section.rows.append(row);

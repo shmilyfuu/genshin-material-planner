@@ -37,5 +37,5 @@ test('仅有目标等级变化的对象参与计算', () => {
   assert.equal(result.official.weapon,true);
 });
 test('未设置养成目标不触发计算', () => {
-  assert.throws(()=>resolve({characterId:'',weaponId:'',config},[],[]),/请选择角色或武器/);
+  assert.throws(()=>resolve({characterId:'',weaponId:'',config},[],[]),/请先选择角色或武器/);
 });
