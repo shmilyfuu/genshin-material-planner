@@ -72,3 +72,37 @@ test('每个 UID 的实际库存分别保存，错误输入在恢复时剔除', 
   assert.equal(state.hybridInventory['987654321']['110201'],13);
   assert.equal(state.hybridInventory['123456789']['110203'],undefined);
 });
+
+
+test('前瞻角色自动读取米游社探测数量，按实际培养目标计算',()=>{
+  const demand=buildNanokaDemand({config:full,characterProfile:char,parts:{character:true}});
+  const result=evaluateNanokaDemand(demand,{inventoryProbe:[{id:10,num:47,minimum:false}]});
+  const row=result.groups.flatMap(g=>g.rows).find(r=>r.id===10);
+  assert.equal(row.stock,47);
+  assert.equal(row.lack,121);
+  assert.equal(row.source,'米游社推算');
+});
+
+test('探测材料填充整个合成系列后直接计算缺口',()=>{
+  const demand=buildNanokaDemand({config:full,weaponProfile:weapon,parts:{weapon:true}});
+  const inventoryProbe=[
+    {id:401,num:5},{id:402,num:14},{id:403,num:14},{id:404,num:6},
+    {id:110201,num:47},{id:110202,num:36},
+    {id:110203,num:11},{id:110204,num:0}
+  ];
+  const calculated=evaluateNanokaDemand(demand,{inventoryProbe});
+  assert.ok(calculated.groups.filter(g=>g.rows.some(r=>r.id===110201||r.id===401)).every(g=>g.complete));
+});
+
+test('混合官方和前瞻目标时优先使用官方计算后的剩余量',()=>{
+  const demand=buildNanokaDemand({config:full,characterProfile:char,parts:{character:true}});
+  const result=evaluateNanokaDemand(demand,{
+    inventoryProbe:[{id:202,num:2500000},{id:10,num:47}],
+    officialMaterials:[{id:202,total:100000,lack:0}],
+    available:[{id:202,num:18000}],mixed:true
+  });
+  const rows=result.groups.flatMap(g=>g.rows);
+  assert.equal(rows.find(r=>r.id===202).stock,18000);
+  assert.equal(rows.find(r=>r.id===10).stock,47);
+  assert.equal(rows.find(r=>r.id===202).source,'官方计算后可用');
+});
