@@ -45,14 +45,16 @@ async function mysJson(url, init) {
   } catch (error) {
     throw new Error('网络请求失败：' + String(error?.message || error));
   }
+  const responseType = (response.headers.get('content-type') || '未知类型').split(';')[0];
   let payload;
   try {
     payload = await response.json();
   } catch {
-    throw new Error('接口返回格式错误（HTTP ' + response.status + '）。');
+    throw new Error('HTTP ' + response.status + '（' + responseType + '），服务器返回了非 JSON 内容。');
   }
   if (!response.ok || payload?.retcode !== 0) {
-    throw new Error('米游社接口错误 ' + (payload?.retcode ?? response.status) + '：' + String(payload?.message || '请求失败'));
+    throw new Error('HTTP ' + response.status + '，米游社接口错误 '
+      + (payload?.retcode ?? '未知') + '：' + String(payload?.message || '请求失败'));
   }
   return payload;
 }
@@ -152,7 +154,7 @@ function mysQuoteRegex(value) {
   return Array.from(String(value), (char) => '.*+?^$()[]{}|\\'.includes(char) ? '\\' + char : char).join('');
 }
 
-async function mysCookieRequest(url, cookie, init) {
+async function mysCookieRequest(url, cookie, init, requestContext = null) {
   const run = async () => {
     await mysHeaderReady;
     await chrome.declarativeNetRequest.updateSessionRules({
@@ -160,7 +162,16 @@ async function mysCookieRequest(url, cookie, init) {
       addRules: [{
         id: MYS_RULE_ID,
         priority: 10,
-        action: { type: 'modifyHeaders', requestHeaders: [{ header: 'Cookie', operation: 'set', value: cookie }] },
+        action: {
+          type: 'modifyHeaders',
+          requestHeaders: [
+            { header: 'Cookie', operation: 'set', value: cookie },
+            ...(requestContext ? [
+              { header: 'Referer', operation: 'set', value: requestContext.referrer },
+              { header: 'Origin', operation: 'set', value: requestContext.origin }
+            ] : [])
+          ]
+        },
         condition: { regexFilter: '^' + mysQuoteRegex(url) + '$', resourceTypes: ['xmlhttprequest'] }
       }]
     });

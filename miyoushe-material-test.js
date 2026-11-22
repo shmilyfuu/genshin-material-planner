@@ -1,6 +1,10 @@
 'use strict';
 
 const MYS_CALC_ROOT = MYS.takumi + '/event/e20200928calculate';
+const MYS_CALC_CONTEXT = {
+  origin: 'https://act.mihoyo.com',
+  referrer: 'https://act.mihoyo.com/ys/event/calculator/index.html'
+};
 
 function mysCalcHeaders(device) {
   return {
@@ -21,9 +25,19 @@ function mysCalcHeaders(device) {
 }
 
 async function mysCalcPost(path, body, cookie, headers) {
-  return mysCookieRequest(MYS_CALC_ROOT + path, cookie, {
-    method: 'POST', headers, body: JSON.stringify(body)
-  });
+  const steps = {
+    '/v1/avatar/list': '读取角色目录',
+    '/v1/weapon/list': '读取武器目录',
+    '/v3/batch_compute': '计算养成材料'
+  };
+  try {
+    return await mysCookieRequest(MYS_CALC_ROOT + path, cookie, {
+      method: 'POST', headers, body: JSON.stringify(body)
+    }, MYS_CALC_CONTEXT);
+  } catch (error) {
+    throw new Error((steps[path] || '材料接口') + '（' + path + '）失败：'
+      + String(error?.message || error));
+  }
 }
 
 function mysCalcSample(characters, weapons, limit = 20) {
