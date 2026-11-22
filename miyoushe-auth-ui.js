@@ -135,18 +135,21 @@ function mysBuild() {
     const response = await mysSend('roles');
     roles = response.roles;
     uidSelect.replaceChildren();
+    uidSelect.append(new Option('手动背包', ''));
     for (const role of roles) {
       uidSelect.append(new Option((role.nickname || '旅行者') + ' · ' + role.uid, role.uid));
     }
     uidSelect.hidden = roles.length === 0;
+    uidSelect.value = roles[0]?.uid || '';
     syncButton.disabled = roles.length === 0;
-    chooseInventoryUid(roles[0]?.uid || '');
+    chooseInventoryUid(uidSelect.value);
     message(roles.length ? '已选择 UID ' + roles[0].uid + '，可同步背包。' : '账号未返回国服原神 UID。', roles.length ? 'success' : 'error');
   }));
 
   uidSelect.addEventListener('change', () => {
     chooseInventoryUid(uidSelect.value);
-    message('已切换到 UID ' + uidSelect.value + '。');
+    syncButton.disabled = !uidSelect.value;
+    message(uidSelect.value ? '已切换到 UID ' + uidSelect.value + '。' : '已切换到手动背包。');
   });
 
   syncButton.addEventListener('click', () => void perform(syncButton, async () => {
