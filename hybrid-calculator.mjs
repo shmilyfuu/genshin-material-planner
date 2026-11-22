@@ -1,4 +1,4 @@
-import { TALENT_DATA, CHAR_ASC_DATA, WEAPON_ASC_DATA, calcTieredDeficit } from './core.mjs';
+import { TALENT_DATA, CHAR_ASC_DATA, WEAPON_ASC_DATA, calcTieredDeficit, safeEval } from './core.mjs';
 
 const number = (value) => Number.isSafeInteger(value) && value >= 0;
 const itemId = (material) => {
@@ -114,13 +114,68 @@ export function buildNanokaDemand({ config, characterProfile, weaponProfile, par
   return {groups, unrecognized};
 }
 
+export function mapManualInventory({inventory = {}, characterProfile, weaponProfile, mergeRules = {}} = {}) {
+  const values = new Map();
+  const conflicts = new Set();
+  const put = (material, input) => {
+    const id = itemId(material);
+    if (id === null || input === null || input === undefined
+      || String(input).trim() === '') return;
+    const expression = String(input).trim()
+      .replace(/[，,\s]/g, '').replace(/[×xX]/g, '*')
+      .replace(/÷/g, '/').replace(/（/g, '(').replace(/）/g, ')');
+    if (!/^[\d+\-*/().]+$/.test(expression) || /[+\-*/.(]$/.test(expression)) return;
+    const amount = safeEval(input);
+    if (!number(amount)) return;
+    if (values.has(id) && values.get(id) !== amount) conflicts.add(id);
+    values.set(id, amount);
+  };
+  const singles = [
+    ['gold', {id: 202}],
+    ['spec', characterProfile?.materials?.spec],
+    ['boss', characterProfile?.materials?.boss],
+    ['weekly', characterProfile?.materials?.weekly],
+    ['crown', characterProfile?.materials?.crown]
+  ];
+  for (const [key, material] of singles) put(material, inventory?.[key]);
+
+  const groups = [
+    ['books', characterProfile?.materials?.books],
+    ['charGems', characterProfile?.materials?.charGems],
+    ['weapGems', weaponProfile?.materials?.weapGems],
+    ['cult', characterProfile?.materials?.cult],
+    ['matA', weaponProfile?.materials?.matA],
+    ['matB', weaponProfile?.materials?.matB]
+  ];
+  for (const [key, items] of groups) {
+    if ((key === 'matA' && mergeRules.matAIntoCult)
+      || (key === 'matB' && mergeRules.matBIntoCult)) continue;
+    const slots = inventory?.[key];
+    if (!Array.isArray(slots)) continue;
+    for (let i = 0; i < slots.length; i++) {
+      const material = key === 'cult' && i === 3
+        ? mergeRules.matAIntoCult ? weaponProfile?.materials?.matA?.[2] : null
+        : items?.[i];
+      put(material, slots[i]);
+    }
+  }
+  for (const id of conflicts) values.delete(id);
+  return {
+    values: Object.fromEntries([...values].map(([id, amount]) => [String(id), amount])),
+    conflicts: [...conflicts]
+  };
+}
+
 export function evaluateNanokaDemand(demand, {
-  manual = {}, available = [], inventoryProbe = [], officialMaterials = [], mixed = false
+  manual = {}, manualReference = {}, available = [], inventoryProbe = [],
+  officialMaterials = [], mixed = false
 } = {}) {
   const known = new Map();
   for (const entry of inventoryProbe.length ? inventoryProbe : available) {
     const id = Number(entry?.id), count = Number(entry?.num);
-    if (Number.isSafeInteger(id) && id > 0 && number(count)) known.set(id, count);
+    if (Number.isSafeInteger(id) && id > 0 && number(count)) {
+      known.set(id, {count, minimum: entry.minimum === true});
+    }
   }
   const consumedByOfficial = new Set(officialMaterials
     .filter(row => number(row?.total) && row.total > 0)
@@ -132,24 +187,42 @@ export function evaluateNanokaDemand(demand, {
   }
   const groups = demand.groups.map(group => {
     const rows = group.rows.map(row => {
-      const own = Object.prototype.hasOwnProperty.call(manual, String(row.id))
-        ? manual[String(row.id)] : undefined;
+      const id = String(row.id);
+      const explicit = Object.hasOwn(manual, id) && number(manual[id]) ? manual[id] : null;
+      const reference = Object.hasOwn(manualReference, id) && number(manualReference[id])
+        ? manualReference[id] : null;
+      const inferred = known.get(row.id);
       const officialUsed = mixed && consumedByOfficial.has(row.id);
       let stock = null;
       let source = '待确认';
-      if (number(own)) {
-        stock = own;
-        source = '手动';
+      let verified = false;
+      if (explicit !== null) {
+        stock = explicit;
+        source = '手动确认';
+        verified = true;
       } else if (officialUsed) {
-        stock = remaining.get(row.id) ?? 0;
-        source = '官方计算后可用';
-      } else if (known.has(row.id)) {
-        stock = known.get(row.id);
-        source = inventoryProbe.length ? '米游社推算' : '米游社剩余量';
+        if (remaining.has(row.id)) {
+          stock = remaining.get(row.id);
+          source = '官方计算后可用';
+        }
+      } else if (reference !== null) {
+        stock = reference;
+        source = '手动背包';
+        verified = true;
+      } else if (inferred) {
+        stock = inferred.count;
+        source = '米游社推算';
+        verified = !group.family && !inferred.minimum;
       }
-      return {...row, stock, source};
+      return {
+        ...row, stock, source, verified,
+        manualReference: reference,
+        probeValue: inferred?.count ?? null,
+        different: reference !== null && inferred && reference !== inferred.count
+      };
     });
-    const complete = rows.every(row => number(row.stock));
+    const complete = rows.every(row => row.verified);
+    const covered = rows.every(row => number(row.stock));
     if (complete) {
       const deficit = group.family
         ? calcTieredDeficit(rows.map(row => row.count), rows.map(row => row.stock)).optimal
@@ -158,7 +231,7 @@ export function evaluateNanokaDemand(demand, {
     } else {
       rows.forEach(row => { row.lack = null; });
     }
-    return {...group, complete, rows};
+    return {...group, complete, covered, rows};
   });
   return {...demand, groups};
 }
