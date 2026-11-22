@@ -236,8 +236,7 @@ function setInventoryValue(definition, value) {
   }
   const entry = state.accountInventories[state.inventoryUid] ||= {manual: {}, materials: {}, updatedAt: 0};
   const key = inventoryItemKey(definition);
-  if (value === '') delete entry.manual[key];
-  else entry.manual[key] = value;
+  entry.manual[key] = value;
 }
 
 export function chooseInventoryUid(value) {

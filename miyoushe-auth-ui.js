@@ -99,8 +99,8 @@ function mysBuild() {
     message('正在请求登录二维码…');
     const response = await mysSend('start-qr');
     ticket = response.qr.ticket;
-    const code = globalThis.qrcode(0, 'M');
     globalThis.qrcode.stringToBytes = globalThis.qrcode.stringToBytesFuncs['UTF-8'];
+    const code = globalThis.qrcode(0, 'M');
     code.addData(response.qr.url, 'Byte');
     code.make();
     qrImage.src = code.createDataURL(5, 12);
