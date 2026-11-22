@@ -1,0 +1,70 @@
+name: Build Miyoushe login test
+
+on:
+  push:
+    branches:
+      - miyoushe-inventory
+    paths:
+      - 'manifest.json'
+      - 'sidepanel.html'
+      - 'service-worker.js'
+      - 'miyoushe-*.js'
+      - 'miyoushe-*.css'
+      - 'vendor/**'
+      - '.github/workflows/build-miyoushe-auth.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate extension
+        run: |
+          set -euo pipefail
+          python -m json.tool manifest.json >/dev/null
+          node --check background.js
+          node --check app.js
+          node --check stepper.js
+          node --check service-worker.js
+          node --check miyoushe-md5.js
+          node --check miyoushe-auth-network.js
+          node --check miyoushe-auth-state.js
+          node --check miyoushe-auth-ui.js
+          node --check vendor/qrcode-generator.js
+          node - <<'NODE'
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+          if (m.background.service_worker !== 'service-worker.js') throw Error('Unexpected service worker');
+          if (!m.key || !m.host_permissions.includes('https://passport-api.mihoyo.com/*')) throw Error('Missing login configuration');
+          if (!fs.readFileSync('sidepanel.html', 'utf8').includes('miyoushe-auth-ui.js')) throw Error('Missing login UI');
+          NODE
+
+      - name: Build test ZIP
+        run: |
+          set -euo pipefail
+          NAME='genshin-material-planner-miyoushe-login-v1.3.0'
+          ROOT="dist/$NAME"
+          mkdir -p "$ROOT/icons" "$ROOT/vendor"
+          cp manifest.json background.js service-worker.js sidepanel.html app.js core.mjs hakushin.mjs styles.css stepper.js stepper.css "$ROOT/"
+          cp miyoushe-md5.js miyoushe-auth-network.js miyoushe-auth-state.js miyoushe-auth-ui.js miyoushe-auth.css "$ROOT/"
+          cp vendor/qrcode-generator.js "$ROOT/vendor/"
+          cp THIRD_PARTY_NOTICES.md "$ROOT/"
+          cp icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png "$ROOT/icons/"
+          cd dist
+          zip -qr "$NAME.zip" "$NAME"
+          sha256sum "$NAME.zip" > "$NAME.zip.sha256"
+
+      - name: Upload test package
+        uses: actions/upload-artifact@v4
+        with:
+          name: genshin-material-planner-miyoushe-login-v1.3.0
+          path: |
+            dist/genshin-material-planner-miyoushe-login-v1.3.0.zip
+            dist/genshin-material-planner-miyoushe-login-v1.3.0.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
