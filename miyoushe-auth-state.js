@@ -122,13 +122,11 @@ async function mysRemove(id) {
   return mysPublicAccounts(accounts);
 }
 
-async function mysRoles() {
-  const accounts = await mysReadAccounts();
-  const account = accounts.entries[accounts.activeId];
-  if (!account) throw new Error('请先选择已登录账号。');
-  if (!account.cookieToken || !account.ltoken) throw new Error('短期令牌缺失，请点击刷新凭证。');
-
-  const cookie = [
+function mysAccountCookie(account) {
+  if (!account?.id || !account.mid || !account.cookieToken || !account.ltoken) {
+    throw new Error('账号短期凭证缺失，请点击刷新凭证。');
+  }
+  return [
     'account_id_v2=' + account.id,
     'account_mid_v2=' + account.mid,
     'cookie_token_v2=' + account.cookieToken,
@@ -136,6 +134,15 @@ async function mysRoles() {
     'ltmid_v2=' + account.mid,
     'ltoken_v2=' + account.ltoken
   ].join('; ');
+}
+
+async function mysRoles() {
+  const accounts = await mysReadAccounts();
+  const account = accounts.entries[accounts.activeId];
+  if (!account) throw new Error('请先选择已登录账号。');
+  if (!account.cookieToken || !account.ltoken) throw new Error('短期令牌缺失，请点击刷新凭证。');
+
+  const cookie = mysAccountCookie(account);
   const url = MYS.takumi + '/binding/api/getUserGameRolesByCookie?game_biz=hk4e_cn';
   const device = await mysDevice();
   const result = await mysCookieRequest(url, cookie, {
@@ -178,6 +185,8 @@ async function mysAuthCommand(message) {
     }
     case 'mys-auth:roles':
       return { roles: await mysRoles() };
+    case 'mys-auth:materials':
+      return { materials: await mysMaterials(String(message.uid || ''), String(message.region || '')) };
     default:
       throw new Error('未知登录操作。');
   }

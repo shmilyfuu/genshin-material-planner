@@ -27,9 +27,10 @@ function mysBuild() {
   const qrButton = mysEl('button', '添加账号（扫码）', 'button button-primary');
   const refreshButton = mysEl('button', '刷新凭证', 'button button-secondary');
   const verifyButton = mysEl('button', '验证账号与 UID', 'button button-secondary');
+  const materialsButton = mysEl('button', '测试读取材料', 'button button-secondary');
   const removeButton = mysEl('button', '移除账号', 'button button-danger');
-  [qrButton, refreshButton, verifyButton, removeButton].forEach((button) => { button.type = 'button'; });
-  controls.append(account, qrButton, refreshButton, verifyButton, removeButton);
+  [qrButton, refreshButton, verifyButton, materialsButton, removeButton].forEach((button) => { button.type = 'button'; });
+  controls.append(account, qrButton, refreshButton, verifyButton, materialsButton, removeButton);
   card.append(controls);
 
   const qrArea = mysEl('div', '', 'mys-auth-qr');
@@ -50,6 +51,13 @@ function mysBuild() {
   const roles = mysEl('div', '', 'mys-auth-roles');
   roles.hidden = true;
   card.append(roles);
+  const uidSelect = mysEl('select');
+  uidSelect.setAttribute('aria-label', '选择原神 UID');
+  uidSelect.hidden = true;
+  card.append(uidSelect);
+  const materialsArea = mysEl('section', '', 'mys-material-results');
+  materialsArea.hidden = true;
+  card.append(materialsArea);
   const note = mysEl('p', '保存的登录令牌属于敏感凭证。请仅在个人可信的 Chrome 配置文件中使用。', 'mys-auth-description');
   card.append(note);
 
@@ -58,6 +66,8 @@ function mysBuild() {
 
   let ticket = '';
   let currentAccounts = { activeId: '', entries: [] };
+  let verifiedRoles = [];
+  materialsButton.disabled = true;
 
   const message = (text, kind = 'info') => {
     status.textContent = text;
@@ -80,6 +90,11 @@ function mysBuild() {
     }
     refreshButton.disabled = removeButton.disabled = verifyButton.disabled = entries.length === 0;
     roles.hidden = true;
+    uidSelect.hidden = true;
+    verifiedRoles = [];
+    materialsButton.disabled = true;
+    materialsArea.hidden = true;
+    materialsArea.replaceChildren();
   };
 
   const action = async (button, task) => {
@@ -89,7 +104,7 @@ function mysBuild() {
     } catch (error) {
       message(String(error?.message || error), 'error');
     } finally {
-      button.disabled = false;
+      button.disabled = button === materialsButton ? verifiedRoles.length === 0 : false;
     }
   };
 
@@ -151,7 +166,49 @@ function mysBuild() {
         roles.append(mysEl('p', (role.nickname || '旅行者') + ' · ' + role.uid + (role.regionName ? ' · ' + role.regionName : '')));
       }
     }
+    verifiedRoles = response.roles;
+    uidSelect.replaceChildren();
+    for (const role of verifiedRoles) {
+      uidSelect.append(new Option((role.nickname || '旅行者') + ' · ' + role.uid, role.uid));
+    }
+    uidSelect.hidden = verifiedRoles.length <= 1;
+    materialsButton.disabled = verifiedRoles.length === 0;
+    materialsArea.hidden = true;
+    materialsArea.replaceChildren();
     message('账号验证完成，返回 ' + response.roles.length + ' 个国服原神 UID。', 'success');
+  }));
+
+  materialsButton.addEventListener('click', () => void action(materialsButton, async () => {
+    const selected = verifiedRoles.find((role) => role.uid === uidSelect.value);
+    if (!selected) throw new Error('请先验证账号并选择原神 UID。');
+    message('正在查询米游社养成计算器材料…');
+    const response = await mysSend('materials', { uid: selected.uid, region: selected.region });
+    const result = response.materials;
+    materialsArea.replaceChildren();
+    const summary = mysEl('p', 'UID ' + result.uid + ' · 测试 ' + result.avatarCount + ' 名角色、' + result.weaponCount + ' 把武器 · 返回 ' + result.materials.length + ' 种材料');
+    const note = mysEl('p', '持有量为养成计算器按本次需求推算的参考值，可能低于实际背包数量。此次测试不会修改本地背包。', 'mys-auth-description');
+    materialsArea.append(summary, note);
+    if (result.weaponWarning) {
+      materialsArea.append(mysEl('p', '武器目录读取异常：' + result.weaponWarning, 'mys-auth-description'));
+    }
+    const scroll = mysEl('div', '', 'mys-material-list');
+    const table = mysEl('table', '', 'mys-material-table');
+    const head = mysEl('thead');
+    const headRow = mysEl('tr');
+    ['材料', '推算持有', '本次需求', '仍缺'].forEach((label) => headRow.append(mysEl('th', label)));
+    head.append(headRow);
+    table.append(head);
+    const body = mysEl('tbody');
+    for (const item of result.materials) {
+      const row = mysEl('tr');
+      [item.name, String(item.estimatedOwned), String(item.total), String(item.lack)].forEach((value) => row.append(mysEl('td', value)));
+      body.append(row);
+    }
+    table.append(body);
+    scroll.append(table);
+    materialsArea.append(scroll);
+    materialsArea.hidden = false;
+    message('材料验证完成，返回 ' + result.materials.length + ' 种材料。', 'success');
   }));
 
   removeButton.addEventListener('click', () => void action(removeButton, async () => {

@@ -10,3 +10,12 @@
 .mys-auth-status[data-tone="error"] { color: #b91c1c; }
 .mys-auth-roles { display: grid; gap: 4px; padding: 8px; border-radius: 8px; background: rgba(148, 163, 184, .08); }
 .mys-auth-roles p { margin: 0; font-size: 12px; }
+
+.mys-material-results { display: grid; gap: 8px; min-width: 0; }
+.mys-material-results p { margin: 0; font-size: 12px; }
+.mys-material-list { max-height: 340px; overflow: auto; border: 1px solid #d6dce6; border-radius: 8px; }
+.mys-material-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mys-material-table th, .mys-material-table td { padding: 6px 5px; border-bottom: 1px solid #e2e8f0; text-align: right; white-space: nowrap; }
+.mys-material-table th:first-child, .mys-material-table td:first-child { text-align: left; white-space: normal; min-width: 92px; }
+
+.mys-auth [hidden] { display: none; }
