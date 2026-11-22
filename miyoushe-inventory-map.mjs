@@ -20,18 +20,17 @@ export function mapInventoryMaterials({ officialMaterials = [], characterProfile
     const id = parseId(material);
     if (id === null) return;
     const result = reported.get(id);
-    const need = Number(result?.total);
-    const lack = Number(result?.lack);
-    const owned = Number(result?.estimatedOwned);
-    const valid = result && Number.isSafeInteger(need) && need >= 0
-      && Number.isSafeInteger(lack) && lack >= 0 && lack <= need
-      && Number.isSafeInteger(owned) && owned >= 0 && owned === need - lack;
+    const raw = result?.bagOwned;
+    const effective = result?.estimatedOwned;
+    const hasBag = Number.isSafeInteger(raw) && raw >= 0;
+    const hasEffective = Number.isSafeInteger(effective) && effective >= 0;
     rows.push({
       id, key, index,
       name: String(material.name || fallbackLabel),
       current: ownValue(inventory, key, index),
-      official: valid ? owned : null,
-      status: !valid ? 'missing' : lack > 0 ? 'estimate' : 'lowerBound'
+      official: hasBag ? raw : null,
+      effective: hasEffective ? effective : null,
+      status: hasBag ? 'bag' : hasEffective ? 'derived' : 'missing'
     });
   };
 
@@ -62,8 +61,8 @@ export function mapInventoryMaterials({ officialMaterials = [], characterProfile
   }
   return {
     rows,
-    available: rows.filter((row) => row.status === 'estimate').length,
-    lowerBounds: rows.filter((row) => row.status === 'lowerBound').length,
+    available: rows.filter((row) => row.status === 'bag').length,
+    lowerBounds: rows.filter((row) => row.status === 'derived').length,
     missing: rows.filter((row) => row.status === 'missing').length
   };
 }

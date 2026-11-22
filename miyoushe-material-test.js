@@ -101,6 +101,46 @@ function mysCalcSample(characters, weapons, limit = 20) {
   return { items, weaponsIncluded };
 }
 
+
+function mysParseMaterials(response) {
+  const data = response?.data;
+  if (!Array.isArray(data?.overall_consume)) {
+    throw new Error('官方计算结果缺少 overall_consume 材料列表。');
+  }
+  const byId = new Map();
+  for (const item of data.overall_consume) {
+    const id = Number(item?.id);
+    const total = Number(item?.num);
+    const lack = Number(item?.lack_num);
+    if (!Number.isSafeInteger(id) || id <= 0
+      || !Number.isSafeInteger(total) || total < 0
+      || !Number.isSafeInteger(lack) || lack < 0 || lack > total) continue;
+    byId.set(id, {
+      id,
+      name: String(item.name || ('素材 ' + id)),
+      total,
+      lack,
+      estimatedOwned: total - lack,
+      bagOwned: null
+    });
+  }
+  // available_material contains inventory entries associated with the current calculation.
+  // overall_consume represents required amounts and crafting-adjusted deficits.
+  for (const item of Array.isArray(data.available_material) ? data.available_material : []) {
+    const id = Number(item?.id);
+    const quantity = Number(item?.num);
+    if (!Number.isSafeInteger(id) || id <= 0
+      || !Number.isSafeInteger(quantity) || quantity < 0) continue;
+    const row = byId.get(id) || {
+      id, name: String(item.name || ('素材 ' + id)),
+      total: null, lack: null, estimatedOwned: null, bagOwned: null
+    };
+    row.bagOwned = quantity;
+    byId.set(id, row);
+  }
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+}
+
 async function mysMaterials(uid, region) {
   const roles = await mysRoles();
   const role = roles.find((entry) => entry.uid === uid && entry.region === region);
@@ -139,24 +179,8 @@ async function mysMaterials(uid, region) {
   if (result?.data?.has_user_info === false) {
     throw new Error('官方计算结果未包含该 UID 的背包信息，请确认米游社养成计算器能读取该 UID 的数据。');
   }
-  const consume = result?.data?.overall_consume;
-  if (!Array.isArray(consume)) throw new Error('官方计算结果缺少 overall_consume 材料列表。');
-
-  const materials = consume.map((material) => {
-    const total = Number(material.num);
-    const lack = Number(material.lack_num);
-    const id = Number(material.id);
-    if (!Number.isSafeInteger(id) || id <= 0 || !Number.isFinite(total) || !Number.isFinite(lack)
-      || total < 0 || lack < 0 || lack > total) return null;
-    return {
-      id,
-      name: String(material.name || ('素材 ' + id)),
-      total,
-      lack,
-      estimatedOwned: total - lack
-    };
-  }).filter(Boolean).sort((a, b) => a.id - b.id);
-  if (!materials.length) throw new Error('官方计算结果中没有可验证的材料数据。');
+  const materials = mysParseMaterials(result);
+  if (!materials.length) throw new Error('官方计算结果中没有可识别的材料数据。');
 
   const latest = await mysReadAccounts();
   if (latest.activeId !== accountId || latest.entries[accountId]?.stoken !== account.stoken) {

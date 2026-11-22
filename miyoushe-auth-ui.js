@@ -188,7 +188,7 @@ function mysBuild() {
     const result = response.materials;
     materialsArea.replaceChildren();
     const summary = mysEl('p', 'UID ' + result.uid + ' · 测试 ' + result.avatarCount + ' 名角色、' + result.weaponCount + ' 把武器 · 返回 ' + result.materials.length + ' 种材料');
-    const note = mysEl('p', '持有量为养成计算器按本次需求推算的参考值，可能低于实际背包数量。此次测试不会修改本地背包。', 'mys-auth-description');
+    const note = mysEl('p', '背包返回数量来自 available_material，仅覆盖接口本次返回的材料。需求抵扣包含合成换算，只用于养成计算；数据可能存在同步延迟。', 'mys-auth-description');
     materialsArea.append(summary, note);
     if (result.weaponWarning) {
       materialsArea.append(mysEl('p', '武器目录读取异常：' + result.weaponWarning, 'mys-auth-description'));
@@ -197,13 +197,19 @@ function mysBuild() {
     const table = mysEl('table', '', 'mys-material-table');
     const head = mysEl('thead');
     const headRow = mysEl('tr');
-    ['材料', '持有参考', '本次需求', '仍缺'].forEach((label) => headRow.append(mysEl('th', label)));
+    ['材料', '背包返回', '需求抵扣', '本次需求', '仍缺'].forEach((label) => headRow.append(mysEl('th', label)));
     head.append(headRow);
     table.append(head);
     const body = mysEl('tbody');
     for (const item of result.materials) {
       const row = mysEl('tr');
-      [item.name, (item.lack ? '' : '≥') + item.estimatedOwned, String(item.total), String(item.lack)].forEach((value) => row.append(mysEl('td', value)));
+      [
+        item.name,
+        item.bagOwned === null ? '—' : String(item.bagOwned),
+        item.estimatedOwned === null ? '—' : String(item.estimatedOwned),
+        item.total === null ? '—' : String(item.total),
+        item.lack === null ? '—' : String(item.lack)
+      ].forEach((value) => row.append(mysEl('td', value)));
       body.append(row);
     }
     table.append(body);
@@ -216,21 +222,24 @@ function mysBuild() {
       section.append(mysEl('p', '请先选择角色或武器，再次读取材料可查看 ID 对应关系。', 'mys-auth-description'));
     } else {
       section.append(mysEl('p',
-        '有缺口 ' + mapped.available + ' 项 · 需求已覆盖 ' + mapped.lowerBounds
+        '接口背包 ' + mapped.available + ' 项 · 仅有抵扣数据 ' + mapped.lowerBounds
         + ' 项 · 未返回 ' + mapped.missing + ' 项', 'mys-auth-description'));
       const wrap = mysEl('div', '', 'mys-material-list');
       const table = mysEl('table', '', 'mys-material-table');
       const head = mysEl('thead');
       const header = mysEl('tr');
-      ['材料', '当前输入', '官方参考', '状态'].forEach((label) => header.append(mysEl('th', label)));
+      ['材料', '当前输入', '接口背包', '需求抵扣', '状态'].forEach((label) => header.append(mysEl('th', label)));
       head.append(header);
       table.append(head);
       const body = mysEl('tbody');
       for (const row of mapped.rows) {
         const tr = mysEl('tr');
-        const reference = row.status === 'missing' ? '—' : (row.status === 'lowerBound' ? '≥' : '') + row.official;
-        const status = row.status === 'missing' ? '未返回' : row.status === 'lowerBound' ? '下限' : '可核对';
-        [row.name, row.current || '—', reference, status].forEach((value) => tr.append(mysEl('td', value)));
+        const reference = row.official === null ? '—' : String(row.official);
+        const effective = row.effective === null ? '—' : String(row.effective);
+        const status = row.status === 'missing' ? '未返回'
+          : row.status === 'derived' ? '仅抵扣数据' : '背包记录';
+        [row.name, row.current || '—', reference, effective, status]
+          .forEach((value) => tr.append(mysEl('td', value)));
         body.append(tr);
       }
       table.append(body);
