@@ -1,3 +1,5 @@
+import { previewCurrentInventory } from './app.js';
+
 const mysEl = (tag, text = '', cls = '') => {
   const el = document.createElement(tag);
   if (text) el.textContent = text;
@@ -195,18 +197,47 @@ function mysBuild() {
     const table = mysEl('table', '', 'mys-material-table');
     const head = mysEl('thead');
     const headRow = mysEl('tr');
-    ['材料', '推算持有', '本次需求', '仍缺'].forEach((label) => headRow.append(mysEl('th', label)));
+    ['材料', '持有参考', '本次需求', '仍缺'].forEach((label) => headRow.append(mysEl('th', label)));
     head.append(headRow);
     table.append(head);
     const body = mysEl('tbody');
     for (const item of result.materials) {
       const row = mysEl('tr');
-      [item.name, String(item.estimatedOwned), String(item.total), String(item.lack)].forEach((value) => row.append(mysEl('td', value)));
+      [item.name, (item.lack ? '' : '≥') + item.estimatedOwned, String(item.total), String(item.lack)].forEach((value) => row.append(mysEl('td', value)));
       body.append(row);
     }
     table.append(body);
     scroll.append(table);
     materialsArea.append(scroll);
+    const mapped = previewCurrentInventory(result.materials);
+    const section = mysEl('section', '', 'mys-material-mapping');
+    section.append(mysEl('h3', '当前养成对象材料核对'));
+    if (!mapped.rows.length) {
+      section.append(mysEl('p', '请先选择角色或武器，再次读取材料可查看 ID 对应关系。', 'mys-auth-description'));
+    } else {
+      section.append(mysEl('p',
+        '有缺口 ' + mapped.available + ' 项 · 需求已覆盖 ' + mapped.lowerBounds
+        + ' 项 · 未返回 ' + mapped.missing + ' 项', 'mys-auth-description'));
+      const wrap = mysEl('div', '', 'mys-material-list');
+      const table = mysEl('table', '', 'mys-material-table');
+      const head = mysEl('thead');
+      const header = mysEl('tr');
+      ['材料', '当前输入', '官方参考', '状态'].forEach((label) => header.append(mysEl('th', label)));
+      head.append(header);
+      table.append(head);
+      const body = mysEl('tbody');
+      for (const row of mapped.rows) {
+        const tr = mysEl('tr');
+        const reference = row.status === 'missing' ? '—' : (row.status === 'lowerBound' ? '≥' : '') + row.official;
+        const status = row.status === 'missing' ? '未返回' : row.status === 'lowerBound' ? '下限' : '可核对';
+        [row.name, row.current || '—', reference, status].forEach((value) => tr.append(mysEl('td', value)));
+        body.append(tr);
+      }
+      table.append(body);
+      wrap.append(table);
+      section.append(wrap);
+    }
+    materialsArea.append(section);
     materialsArea.hidden = false;
     message('材料验证完成，返回 ' + result.materials.length + ' 种材料。', 'success');
   }));

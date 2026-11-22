@@ -16,6 +16,7 @@ import {
   mergeSourceLists,
   itemIconUrl
 } from './hakushin.mjs';
+import { mapInventoryMaterials } from './miyoushe-inventory-map.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
@@ -195,6 +196,16 @@ function formatWeaponType(value) {
 
 function rarityText(value) {
   return value ? `${value}★` : '';
+}
+
+export function previewCurrentInventory(officialMaterials) {
+  return mapInventoryMaterials({
+    officialMaterials,
+    characterProfile,
+    weaponProfile,
+    inventory: state.inv,
+    rules: state.source.mergeRules
+  });
 }
 
 function getInventoryValue(definition) {
