@@ -185,9 +185,14 @@ function buildMiyoushePanel() {
     message('正在计算当前培养目标的材料缺口…');
     const response = await mysSend('calculate', {uid: role.uid, region: role.region, plan});
     const summary = setOfficialCalculation(role.uid, plan, response.calculation);
-    message('计算完成 · 米游社缺口 ' + summary.officialMissing + ' 项 · '
+    message('计算完成 · 官方缺口 ' + summary.officialMissing + ' 项 · '
       + 'Nanoka 需求 ' + summary.fallbackCount + ' 项'
-      + (summary.unresolved ? ' · 待补充材料 ' + summary.unresolved + ' 项' : '') + '。', 'success');
+      + (summary.probeCoverage.total
+          ? ' · 自动探测 ' + summary.inventoryCount + ' 种材料'
+          + (summary.probeCoverage.completed < summary.probeCoverage.total
+              ? '（部分批次失败）' : '')
+          : '')
+      + (summary.unresolved ? ' · 数据待补充 ' + summary.unresolved + ' 项' : '') + '。', 'success');
   }));
 
   removeButton.addEventListener('click', () => void perform(removeButton, async () => {

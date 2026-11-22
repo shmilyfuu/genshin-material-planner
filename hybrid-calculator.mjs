@@ -114,18 +114,40 @@ export function buildNanokaDemand({ config, characterProfile, weaponProfile, par
   return {groups, unrecognized};
 }
 
-export function evaluateNanokaDemand(demand, { manual = {}, available = [] } = {}) {
+export function evaluateNanokaDemand(demand, {
+  manual = {}, available = [], inventoryProbe = [], officialMaterials = [], mixed = false
+} = {}) {
   const known = new Map();
-  for (const entry of available) {
+  for (const entry of inventoryProbe.length ? inventoryProbe : available) {
     const id = Number(entry?.id), count = Number(entry?.num);
     if (Number.isSafeInteger(id) && id > 0 && number(count)) known.set(id, count);
+  }
+  const consumedByOfficial = new Set(officialMaterials
+    .filter(row => number(row?.total) && row.total > 0)
+    .map(row => Number(row.id)));
+  const remaining = new Map();
+  for (const entry of available) {
+    const id = Number(entry?.id), count = Number(entry?.num);
+    if (Number.isSafeInteger(id) && id > 0 && number(count)) remaining.set(id, count);
   }
   const groups = demand.groups.map(group => {
     const rows = group.rows.map(row => {
       const own = Object.prototype.hasOwnProperty.call(manual, String(row.id))
         ? manual[String(row.id)] : undefined;
-      const stock = number(own) ? own : (known.has(row.id) ? known.get(row.id) : null);
-      return {...row, stock, source: number(own) ? '手动' : known.has(row.id) ? '米游社剩余量' : '待确认'};
+      const officialUsed = mixed && consumedByOfficial.has(row.id);
+      let stock = null;
+      let source = '待确认';
+      if (number(own)) {
+        stock = own;
+        source = '手动';
+      } else if (officialUsed) {
+        stock = remaining.get(row.id) ?? 0;
+        source = '官方计算后可用';
+      } else if (known.has(row.id)) {
+        stock = known.get(row.id);
+        source = inventoryProbe.length ? '米游社推算' : '米游社剩余量';
+      }
+      return {...row, stock, source};
     });
     const complete = rows.every(row => number(row.stock));
     if (complete) {

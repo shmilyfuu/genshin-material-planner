@@ -238,7 +238,8 @@ export function setOfficialCalculation(uid, plan, result) {
     || calculationSignature(uid, plan) !== currentCalculationSignature()) {
     throw new Error('账号或培养目标已变更，请重新计算。');
   }
-  if (!Array.isArray(result?.materials) || !Array.isArray(result?.available)) {
+  if (!Array.isArray(result?.materials) || !Array.isArray(result?.available)
+    || !Array.isArray(result?.inventoryProbe)) {
     throw new Error('米游社计算结果格式错误。');
   }
   const fallback = {
@@ -252,6 +253,8 @@ export function setOfficialCalculation(uid, plan, result) {
     signature: currentCalculationSignature(),
     materials: result.materials,
     available: result.available,
+    inventoryProbe: result.inventoryProbe,
+    probeCoverage: result.probeCoverage || {completed: 0, total: 0},
     demand,
     officialItemCount: Number.isSafeInteger(result.itemCount) ? result.itemCount : 0,
     manualRemaining: {},
@@ -262,6 +265,8 @@ export function setOfficialCalculation(uid, plan, result) {
     officialMissing: result.materials.filter(material => material.lack > 0).length,
     fallbackCount: demand?.groups.reduce((sum, group) =>
       sum + group.rows.filter(row => row.count > 0).length, 0) || 0,
+    inventoryCount: result.inventoryProbe.length,
+    probeCoverage: result.probeCoverage || {completed: 0, total: 0},
     unresolved: demand?.unrecognized.length || 0
   };
 }
@@ -613,13 +618,17 @@ function appendHybridResults(container, calculation) {
   const mixed = calculation.officialItemCount > 0;
   const manual = mixed ? calculation.manualRemaining : (state.hybridInventory[uid] || {});
   const stock = evaluateNanokaDemand(calculation.demand, {
-    manual, available: calculation.available
+    manual,
+    available: calculation.available,
+    inventoryProbe: calculation.inventoryProbe,
+    officialMaterials: calculation.materials,
+    mixed
   });
   const label = document.createElement('p');
   label.className = 'hybrid-inventory-description';
   label.textContent = mixed
-    ? 'Nanoka 材料需求 · 请填写米游社已计算部分扣除后的本次剩余库存。'
-    : 'Nanoka 材料需求 · 填写游戏背包实际数量后，可按材料等级计算剩余缺口。';
+    ? '米游社自动探测材料数量，并优先采用官方计算后余量。推算数量可能包含合成，必要时可填写本次剩余数量。'
+    : '已使用米游社探测的材料数量自动计算。合成材料的推算数量可能与背包实数存在差异，可直接修改。';
   container.append(label);
   for (const group of stock.groups) {
     const section = createResultSection(group.title + ' · Nanoka');
@@ -648,8 +657,10 @@ function appendHybridResults(container, calculation) {
       input.setAttribute('aria-label', item.name + '可用数量');
       input.value = item.stock === null ? '' : String(item.stock);
       const stockLabel = document.createElement('span');
-      stockLabel.textContent = item.source === '米游社剩余量'
-        ? '接口剩余' : mixed ? '本次剩余' : '背包数量';
+      stockLabel.textContent = item.source === '米游社推算'
+        ? '米游社推算' : item.source === '官方计算后可用'
+          ? '官方余量' : item.source === '米游社剩余量'
+            ? '接口剩余' : mixed ? '本次剩余' : '背包数量';
       editor.append(stockLabel, input);
       input.addEventListener('change', () => {
         const value = input.value.trim();
