@@ -11,7 +11,7 @@ const char = {materials: {
   spec: {id: 10, name: '妖精绿艾'},
   boss: {id: 11}, weekly: {id: 12}, crown: {id: 13},
   charGems: [1,2,3,4].map((id, i) => ({id: 100 + id, rank: i + 2})),
-  cult: [1,2,3].map((id, i) => ({id: 200 + id, rank: i + 1})),
+  cult: [1,2,3].map((id, i) => ({id: 110200 + id, rank: i + 1})),
   books: [1,2,3].map((id, i) => ({id: 300 + id, rank: i + 2}))
 }};
 const weapon = {materials: {
@@ -31,11 +31,12 @@ test('角色与武器共用材料 ID 时合并需求，只计算一次库存', (
   const demand=buildNanokaDemand({config:full,characterProfile:char,weaponProfile:weapon,parts:{character:true,weapon:true}});
   const rows=demand.groups.flatMap(g=>g.rows);
   assert.equal(rows.filter(r=>r.id===202).length,1);
-  assert.equal(rows.filter(r=>r.id===202).length,1);
-  assert.equal(rows.find(r=>r.id===202).count,18+23+5);
-  assert.equal(rows.find(r=>r.id===203).count,36+27+23);
-  assert.equal(rows.find(r=>r.id===204).count,41);
-  assert.equal(demand.groups.filter(g=>g.rows.some(r=>r.id===202)).length,1);
+  assert.equal(rows.find(r=>r.id===202).count,420000+255000);
+  assert.equal(rows.filter(r=>r.id===110202).length,1);
+  assert.equal(rows.find(r=>r.id===110202).count,30+23+23);
+  assert.equal(rows.find(r=>r.id===110203).count,36+27+27);
+  assert.equal(rows.find(r=>r.id===110204).count,41);
+  assert.equal(demand.groups.filter(g=>g.rows.some(r=>r.id===110202)).length,1);
 });
 test('可用量只视为已返回的剩余量，未知库存保留 null', () => {
   const d=buildNanokaDemand({config:full,characterProfile:char,parts:{character:true}});
@@ -46,10 +47,10 @@ test('可用量只视为已返回的剩余量，未知库存保留 null', () => 
 });
 test('等级材料需全部有库存后才进行向上合成，按材料 ID 识别', () => {
   const d=buildNanokaDemand({config:full,weaponProfile:weapon,parts:{weapon:true}});
-  const manual={'401':0,'402':0,'403':0,'404':0,'202':47,'203':36,'204':11,'201':0};
+  const manual={'401':0,'402':0,'403':0,'404':0,'110201':47,'110202':36,'110203':11,'110204':0};
   const x=evaluateNanokaDemand(d,{manual});
-  assert.ok(x.groups.some(g=>g.family && g.complete && g.rows.some(r=>r.id===204)));
-  assert.equal(x.groups.find(g=>g.rows.some(r=>r.id===202)).rows.find(r=>r.id===202).stock,47);
+  assert.ok(x.groups.some(g=>g.family && g.complete && g.rows.some(r=>r.id===110204)));
+  assert.equal(x.groups.find(g=>g.rows.some(r=>r.id===110201)).rows.find(r=>r.id===110201).stock,47);
 });
 test('前瞻尚未实装材料如果缺少 ID，报告未识别数量', () => {
   const incomplete=structuredClone(char);
