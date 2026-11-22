@@ -193,3 +193,24 @@ test('相同材料 ID 若输入框数量冲突，跳过该材料，避免采用�
   assert.equal(Object.hasOwn(manual.values,'110202'),false);
   assert.equal(manual.conflicts.length,3);
 });
+
+
+test('雪缚系列：高阶实物 8 与合成推算 19 分别得到缺 21 和缺 10', () => {
+  const profile=structuredClone(weapon);
+  profile.materials.matB=[{id:501,rank:1},{id:502,rank:2},{id:503,rank:3}];
+  const demand=buildNanokaDemand({config:full,weaponProfile:profile,parts:{weapon:true}});
+  const manual={'110202':114,'110203':32,'110204':8};
+  const probes=[
+    {id:110202,num:114},{id:110203,num:32},{id:110204,num:19}
+  ];
+  const accurate=evaluateNanokaDemand(demand,{manualReference:manual,inventoryProbe:probes});
+  const row=accurate.groups.flatMap(group=>group.rows).find(item=>item.id===110204);
+  assert.equal(row.stock,8);
+  assert.equal(row.lack,21);
+  assert.equal(row.different,true);
+
+  const estimate=evaluateNanokaDemand(demand,{inventoryProbe:probes});
+  const family=estimate.groups.find(group=>group.rows.some(item=>item.id===110204));
+  assert.equal(family.complete,false);
+  assert.equal(family.rows.find(item=>item.id===110204).lack,null);
+});
