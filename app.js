@@ -16,7 +16,7 @@ import {
   mergeSourceLists,
   itemIconUrl
 } from './hakushin.mjs';
-import {buildNanokaDemand, evaluateNanokaDemand} from './hybrid-calculator.mjs';
+import {buildNanokaDemand, evaluateNanokaDemand, mapManualInventory} from './hybrid-calculator.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
@@ -233,6 +233,23 @@ export function chooseInventoryUid(uid) {
   scheduleSave();
 }
 
+function importSavedManualInventory(uid) {
+  if (!uid || state.manualInventoryImportUid) return;
+  const mapped = mapManualInventory({
+    inventory: state.inv,
+    characterProfile,
+    weaponProfile,
+    mergeRules: getMergeRules()
+  });
+  if (!Object.keys(mapped.values).length) return;
+  state.verifiedInventory[uid] = {
+    ...(state.verifiedInventory[uid] || {}),
+    ...mapped.values
+  };
+  state.manualInventoryImportUid = uid;
+  scheduleSave();
+}
+
 export function setOfficialCalculation(uid, plan, result) {
   if (getCalculationMode() !== 'official' || uid !== currentUid()
     || calculationSignature(uid, plan) !== currentCalculationSignature()) {
@@ -242,6 +259,7 @@ export function setOfficialCalculation(uid, plan, result) {
     || !Array.isArray(result?.inventoryProbe)) {
     throw new Error('米游社计算结果格式错误。');
   }
+  importSavedManualInventory(uid);
   const fallback = {
     character: result.fallback?.character === true,
     weapon: result.fallback?.weapon === true
@@ -301,9 +319,32 @@ function getInventoryValue(definition) {
   return definition.index === undefined ? value : value[definition.index];
 }
 
+function materialIdForInventoryInput(definition) {
+  let material;
+  if (definition.key === 'gold') material = {id: 202};
+  else if (definition.key === 'cult' && definition.index === 3) material = getCultMaterial(3);
+  else if (['spec', 'boss', 'weekly', 'crown'].includes(definition.key)) {
+    material = materialAt(definition.key);
+  } else {
+    material = materialAt(definition.key, definition.index);
+  }
+  const id = Number(material?.id);
+  return Number.isSafeInteger(id) && id > 0 ? String(id) : '';
+}
+
 function setInventoryValue(definition, value) {
   if (definition.index === undefined) state.inv[definition.key] = value;
   else state.inv[definition.key][definition.index] = value;
+  const uid = currentUid();
+  const materialId = materialIdForInventoryInput(definition);
+  if (!uid || !materialId) return;
+  const bag = state.verifiedInventory[uid] ||= {};
+  if (!String(value).trim()) {
+    delete bag[materialId];
+  } else {
+    const parsed = safeEval(value);
+    if (Number.isSafeInteger(parsed) && parsed >= 0) bag[materialId] = parsed;
+  }
 }
 
 function scheduleSave(options = {}) {
@@ -621,21 +662,24 @@ function appendHybridResults(container, calculation) {
     manual,
     available: calculation.available,
     inventoryProbe: calculation.inventoryProbe,
+    manualReference: state.verifiedInventory[uid] || {},
     officialMaterials: calculation.materials,
     mixed
   });
   const label = document.createElement('p');
   label.className = 'hybrid-inventory-description';
   label.textContent = mixed
-    ? '米游社自动探测材料数量，并优先采用官方计算后余量。推算数量可能包含合成，必要时可填写本次剩余数量。'
-    : '已使用米游社探测的材料数量自动计算。合成材料的推算数量可能与背包实数存在差异，可直接修改。';
+    ? '已确认的手动数量按材料 ID 对照；官方已计算的材料使用本次剩余量。合成材料需核对库存。'
+    : '优先使用已确认的手动数量。米游社推算可能包含合成产物，未确认的材料系列显示需求量。';
   container.append(label);
   for (const group of stock.groups) {
     const section = createResultSection(group.title + ' · Nanoka');
     if (!group.complete) {
       const note = document.createElement('p');
       note.className = 'hybrid-inventory-note';
-      note.textContent = '库存尚未全部确认，当前仅展示培养需求。';
+      note.textContent = group.covered
+        ? '当前库存包含米游社合成推算，缺口待核对；暂显示培养需求。'
+        : '库存尚未全部确认，当前显示培养需求。';
       section.section.append(note);
     }
     for (const item of group.rows) {
@@ -645,7 +689,7 @@ function appendHybridResults(container, calculation) {
       const amount = row.querySelector('strong');
       amount.textContent = group.complete
         ? (item.lack ? '缺 × ' + item.lack.toLocaleString() : '已满足')
-        : item.count ? '需 × ' + item.count.toLocaleString() : '合成可用';
+        : item.count ? '需 × ' + item.count.toLocaleString() : '—';
       const editor = document.createElement('label');
       editor.className = 'hybrid-stock';
       const input = document.createElement('input');
@@ -659,8 +703,10 @@ function appendHybridResults(container, calculation) {
       const stockLabel = document.createElement('span');
       stockLabel.textContent = item.source === '米游社推算'
         ? '米游社推算' : item.source === '官方计算后可用'
-          ? '官方余量' : item.source === '米游社剩余量'
-            ? '接口剩余' : mixed ? '本次剩余' : '背包数量';
+          ? '官方余量' : item.source === '手动背包'
+            ? '手动背包' : item.source === '手动确认'
+              ? '手动确认' : item.source === '米游社剩余量'
+                ? '接口剩余' : mixed ? '本次剩余' : '背包数量';
       editor.append(stockLabel, input);
       input.addEventListener('change', () => {
         const value = input.value.trim();
@@ -679,6 +725,13 @@ function appendHybridResults(container, calculation) {
         if (!mixed) scheduleSave();
       });
       row.append(editor);
+      if (item.different) {
+        const difference = document.createElement('small');
+        difference.className = 'hybrid-stock-difference';
+        difference.textContent = '手动背包 ' + item.manualReference.toLocaleString()
+          + ' · 米游社推算 ' + item.probeValue.toLocaleString();
+        row.append(difference);
+      }
       section.rows.append(row);
     }
     container.append(section.section);

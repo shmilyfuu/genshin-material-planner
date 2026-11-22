@@ -60,6 +60,8 @@ export const DEFAULT_STATE = Object.freeze({
   inventoryUid: '',
   calculationMode: 'manual',
   hybridInventory: {},
+  verifiedInventory: {},
+  manualInventoryImportUid: '',
   inv: {
     gold: '',
     spec: '',
@@ -135,6 +137,9 @@ export function normalizeState(input) {
     inventoryUid: /^\d{6,12}$/.test(String(source.inventoryUid || '')) ? String(source.inventoryUid) : '',
     calculationMode: source.calculationMode === 'official' ? 'official' : 'manual',
     hybridInventory: normalizeHybridInventory(source.hybridInventory),
+    verifiedInventory: normalizeHybridInventory(source.verifiedInventory),
+    manualInventoryImportUid: /^\d{6,12}$/.test(String(source.manualInventoryImportUid || ''))
+      ? String(source.manualInventoryImportUid) : '',
     source: {
       selectedCharacterId: normalizeString(sourceSettings.selectedCharacterId),
       selectedCharacterName: normalizeString(sourceSettings.selectedCharacterName),
