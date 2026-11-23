@@ -10,3 +10,20 @@ Source: https://github.com/kazuhikoarase/qrcode-generator
 
 The bundled source file retains its original copyright and license notice.
 The library is bundled locally and does not rely on an external image service.
+
+## Genshin Impact artwork
+
+Character development icon and rarity background artwork originate from Genshin Impact game assets.
+
+The character development icon is catalogued at:
+https://genshin-impact.fandom.com/wiki/File:Icon_Inventory_Character_Development_Items.png
+
+Rarity backgrounds are catalogued at:
+https://genshin-impact.fandom.com/wiki/Category:Item_Backgrounds
+
+Local copies were sourced from:
+https://github.com/xhmyjae/Build-Me-Paimon
+https://github.com/Primajin/genshin-farming-helper
+https://github.com/Kiyang101/Genshin-Randomizer-v2
+
+Game artwork remains the property of its respective rights holders.
