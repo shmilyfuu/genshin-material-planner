@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>原神养成规划</title>
+  <link rel="stylesheet" href="desktop.css">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="app-identity">
+        <div class="app-mark">◆</div>
+        <div><strong>原神养成规划</strong><span>多培养项 · 本地手动背包</span></div>
+      </div>
+      <span class="data-status" id="dataStatus" role="status">正在读取本地数据…</span>
+      <div class="header-actions">
+        <button type="button" class="soft-btn" id="refreshButton">刷新资料</button>
+        <button type="button" class="soft-btn" id="importButton">导入</button>
+        <button type="button" class="soft-btn" id="exportButton">导出</button>
+        <button type="button" class="soft-btn disabled" disabled title="预留米游社登录入口">米游社登录 · 预留</button>
+      </div>
+    </header>
+
+    <div class="workbench">
+      <aside class="account-rail">
+        <div class="rail-label">当前规划账号</div>
+        <div class="account-picker"><select id="accountSelect" aria-label="选择账号"></select></div>
+        <div class="account-buttons">
+          <button id="addAccountButton" type="button">添加</button>
+          <button id="renameAccountButton" type="button">重命名</button>
+          <button id="deleteAccountButton" type="button">删除</button>
+        </div>
+        <div class="rail-rule"></div>
+        <div class="rail-heading"><strong>培养项</strong><span id="planCounter">0 项</span></div>
+        <div class="plan-list" id="planList" role="listbox" aria-label="培养项"></div>
+        <button class="new-plan" type="button" id="addPlanButton">＋ 添加培养项</button>
+        <div class="rail-bottom"><span>所有培养项使用当前账号的同一份背包</span></div>
+      </aside>
+
+      <main class="editor">
+        <div class="editor-heading">
+          <div><span class="eyebrow" id="activePlanLabel">培养项 1</span><h1 id="activePlanTitle">选择培养对象</h1></div>
+          <button class="text-danger" id="removePlanButton" type="button">删除当前项</button>
+        </div>
+        <section class="chooser-panel">
+          <div class="tabs" role="tablist" aria-label="培养对象">
+            <button type="button" class="tab active" data-tab="character" aria-selected="true">角色选择</button>
+            <button type="button" class="tab" data-tab="weapon" aria-selected="false">武器选择</button>
+            <div class="tabs-right"><button id="clearSelectionButton" type="button" class="clear-selection">清空当前选择</button></div>
+          </div>
+          <div class="filter-area">
+            <div class="filter-top">
+              <label class="searchbox"><span class="search-icon" aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索角色名称" autocomplete="off"></label>
+              <div class="filter-row" id="starFilters" aria-label="星级筛选"></div>
+            </div>
+            <div class="filter-row" id="elementFilters" aria-label="元素筛选"></div>
+            <div class="filter-row" id="weaponFilters" aria-label="武器类型筛选"></div>
+          </div>
+          <div class="roster-scroll" id="rosterScroll"><div class="roster-grid" id="rosterGrid" aria-live="polite"></div></div>
+          <div class="roster-foot"><span id="rosterCount">—</span><span>单击头像选择培养对象</span></div>
+        </section>
+        <section class="targets-panel">
+          <div class="section-title"><strong>培养目标</strong><span>每项独立设置当前等级与目标等级</span></div>
+          <div class="target-groups" id="targetGroups"></div>
+        </section>
+      </main>
+
+      <aside class="inventory-rail">
+        <div class="inventory-heading"><div><strong>背包材料</strong><span>当前培养项</span></div><div class="inventory-tag">手动数量</div></div>
+        <p class="inventory-note">共用材料按 ID 同步，同一账号只扣除一次库存。</p>
+        <div class="inventory-scroll" id="inventoryGroups"></div>
+      </aside>
+    </div>
+
+    <details class="deficit-drawer" id="deficitDrawer">
+      <summary><span class="drawer-arrow" aria-hidden="true">▾</span><strong>全部培养项 · 材料缺口</strong><span id="resultSummary">选择目标后查看合并需求</span><span class="drawer-end">展开详情</span></summary>
+      <div class="drawer-content" id="resultContent"></div>
+    </details>
+  </div>
+
+  <div class="modal-backdrop" id="modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle">账号名称</h2>
+      <p id="modalDescription"></p>
+      <input id="modalInput" type="text" maxlength="32" autocomplete="off">
+      <div class="modal-actions"><button type="button" id="modalCancel">取消</button><button class="primary-btn" type="button" id="modalConfirm">确认</button></div>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="desktop-app.mjs"></script>
+</body>
+</html>

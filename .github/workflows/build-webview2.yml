@@ -1,0 +1,50 @@
+name: Build Windows WebView2 planner
+
+on:
+  push:
+    branches:
+      - desktop/webview2
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/build-webview2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Validate JavaScript and planner logic
+        shell: pwsh
+        run: |
+          node --check desktop/GenshinPlanner/wwwroot/desktop-app.mjs
+          node --test desktop/GenshinPlanner/tests/desktop.test.mjs
+          node --test tests/*.test.mjs
+      - name: Publish desktop app
+        shell: pwsh
+        run: |
+          dotnet restore desktop/GenshinPlanner/GenshinPlanner.csproj
+          dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish /p:PublishReadyToRun=false
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path desktop/publish/GenshinPlanner.exe)) { throw 'Executable missing' }
+          if (-not (Test-Path desktop/publish/wwwroot/desktop-app.mjs)) { throw 'Frontend missing' }
+      - name: Package portable Windows app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path desktop/dist | Out-Null
+          Compress-Archive -Path desktop/publish/* -DestinationPath desktop/dist/GenshinPlanner-WebView2-win-x64.zip -Force
+          (Get-FileHash desktop/dist/GenshinPlanner-WebView2-win-x64.zip -Algorithm SHA256).Hash.ToLower() | Set-Content desktop/dist/GenshinPlanner-WebView2-win-x64.zip.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GenshinPlanner-WebView2-win-x64-preview
+          path: |
+            desktop/dist/GenshinPlanner-WebView2-win-x64.zip
+            desktop/dist/GenshinPlanner-WebView2-win-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
