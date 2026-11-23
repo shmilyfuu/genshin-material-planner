@@ -40,6 +40,29 @@ export function makeWeaponInstance(row,fields={}){
     lock:Boolean(fields.lock),scanned:Boolean(fields.scanned)};
 }
 
+export function removeWeaponInstance(state,instanceId){
+  const existing=weaponInstance(state,instanceId);
+  if(!existing)throw new Error('武器实例不存在。');
+  const matching=state.weaponInstances.filter(item=>item.weaponId===existing.weaponId);
+  if(matching.length<=1)throw new Error('至少保留一把该名称的武器。');
+
+  const removedGoalIds=state.plans
+    .filter(goal=>goalKind(goal)==='weapon'&&goal.weaponInstanceId===instanceId)
+    .map(goal=>goal.id);
+  const removed=new Set(removedGoalIds);
+  state.weaponInstances=state.weaponInstances.filter(item=>item.id!==instanceId);
+  state.plans=state.plans.filter(goal=>!removed.has(goal.id));
+  for(const goal of state.plans){
+    if(goalKind(goal)==='character'&&goal.linkedWeaponInstanceId===instanceId){
+      goal.linkedWeaponInstanceId='';
+    }
+  }
+  if(removed.has(state.activePlanId)){
+    state.activePlanId=state.plans[0]?.id||'';
+  }
+  return {removedGoalIds};
+}
+
 export function initializePlanner(state){
   state.ownedCharacters ||= {};
   state.weaponInstances ||= [];
