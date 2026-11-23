@@ -157,3 +157,46 @@ export function calculateMultiPlan(entries, inventory = {}) {
     materials: [...materials.values()]
   };
 }
+
+
+export function collectInventoryCatalog(entries) {
+  const seen = new Set();
+  const sections = {
+    basicInventory: [], cultInventory: [],
+    talentInventory: [], weaponInventory: []
+  };
+  const add = (container,title,materials) => {
+    const rows = [];
+    for (const material of materials) {
+      const id = idOf(material);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      rows.push({
+        id, name: String(material.name || '材料 '+id),
+        rank: Number(material.rank) || 0
+      });
+    }
+    if (rows.length) sections[container].push({title,rows});
+  };
+  add('basicInventory','', [{id:202,name:'摩拉'}]);
+  for (const entry of entries) {
+    const character=entry.characterProfile;
+    const weapon=entry.weaponProfile;
+    if (character) {
+      const materials=character.materials || {};
+      add('basicInventory','',[
+        materials.spec,materials.boss,materials.weekly,materials.crown
+      ]);
+      add('cultInventory','角色培养素材',materials.cult || []);
+      add('talentInventory','天赋书',materials.books || []);
+      add('talentInventory','角色突破石',materials.charGems || []);
+    }
+    if (weapon) {
+      const materials=weapon.materials || {};
+      add('weaponInventory','武器突破秘境材料',materials.weapGems || []);
+      add('weaponInventory','武器素材 A',materials.matA || []);
+      add('weaponInventory','武器素材 B',materials.matB || []);
+    }
+  }
+  return sections;
+}

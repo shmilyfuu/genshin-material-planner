@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {calculateMultiPlan,migrateLegacyInventory} from '../multi-planner.mjs';
+import {calculateMultiPlan,migrateLegacyInventory,collectInventoryCatalog} from '../multi-planner.mjs';
 
 const defaults=()=>({charAsc:[0,6],weapAsc:[0,6],talentA:[0,0],talentE:[0,0],talentQ:[0,0]});
 const character=(id,spec,books=[301,302,303])=>({
@@ -81,4 +81,19 @@ test('所有培养项未选择时没有需求',()=>{
   const result=calculateMultiPlan([{plan:plan()}],{});
   assert.equal(result.hasAnyTarget,false);
   assert.equal(result.groups.length,0);
+});
+
+
+test('养成目标尚未设置时也提供角色与武器所有材料的背包输入',()=>{
+  const plans=[
+    {plan:plan(1),characterProfile:character(1,501),weaponProfile:null},
+    {plan:plan('',16),characterProfile:null,weaponProfile:weapon(16)}
+  ];
+  const catalogue=collectInventoryCatalog(plans);
+  const all=Object.values(catalogue).flatMap(groups=>groups.flatMap(g=>g.rows));
+  assert.equal(all.find(r=>r.id==='501').name,'特产501');
+  assert.ok(all.some(r=>r.id==='202'));
+  assert.ok(all.some(r=>r.id==='114004'));
+  assert.equal(all.filter(r=>r.id==='110201').length,1);
+  assert.equal(new Set(all.map(r=>r.id)).size,all.length);
 });

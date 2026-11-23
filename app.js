@@ -16,7 +16,7 @@ import {
   itemIconUrl
 } from './hakushin.mjs';
 import {buildNanokaDemand, evaluateNanokaDemand, mapManualInventory} from './hybrid-calculator.mjs';
-import {calculateMultiPlan,migrateLegacyInventory} from './multi-planner.mjs';
+import {calculateMultiPlan,migrateLegacyInventory,collectInventoryCatalog} from './multi-planner.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
@@ -544,33 +544,31 @@ function createMultiInventoryInput(material) {
 }
 
 function renderInventory() {
-  const holders = ['basicInventory','cultInventory','talentInventory','weaponInventory'];
-  for (const id of holders) document.getElementById(id).replaceChildren();
-  document.getElementById('independentWeaponMaterials').replaceChildren();
-  const result = currentMultiCalculation();
-  const flat = new Map();
-  for (const group of result.groups) {
-    if (group.family) {
-      let target = 'weaponInventory';
-      if (group.title.includes('天赋书') || group.title.includes('角色突破石')) target='talentInventory';
-      else if (group.title.includes('角色培养') || group.title.includes('共同培养')) target='cultInventory';
-      const section = document.createElement('section');
+  const result = collectInventoryCatalog(state.plans.map(plan=>({
+    characterProfile:planProfiles.get(plan.id)?.characterProfile || null,
+    weaponProfile:planProfiles.get(plan.id)?.weaponProfile || null
+  })));
+  for (const [containerId,sections] of Object.entries(result)) {
+    const holder=document.getElementById(containerId);
+    holder.replaceChildren();
+    for (const group of sections) {
+      if (!group.title) {
+        for (const row of group.rows) holder.append(createMultiInventoryInput(row));
+        continue;
+      }
+      const section=document.createElement('section');
       section.className='independent-group';
       const title=document.createElement('h3');
       title.textContent=group.title;
       const grid=document.createElement('div');
       grid.className='input-grid';
-      for (const item of group.rows) grid.append(createMultiInventoryInput(item));
+      for (const row of group.rows) grid.append(createMultiInventoryInput(row));
       section.append(title,grid);
-      document.getElementById(target).append(section);
-    } else {
-      for (const row of group.rows) flat.set(String(row.id),row);
+      holder.append(section);
     }
   }
-  for (const row of flat.values()) document.getElementById('basicInventory').append(createMultiInventoryInput(row));
+  document.getElementById('independentWeaponMaterials').replaceChildren();
 }
-
-
 
 function createResultSection(title) {
   const section = document.createElement('section');
