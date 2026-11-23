@@ -24,7 +24,9 @@ test('桌面窗口使用可调整三栏、顶部培养区、日历和常驻缺�
   assert.ok(js.includes("bridge('ui.layout.save'"));
   assert.ok(js.includes("className='deficit-name'"));
   assert.ok(js.includes("className='material-arrows'"));
-  assert.ok(html.includes('id="goalModal"'));\n  assert.ok(html.includes('id="activeGoals"'));\n  assert.ok(html.includes('id="calendarDays"'));
+  assert.ok(html.includes('id="goalModal"'));
+  assert.ok(html.includes('id="activeGoals"'));
+  assert.ok(html.includes('id="calendarDays"'));
 });
 
 
