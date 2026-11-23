@@ -1,6 +1,5 @@
 import {
   CHAR_LEVEL_LABELS,
-  calculateResult,
   cloneDefaultState,
   normalizeState,
   safeEval
@@ -17,22 +16,13 @@ import {
   itemIconUrl
 } from './hakushin.mjs';
 import {buildNanokaDemand, evaluateNanokaDemand, mapManualInventory} from './hybrid-calculator.mjs';
+import {calculateMultiPlan,migrateLegacyInventory} from './multi-planner.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
 const OLD_EXPORT_TYPE = 'material-planner-sidepanel-config';
-const TIER_COLOR_MAP = {
-  白色: 'white',
-  绿色: 'green',
-  蓝色: 'blue',
-  紫色: 'purple',
-  金色: 'gold',
-  白: 'white',
-  绿: 'green',
-  蓝: 'blue',
-  紫: 'purple',
-  金: 'gold'
-};
+
+
 const ELEMENT_LABELS = {
   Pyro: '火', Hydro: '水', Cryo: '冰', Electro: '雷', Anemo: '风', Geo: '岩', Dendro: '草'
 };
@@ -49,36 +39,7 @@ const selectorDefinitions = [
   { container: 'weaponSelectors', key: 'weapAsc', label: '武器等级', labels: CHAR_LEVEL_LABELS }
 ];
 
-const inventoryDefinitions = {
-  basicInventory: [
-    { key: 'gold', label: '金币', color: 'base' },
-    { key: 'spec', label: '区域特产', color: 'base' },
-    { key: 'boss', label: 'Boss 素材', color: 'base' },
-    { key: 'weekly', label: '周本材料', color: 'base' },
-    { key: 'crown', label: '皇冠', color: 'gold' }
-  ],
-  cultInventory: [
-    { key: 'cult', index: 0, label: '白色培养素材', color: 'white' },
-    { key: 'cult', index: 1, label: '绿色培养素材', color: 'green' },
-    { key: 'cult', index: 2, label: '蓝色培养素材', color: 'blue' },
-    { key: 'cult', index: 3, label: '紫色培养素材', color: 'purple', condition: (state) => Boolean(state.source?.mergeRules?.matAIntoCult) }
-  ],
-  talentInventory: [
-    { key: 'books', index: 0, label: '绿天赋书', color: 'green' },
-    { key: 'books', index: 1, label: '蓝天赋书', color: 'blue' },
-    { key: 'books', index: 2, label: '紫天赋书', color: 'purple' },
-    { key: 'charGems', index: 0, label: '绿角色石头', color: 'green' },
-    { key: 'charGems', index: 1, label: '蓝角色石头', color: 'blue' },
-    { key: 'charGems', index: 2, label: '紫角色石头', color: 'purple' },
-    { key: 'charGems', index: 3, label: '金角色石头', color: 'gold' }
-  ],
-  weaponInventory: [
-    { key: 'weapGems', index: 0, label: '绿武器材料', color: 'green' },
-    { key: 'weapGems', index: 1, label: '蓝武器材料', color: 'blue' },
-    { key: 'weapGems', index: 2, label: '紫武器材料', color: 'purple' },
-    { key: 'weapGems', index: 3, label: '金武器材料', color: 'gold' }
-  ]
-};
+
 
 let state = cloneDefaultState();
 let saveTimer = null;
@@ -88,6 +49,9 @@ let characterList = [];
 let weaponList = [];
 let characterProfile = null;
 let weaponProfile = null;
+let planProfiles = new Map();
+let profileLoadSerial = 0;
+let nextPlanSerial = 0;
 let syncInfo = { live: '', latest: '', listSource: 'none' };
 let uiFilters = {
   characterSearch: '',
@@ -196,6 +160,100 @@ function formatWeaponType(value) {
 
 function rarityText(value) {
   return value ? `${value}★` : '';
+}
+
+function activePlan() {
+  return state.plans.find(plan => plan.id === state.activePlanId) || state.plans[0];
+}
+
+function commitActivePlan() {
+  const plan = activePlan();
+  if (plan) {
+    plan.source = structuredClone(state.source);
+    plan.config = structuredClone(state.config);
+  }
+}
+
+function showActivePlan() {
+  const plan = activePlan();
+  if (!plan) return;
+  state.source = structuredClone(plan.source);
+  state.config = structuredClone(plan.config);
+  const profiles = planProfiles.get(plan.id) || {};
+  characterProfile = profiles.characterProfile || null;
+  weaponProfile = profiles.weaponProfile || null;
+  renderPlanItems();
+  renderSourceControls();
+  renderSelectors();
+  renderInventory();
+  renderResults();
+}
+
+function renderPlanItems() {
+  const holder = document.getElementById('planItems');
+  if (!holder) return;
+  holder.replaceChildren();
+  state.plans.forEach((plan,index) => {
+    const source = plan.id === state.activePlanId ? state.source : plan.source;
+    const names = [source.selectedCharacterName,source.selectedWeaponName].filter(Boolean);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'plan-item' + (plan.id === state.activePlanId ? ' active' : '');
+    button.setAttribute('aria-pressed',String(plan.id === state.activePlanId));
+    button.textContent = '培养项 ' + (index + 1) + (names.length ? ' · ' + names.join(' + ') : ' · 选择养成对象');
+    button.addEventListener('click',() => {
+      if (plan.id === state.activePlanId) return;
+      commitActivePlan();
+      state.activePlanId = plan.id;
+      officialCalculation = null;
+      showActivePlan();
+      scheduleSave();
+    });
+    holder.append(button);
+  });
+  const remove = document.getElementById('removePlanButton');
+  if (remove) remove.disabled = state.plans.length === 1
+    && !state.source.selectedCharacterId && !state.source.selectedWeaponId;
+}
+
+function addPlan() {
+  commitActivePlan();
+  const defaults = cloneDefaultState();
+  const id = 'item-' + Date.now().toString(36) + '-' + (++nextPlanSerial);
+  state.plans.push({id,source:defaults.source,config:defaults.config});
+  state.activePlanId = id;
+  officialCalculation = null;
+  showActivePlan();
+  scheduleSave({immediate:true});
+}
+
+function removePlan() {
+  commitActivePlan();
+  const index=state.plans.findIndex(plan=>plan.id===state.activePlanId);
+  if(index<0)return;
+  const removed=state.plans[index];
+  state.plans.splice(index,1);
+  planProfiles.delete(removed.id);
+  if (!state.plans.length) {
+    const defaults=cloneDefaultState();
+    state.plans=defaults.plans;
+  }
+  state.activePlanId=state.plans[Math.min(index,state.plans.length-1)].id;
+  officialCalculation=null;
+  showActivePlan();
+  scheduleSave({immediate:true});
+}
+
+function currentMultiCalculation() {
+  commitActivePlan();
+  return calculateMultiPlan(
+    state.plans.map(plan=>({
+      plan,
+      characterProfile:planProfiles.get(plan.id)?.characterProfile || null,
+      weaponProfile:planProfiles.get(plan.id)?.weaponProfile || null
+    })),
+    state.materialInventory
+  );
 }
 
 let officialCalculation = null;
@@ -314,38 +372,7 @@ function chooseCalculationMode(mode) {
   scheduleSave();
 }
 
-function getInventoryValue(definition) {
-  const value = state.inv[definition.key];
-  return definition.index === undefined ? value : value[definition.index];
-}
 
-function materialIdForInventoryInput(definition) {
-  let material;
-  if (definition.key === 'gold') material = {id: 202};
-  else if (definition.key === 'cult' && definition.index === 3) material = getCultMaterial(3);
-  else if (['spec', 'boss', 'weekly', 'crown'].includes(definition.key)) {
-    material = materialAt(definition.key);
-  } else {
-    material = materialAt(definition.key, definition.index);
-  }
-  const id = Number(material?.id);
-  return Number.isSafeInteger(id) && id > 0 ? String(id) : '';
-}
-
-function setInventoryValue(definition, value) {
-  if (definition.index === undefined) state.inv[definition.key] = value;
-  else state.inv[definition.key][definition.index] = value;
-  const uid = currentUid();
-  const materialId = materialIdForInventoryInput(definition);
-  if (!uid || !materialId) return;
-  const bag = state.verifiedInventory[uid] ||= {};
-  if (!String(value).trim()) {
-    delete bag[materialId];
-  } else {
-    const parsed = safeEval(value);
-    if (Number.isSafeInteger(parsed) && parsed >= 0) bag[materialId] = parsed;
-  }
-}
 
 function scheduleSave(options = {}) {
   const { immediate = false } = options;
@@ -362,6 +389,7 @@ async function persistState() {
   clearTimeout(saveTimer);
   saveTimer = null;
   try {
+    commitActivePlan();
     await storage.set(state);
     setSaveStatus('已自动保存');
   } catch (error) {
@@ -384,7 +412,9 @@ function updateLevelRange(key, changedIndex, rawValue) {
   if (changedIndex === 0 && next[1] < next[0]) next[1] = next[0];
   if (changedIndex === 1 && next[1] < next[0]) next[0] = next[1];
   state.config[key] = next;
+  commitActivePlan();
   renderSelectors();
+  renderInventory();
   renderResults();
   scheduleSave({ immediate: true });
 }
@@ -464,114 +494,82 @@ function getCultMaterial(index) {
   return null;
 }
 
-function resolveDefinition(definition) {
-  const material = definition.key === 'gold' ? { name: '摩拉', icon: itemIconUrl(202) }
-    : definition.key === 'cult' && definition.index === 3 ? getCultMaterial(3)
-    : ['spec', 'boss', 'weekly', 'crown'].includes(definition.key)
-      ? materialAt(definition.key) : materialAt(definition.key, definition.index);
-  return {
-    ...definition,
-    displayLabel: material?.name || definition.label,
-    icon: material?.icon || ''
-  };
-}
-
-function createInventoryInput(definition) {
-  const resolved = resolveDefinition(definition);
+function createMultiInventoryInput(material) {
+  const id = String(material.id);
   const wrapper = document.createElement('label');
-  wrapper.className = `item-input color-${definition.color}`;
-
+  const color = material.rank >= 5 ? 'gold' : material.rank === 4 ? 'purple'
+    : material.rank === 3 ? 'blue' : material.rank === 2 ? 'green'
+      : material.rank === 1 ? 'white' : 'base';
+  wrapper.className = 'item-input color-' + color;
   const iconSlot = document.createElement('span');
-  iconSlot.className = `material-icon-slot inventory-icon-slot slot-${definition.color}`;
-  if (resolved.icon || resolved.displayLabel) {
-    const icon = document.createElement('img');
-    icon.className = 'material-icon';
-    icon.alt = '';
-    iconSlot.append(icon);
-    applyImageSource(icon, resolved.icon, iconSlot, resolved.displayLabel);
-  } else {
-    iconSlot.classList.add('icon-fallback');
-  }
-
+  iconSlot.className = 'material-icon-slot inventory-icon-slot slot-' + color;
+  const icon = document.createElement('img');
+  icon.className = 'material-icon';
+  icon.alt = '';
+  iconSlot.append(icon);
+  applyImageSource(icon,itemIconUrl(id),iconSlot,material.name);
   const labelText = document.createElement('span');
   labelText.className = 'item-label';
-  labelText.textContent = resolved.displayLabel;
-
+  labelText.textContent = material.name;
   const inputWrap = document.createElement('span');
   inputWrap.className = 'input-wrap';
   const input = document.createElement('input');
   input.type = 'text';
-  input.inputMode = 'text';
   input.autocomplete = 'off';
   input.spellcheck = false;
   input.placeholder = '0';
-  input.value = getInventoryValue(definition);
-  input.setAttribute('aria-label', resolved.displayLabel);
-
+  input.value = state.materialInventory[id] || '';
+  input.setAttribute('aria-label',material.name + '背包数量');
   const preview = document.createElement('span');
   preview.className = 'formula-preview';
-
   const updatePreview = () => {
-    const rawValue = input.value;
-    const evaluated = safeEval(rawValue);
-    const hasOperator = /[+\-*/×÷()（）]/.test(rawValue);
-    preview.textContent = hasOperator && rawValue.trim() ? `= ${evaluated.toLocaleString()}` : '';
-    input.classList.toggle('has-preview', Boolean(preview.textContent));
+    const raw = input.value;
+    const operator = /[+\-*/×÷()（）]/.test(raw);
+    preview.textContent = operator && raw.trim()
+      ? '= ' + safeEval(raw).toLocaleString() : '';
+    input.classList.toggle('has-preview',Boolean(preview.textContent));
   };
-
-  input.addEventListener('input', () => {
-    setInventoryValue(definition, input.value);
+  input.addEventListener('input',() => {
+    if (input.value.trim()) state.materialInventory[id] = input.value;
+    else delete state.materialInventory[id];
     updatePreview();
     renderResults();
     scheduleSave();
   });
   updatePreview();
-  inputWrap.append(input, preview);
-  wrapper.append(iconSlot, labelText, inputWrap);
+  inputWrap.append(input,preview);
+  wrapper.append(iconSlot,labelText,inputWrap);
   return wrapper;
 }
 
-function createIndependentGroup(title, definitions) {
-  const group = document.createElement('section');
-  group.className = 'independent-group';
-  const heading = document.createElement('h3');
-  heading.textContent = title;
-  const grid = document.createElement('div');
-  grid.className = 'input-grid';
-  definitions.forEach((definition) => grid.append(createInventoryInput(definition)));
-  group.append(heading, grid);
-  return group;
-}
-
 function renderInventory() {
-  Object.entries(inventoryDefinitions).forEach(([containerId, definitions]) => {
-    const container = document.getElementById(containerId);
-    container.replaceChildren();
-    definitions
-      .filter((definition) => !definition.condition || definition.condition(state))
-      .forEach((definition) => container.append(createInventoryInput(definition)));
-  });
-
-  const independent = document.getElementById('independentWeaponMaterials');
-  independent.replaceChildren();
-  const rules = getMergeRules();
-
-  if (!rules.matAIntoCult) {
-    independent.append(createIndependentGroup('武器素材 A', [
-      { key: 'matA', index: 0, label: '绿武器 MatA', color: 'green' },
-      { key: 'matA', index: 1, label: '蓝武器 MatA', color: 'blue' },
-      { key: 'matA', index: 2, label: '紫武器 MatA', color: 'purple' }
-    ]));
+  const holders = ['basicInventory','cultInventory','talentInventory','weaponInventory'];
+  for (const id of holders) document.getElementById(id).replaceChildren();
+  document.getElementById('independentWeaponMaterials').replaceChildren();
+  const result = currentMultiCalculation();
+  const flat = new Map();
+  for (const group of result.groups) {
+    if (group.family) {
+      let target = 'weaponInventory';
+      if (group.title.includes('天赋书') || group.title.includes('角色突破石')) target='talentInventory';
+      else if (group.title.includes('角色培养') || group.title.includes('共同培养')) target='cultInventory';
+      const section = document.createElement('section');
+      section.className='independent-group';
+      const title=document.createElement('h3');
+      title.textContent=group.title;
+      const grid=document.createElement('div');
+      grid.className='input-grid';
+      for (const item of group.rows) grid.append(createMultiInventoryInput(item));
+      section.append(title,grid);
+      document.getElementById(target).append(section);
+    } else {
+      for (const row of group.rows) flat.set(String(row.id),row);
+    }
   }
-
-  if (!rules.matBIntoCult) {
-    independent.append(createIndependentGroup('武器素材 B', [
-      { key: 'matB', index: 0, label: '白武器 MatB', color: 'white' },
-      { key: 'matB', index: 1, label: '绿武器 MatB', color: 'green' },
-      { key: 'matB', index: 2, label: '蓝武器 MatB', color: 'blue' }
-    ]));
-  }
+  for (const row of flat.values()) document.getElementById('basicInventory').append(createMultiInventoryInput(row));
 }
+
+
 
 function createResultSection(title) {
   const section = document.createElement('section');
@@ -610,30 +608,7 @@ function createResultRow(label, value, color = 'base', icon = '') {
   return row;
 }
 
-function appendTieredSection(container, group, title, items, baseLabel) {
-  if (!group.hasDeficit) return;
-  const { section, rows } = createResultSection(`${title}（折合 ${group.totalBase.toLocaleString()} ${baseLabel}）`);
-  group.optimal.forEach((count, index) => {
-    if (count <= 0) return;
-    const item = items[index] || {};
-    const label = item.name || `第 ${index + 1} 阶`;
-    const color = item.color || TIER_COLOR_MAP[label] || 'base';
-    rows.append(createResultRow(label, count, color, item.icon || ''));
-  });
-  container.append(section);
-}
 
-function flatItem(label, icon = '', color = 'base') {
-  return { name: label, icon, color };
-}
-
-function buildTierItem(material, fallbackLabel, fallbackColor) {
-  return {
-    name: material?.name || fallbackLabel,
-    icon: material?.icon || '',
-    color: fallbackColor
-  };
-}
 
 function officialMaterialGroups() {
   const groups = new Map();
@@ -786,72 +761,58 @@ function renderResults() {
     renderOfficialResults();
     return;
   }
-  const result = calculateResult(state);
+  const result = currentMultiCalculation();
   const container = document.getElementById('resultContent');
   container.replaceChildren();
 
-  if (!result.hasAnyTarget) {
-    container.append(createEmptyResult('尚未设置升级目标', '先在上方设置等级，再填写背包数量。'));
+  if (!result.hasAnyTarget && !result.unavailable.length && !result.incomplete.length) {
+    container.append(createEmptyResult('尚未设置升级目标','选择角色或武器，并为培养项设置当前等级与目标等级。'));
     return;
   }
-
-  if (!result.hasAnyDeficit) {
-    container.append(createEmptyResult('库存已经满足当前目标', '背包数量已覆盖全部所需材料。'));
+  if (!result.hasAnyDeficit && !result.unavailable.length && !result.incomplete.length) {
+    container.append(createEmptyResult('库存已经满足当前目标','背包数量已覆盖所有培养项的材料需求。'));
     return;
   }
-
-  const flatLabels = {
-    gold: flatItem('金币', itemIconUrl(202), 'base'),
-    spec: flatItem(materialAt('spec')?.name || '区域特产', materialAt('spec')?.icon || '', 'base'),
-    boss: flatItem(materialAt('boss')?.name || 'Boss 素材', materialAt('boss')?.icon || '', 'base'),
-    weekly: flatItem(materialAt('weekly')?.name || '周本材料', materialAt('weekly')?.icon || '', 'base'),
-    crown: flatItem(materialAt('crown')?.name || '皇冠', materialAt('crown')?.icon || '', 'gold')
-  };
-
-  const activeFlat = Object.entries(result.flat).filter(([, value]) => value > 0);
-  if (activeFlat.length) {
-    const { section, rows } = createResultSection('基础专属缺口');
-    activeFlat.forEach(([key, value]) => {
-      const item = flatLabels[key];
-      rows.append(createResultRow(item.name, value, item.color, item.icon));
-    });
-    container.append(section);
+  const singleSections = new Map();
+  for (const group of result.groups) {
+    if (!group.hasDeficit) continue;
+    if (group.family) {
+      const suffix = group.totalBase > 0 ? '（折合 ' + group.totalBase.toLocaleString()
+        + ' 个最低阶材料）' : '';
+      const section = createResultSection(group.title + suffix);
+      for (const row of group.rows) {
+        if (!row.lack) continue;
+        section.rows.append(createResultRow(row.name,row.lack,'base',itemIconUrl(row.id)));
+      }
+      container.append(section.section);
+    } else {
+      let section = singleSections.get(group.title);
+      if (!section) {
+        section = createResultSection(group.title);
+        singleSections.set(group.title,section);
+      }
+      for (const row of group.rows) {
+        if (row.lack) section.rows.append(createResultRow(row.name,row.lack,'base',itemIconUrl(row.id)));
+      }
+    }
   }
-
-  appendTieredSection(container, result.groups.cult, '全局培养素材', [
-    buildTierItem(getCultMaterial(0), '白色培养素材', 'white'),
-    buildTierItem(getCultMaterial(1), '绿色培养素材', 'green'),
-    buildTierItem(getCultMaterial(2), '蓝色培养素材', 'blue'),
-    buildTierItem(getCultMaterial(3), '紫色培养素材', 'purple')
-  ], getCultMaterial(0)?.name || '白色培养素材');
-  appendTieredSection(container, result.groups.books, '天赋书', [
-    buildTierItem(materialAt('books', 0), '绿天赋书', 'green'),
-    buildTierItem(materialAt('books', 1), '蓝天赋书', 'blue'),
-    buildTierItem(materialAt('books', 2), '紫天赋书', 'purple')
-  ], materialAt('books', 0)?.name || '绿天赋书');
-  appendTieredSection(container, result.groups.charGems, '角色突破石', [
-    buildTierItem(materialAt('charGems', 0), '绿角色石头', 'green'),
-    buildTierItem(materialAt('charGems', 1), '蓝角色石头', 'blue'),
-    buildTierItem(materialAt('charGems', 2), '紫角色石头', 'purple'),
-    buildTierItem(materialAt('charGems', 3), '金角色石头', 'gold')
-  ], materialAt('charGems', 0)?.name || '绿角色石头');
-  appendTieredSection(container, result.groups.weapGems, '武器突破材料', [
-    buildTierItem(materialAt('weapGems', 0), '绿武器材料', 'green'),
-    buildTierItem(materialAt('weapGems', 1), '蓝武器材料', 'blue'),
-    buildTierItem(materialAt('weapGems', 2), '紫武器材料', 'purple'),
-    buildTierItem(materialAt('weapGems', 3), '金武器材料', 'gold')
-  ], materialAt('weapGems', 0)?.name || '绿武器材料');
-  appendTieredSection(container, result.groups.matA, '武器素材 A', [
-    buildTierItem(materialAt('matA', 0), '绿武器 MatA', 'green'),
-    buildTierItem(materialAt('matA', 1), '蓝武器 MatA', 'blue'),
-    buildTierItem(materialAt('matA', 2), '紫武器 MatA', 'purple')
-  ], materialAt('matA', 0)?.name || '绿武器 MatA');
-  appendTieredSection(container, result.groups.matB, '武器素材 B', [
-    buildTierItem(materialAt('matB', 0), '白武器 MatB', 'white'),
-    buildTierItem(materialAt('matB', 1), '绿武器 MatB', 'green'),
-    buildTierItem(materialAt('matB', 2), '蓝武器 MatB', 'blue')
-  ], materialAt('matB', 0)?.name || '白武器 MatB');
+  for (const section of singleSections.values()) container.append(section.section);
+  if (result.incomplete.length || result.unavailable.length) {
+    const section=createResultSection('材料数据待补充');
+    for (const missing of result.incomplete) {
+      const row=createResultRow(missing.title,missing.count,'base');
+      section.rows.append(row);
+    }
+    for (const name of result.unavailable) {
+      const note=document.createElement('p');
+      note.className='source-warning';
+      note.textContent=name + ' 的材料数据尚未载入，请重新同步后计算。';
+      section.rows.append(note);
+    }
+    container.append(section.section);
+  }
 }
+
 
 function createEmptyResult(title, description) {
   const empty = document.createElement('div');
@@ -868,6 +829,7 @@ function createEmptyResult(title, description) {
 }
 
 function refreshAll() {
+  renderPlanItems();
   renderSelectors();
   renderInventory();
   renderResults();
@@ -875,6 +837,8 @@ function refreshAll() {
 
 function bindStaticEvents() {
   document.getElementById('clearButton').addEventListener('click', openClearDialog);
+  document.getElementById('addPlanButton').addEventListener('click',addPlan);
+  document.getElementById('removePlanButton').addEventListener('click',removePlan);
   for (const button of document.querySelectorAll('[data-calc-mode]')) {
     button.addEventListener('click', () => chooseCalculationMode(button.dataset.calcMode));
   }
@@ -883,6 +847,8 @@ function bindStaticEvents() {
     const uid = state.inventoryUid;
     state = cloneDefaultState();
     state.inventoryUid = uid;
+    planProfiles.clear();
+    profileLoadSerial++;
     officialCalculation = null;
     refreshCalculationMode();
     characterProfile = null;
@@ -956,6 +922,9 @@ async function importConfiguration(event) {
       throw new Error('invalid structure');
     }
     state = normalizeState(candidate);
+    state.calculationMode = 'manual';
+    planProfiles.clear();
+    profileLoadSerial++;
     officialCalculation = null;
     refreshCalculationMode();
     refreshAll();
@@ -1132,8 +1101,8 @@ function renderSourceControls() {
 
   const characterSelect = document.getElementById('characterSelect');
   const weaponSelect = document.getElementById('weaponSelect');
-  characterSelect.replaceChildren(new Option('手动模式', ''));
-  weaponSelect.replaceChildren(new Option('手动模式', ''));
+  characterSelect.replaceChildren(new Option('不添加角色', ''));
+  weaponSelect.replaceChildren(new Option('不添加武器', ''));
 
   filteredCharacters().forEach((row) => {
     const meta = [formatElement(row.element), rarityText(row.rarity), row.sourceTag].filter(Boolean).join(' · ');
@@ -1333,6 +1302,7 @@ async function initialize() {
   try {
     const stored = await storage.get();
     state = normalizeState(stored);
+    state.calculationMode = 'manual';
     setSaveStatus(stored ? '已恢复上次数据' : '首次使用，数据会自动保存');
   } catch (error) {
     console.error(error);
