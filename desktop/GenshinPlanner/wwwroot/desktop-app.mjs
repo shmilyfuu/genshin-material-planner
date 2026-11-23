@@ -216,7 +216,7 @@ function clickOrEdit(node,onSelect,onEdit){
     clearTimeout(rosterClickTimer);
     if(ev.detail===1)rosterClickTimer=setTimeout(onSelect,210);
   });
-  node.addEventListener('dblclick',ev=>{ev.preventDefault();clearTimeout(rosterClickTimer);onEdit();});
+  node.addEventListener('dblclick',ev=>{if(ev.target.closest('button,input,select')&&ev.target!==node)return;ev.preventDefault();clearTimeout(rosterClickTimer);onEdit();});
   node.addEventListener('keydown',ev=>{
     if(ev.target!==node)return;
     if(ev.key==='Enter'){ev.preventDefault();clearTimeout(rosterClickTimer);onEdit();}
@@ -304,6 +304,14 @@ function rosterCard(row){
   const meta=document.createElement('span');meta.className='avatar-meta';
   meta.textContent=kind==='weapon'&&row.instance?`Lv.${row.instance.level} R${row.instance.refinement}`:kind==='character'&&row.owned?`Lv.${row.owned.level}`:'★'.repeat(Math.min(Number(row.rarity)||0,5));
   if(row.instance){const short=document.createElement('span');short.className='avatar-instance';short.textContent='#'+String((state.weaponInstances.filter(w=>w.weaponId===row.id).findIndex(w=>w.id===row.instance.id))+1);box.append(short);}
+  if(kind==='weapon'){
+    const addCopy=document.createElement('button');addCopy.type='button';addCopy.className='avatar-add-copy';
+    addCopy.textContent='+';addCopy.title='增加一把'+row.name;addCopy.setAttribute('aria-label','增加一把'+row.name);
+    addCopy.onclick=ev=>{ev.stopPropagation();const fresh=makeWeaponInstance(row);
+      const created=makeGoal('weapon',row,{instanceId:fresh.id,current:fresh});
+      state.weaponInstances.push(fresh);state.plans.push(created);renderAll();save();openEditor(created);};
+    card.append(addCopy);
+  }
   card.append(box,title,meta);
   if(row.sourceTag){const tag=document.createElement('span');tag.className='avatar-preview';tag.textContent=row.sourceTag;card.append(tag);}
   clickOrEdit(card,()=>{
@@ -366,10 +374,10 @@ function updateLinkedWeaponField(goal,body){
   for(const instance of state.weaponInstances){const row=weaponRow(instance.weaponId);if(!row||!available(row))continue;
     options.push([instance.id,`${row.name} · Lv.${instance.level} R${instance.refinement}`]);}
   options.push(['__new__','新建并关联武器实例']);
-  let selection=goal.linkedWeaponInstanceId||'',newWeaponId=weaponList[0]?.id||'';
+  const choices=weaponList.filter(available).map(w=>[w.id,`${w.name} · ${w.rarity}★`]);
+  let selection=goal.linkedWeaponInstanceId||'',newWeaponId=choices[0]?.[0]||'';
   const link=editorSelect('关联武器',options,selection,v=>{selection=v;const choose=$('newLinkedWeaponRow');if(choose)choose.hidden=v!=='__new__';});
   body.append(link);
-  const choices=weaponList.filter(available).map(w=>[w.id,`${w.name} · ${w.rarity}★`]);
   const newRow=editorSelect('新建武器',choices,newWeaponId,v=>{newWeaponId=v;});
   newRow.id='newLinkedWeaponRow';newRow.hidden=true;body.append(newRow);
   return ()=>({selection,newWeaponId});
@@ -410,7 +418,13 @@ async function saveEditor(){
     const {selection,newWeaponId}=editor.getLink();
     if(selection==='__new__'){
       const w=weaponRow(newWeaponId);if(w){const wGoal=addGoalFromRow('weapon',w);draft.linkedWeaponInstanceId=wGoal.weaponInstanceId;}
-    }else draft.linkedWeaponInstanceId=selection;
+    }else{
+      draft.linkedWeaponInstanceId=selection;
+      if(selection){
+        const linked=weaponInstance(state,selection),row=linked&&weaponRow(linked.weaponId);
+        if(row)addGoalFromRow('weapon',row,linked);
+      }
+    }
   }
   const originalId=goal.id,originalInstanceId=goal.weaponInstanceId;
   Object.assign(goal,draft,{id:originalId,kind:mode,weaponInstanceId:originalInstanceId||draft.weaponInstanceId});
