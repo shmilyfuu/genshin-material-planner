@@ -5,7 +5,7 @@ import {
   detectMergeRules, itemIconUrl
 } from './hakushin.mjs';
 import {calculateMultiPlan, collectInventoryCatalog, planMaterialUsage, migrateLegacyInventory, materialContributions} from './multi-planner.mjs';
-import {initializePlanner,makeGoal,makeWeaponInstance,characterGoal,weaponGoal,weaponInstance,goalKind,goalObjectId,activeGoals,visibleRoster,setLink,newId} from './planner-model.mjs';
+import {initializePlanner,makeGoal,makeWeaponInstance,characterGoal,weaponGoal,weaponInstance,goalKind,goalObjectId,activeGoals,visibleRoster,setLink,removeWeaponInstance,newId} from './planner-model.mjs';
 import {importGOOD,validateGOOD} from './good-import.mjs';
 import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
@@ -51,6 +51,8 @@ const iconPaths={
   'all-weapons':'<path d="M4 4l16 16M20 4L4 20M3 8l5-5M16 21l5-5M16 3l5 5M3 16l5 5"/>',
   pause:'<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
   play:'<path d="M7 4.5 19 12 7 19.5Z" fill="currentColor" stroke="none"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  minus:'<path d="M5 12h14"/>',
   star:'<path d="m12 2 3 7 7 .5-5.5 5 1.5 7.5-6-4-6 4 1.5-7.5L2 9.5 9 9l3-7Z"/>'
 };
 function svg(name){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name]||iconPaths.star}</svg>`;}
@@ -332,8 +334,6 @@ function rosterCard(row){
   if(kind==='character'){
     badge(elementDefs.find(x=>x.id===row.element),'elements','element');
     badge(weaponDefs.find(x=>x.id===(weaponAliases[row.weaponType]||row.weaponType)),'weapons','weapon');
-  }else{
-    badge(weaponDefs.find(x=>x.id===(weaponAliases[row.weaponType]||row.weaponType)),'weapons','weapon');
   }
   if(goal&&!goal.completed){
     const training=document.createElement('span');training.className='card-badge training';
@@ -357,17 +357,41 @@ function rosterCard(row){
   title.textContent=row.name;title.title=row.name;
   card.append(artwork,title);
   if(kind==='weapon'){
-    const addCopy=document.createElement('button');addCopy.type='button';addCopy.className='avatar-add-copy';
-    addCopy.textContent='+';addCopy.title='增加一把'+row.name;
-    addCopy.setAttribute('aria-label','增加一把'+row.name);
-    addCopy.onclick=ev=>{
-      ev.stopPropagation();const fresh=makeWeaponInstance(row);
+    const createAction=(name,iconName,css,callback)=>{
+      const button=document.createElement('button');
+      button.type='button';button.className='avatar-weapon-action '+css;
+      button.title=name;button.setAttribute('aria-label',name);
+      button.innerHTML=svg(iconName);
+      button.onclick=event=>{event.stopPropagation();callback();};
+      artwork.append(button);
+    };
+    createAction('增加一把'+row.name,'plus','avatar-add-copy',()=>{
+      const fresh=makeWeaponInstance(row);
       const created=makeGoal('weapon',row,{instanceId:fresh.id,current:fresh});
       state.weaponInstances.push(fresh);state.plans.push(created);
       selectedRosterKey=null;selectedGoalId=created.id;inventoryGoalId=created.id;state.activePlanId=created.id;
       renderAll();save();void reloadAllProfiles();
-    };
-    artwork.append(addCopy);
+    });
+    const sameName=state.weaponInstances.filter(item=>item.weaponId===String(row.id));
+    if(row.instance&&sameName.length>1){
+      const ordinal=sameName.findIndex(item=>item.id===row.instance.id)+1;
+      createAction('移除'+row.name+' #'+ordinal,'minus','avatar-remove-copy',async()=>{
+        const linked=state.plans.filter(goal=>goalKind(goal)==='character'
+          &&goal.linkedWeaponInstanceId===row.instance.id).length;
+        const description='确定移除 '+row.name+' #'+ordinal+' 吗？该实例的培养目标将一同移除。'
+          +(linked?'\n另有 '+linked+' 个角色培养目标关联此武器，确认后将解除关联。':'');
+        const decision=await modal({title:'移除武器实例',description,requiresText:false,confirm:'移除'});
+        if(decision===null)return;
+        try{
+          const outcome=removeWeaponInstance(state,row.instance.id);
+          const removed=new Set(outcome.removedGoalIds);
+          if(removed.has(selectedGoalId))selectedGoalId=null;
+          if(removed.has(inventoryGoalId))inventoryGoalId=null;
+          if(selectedRosterKey===selectionKey)selectedRosterKey=null;
+          renderAll();save();void reloadAllProfiles();
+        }catch(error){toast(error.message);}
+      });
+    }
   }
   clickOrEdit(card,()=>{
     if(goal){selectGoal(goal.id);return;}
