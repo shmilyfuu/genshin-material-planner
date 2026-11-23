@@ -171,6 +171,14 @@ function buildMiyoushePanel() {
       : '该账号没有返回原神 UID。', roles.length ? 'success' : 'error');
   }));
 
+  window.addEventListener('planner-account-changed', () => {
+    roles = [];
+    uidSelect.replaceChildren();
+    uidSelect.hidden = true;
+    refreshButtons();
+    message('规划账号已切换，使用米游社计算前请重新读取 UID。');
+  });
+
   uidSelect.addEventListener('change', () => {
     chooseInventoryUid(uidSelect.value);
     refreshButtons();

@@ -200,3 +200,14 @@ export function collectInventoryCatalog(entries) {
   }
   return sections;
 }
+
+export function planMaterialUsage(entries) {
+  const result = new Map();
+  for (const entry of entries) {
+    const catalog = collectInventoryCatalog([entry]);
+    const ids = new Set(Object.values(catalog)
+      .flatMap(groups => groups.flatMap(group => group.rows.map(row => row.id))));
+    for (const id of ids) result.set(id, (result.get(id) || 0) + 1);
+  }
+  return result;
+}

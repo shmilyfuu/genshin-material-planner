@@ -22,6 +22,14 @@
     </div>
   </header>
 
+  <section class="planner-account-bar" aria-label="规划账号管理">
+    <label for="plannerAccountSelect">规划账号</label>
+    <select id="plannerAccountSelect" aria-label="切换规划账号"></select>
+    <button id="addPlannerAccount" class="button button-secondary" type="button">添加</button>
+    <button id="renamePlannerAccount" class="button button-secondary" type="button">重命名</button>
+    <button id="deletePlannerAccount" class="button button-danger" type="button">删除</button>
+  </section>
+
   <main class="layout">
     <section class="card source-card" aria-labelledby="sourceTitle">
       <div class="source-head">
@@ -115,15 +123,13 @@
       </div>
     </details>
 
-    <section class="card result-card" aria-labelledby="resultTitle">
-      <div class="result-header">
-        <div>
-          <h2 id="resultTitle">缺口计算结果</h2>
-          <p id="saveStatus">已读取本地数据</p>
-        </div>
-      </div>
+    <details class="card result-card" id="resultPanel">
+      <summary class="result-header">
+        <span class="result-heading" id="resultTitle">缺口计算结果</span>
+        <span id="saveStatus">已读取本地数据</span>
+      </summary>
       <div id="resultContent" class="result-content" aria-live="polite"></div>
-    </section>
+    </details>
 
     <details class="card inventory-card" open>
       <summary>
@@ -140,22 +146,22 @@
           <div id="mysModeContent"></div>
         </details>
         <div id="manualInventoryGroups">
-        <details class="inventory-group" open>
+        <details class="inventory-group inventory-base" open>
           <summary>基础与专属材料</summary>
           <div id="basicInventory" class="input-grid"></div>
         </details>
 
-        <details class="inventory-group" open>
-          <summary>角色培养素材（全局共享）</summary>
+        <details class="inventory-group inventory-cult" open>
+          <summary>角色培养素材</summary>
           <div id="cultInventory" class="input-grid"></div>
         </details>
 
-        <details class="inventory-group" open>
+        <details class="inventory-group inventory-talent" open>
           <summary>天赋与角色突破</summary>
           <div id="talentInventory" class="input-grid"></div>
         </details>
 
-        <details class="inventory-group" open>
+        <details class="inventory-group inventory-weapon" open>
           <summary>武器突破材料</summary>
           <div id="weaponInventory" class="input-grid"></div>
           <div id="independentWeaponMaterials" class="independent-materials"></div>
@@ -169,8 +175,8 @@
 
   <div id="confirmDialog" class="dialog-backdrop" hidden>
     <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogDescription">
-      <h2 id="dialogTitle">清空全部数据</h2>
-      <p id="dialogDescription">背包数量、目标等级与已选对象都会恢复到初始状态。</p>
+      <h2 id="dialogTitle">清空当前账号数据</h2>
+      <p id="dialogDescription">当前账号的背包数量、培养项与目标等级将恢复初始状态。</p>
       <div class="dialog-actions">
         <button id="cancelClearButton" class="button button-secondary" type="button">取消</button>
         <button id="confirmClearButton" class="button button-danger" type="button">确认清空</button>

@@ -16,7 +16,11 @@ import {
   itemIconUrl
 } from './hakushin.mjs';
 import {buildNanokaDemand, evaluateNanokaDemand} from './hybrid-calculator.mjs';
-import {calculateMultiPlan,migrateLegacyInventory,collectInventoryCatalog} from './multi-planner.mjs';
+import {calculateMultiPlan,migrateLegacyInventory,collectInventoryCatalog,planMaterialUsage} from './multi-planner.mjs';
+import {
+  saveActivePlannerAccount, selectPlannerAccount, createPlannerAccount,
+  renamePlannerAccount, deletePlannerAccount
+} from './planner-accounts.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
 const EXPORT_TYPE = 'material-planner-hakushin-beta-config';
@@ -43,6 +47,7 @@ const selectorDefinitions = [
 
 let state = cloneDefaultState();
 let saveTimer = null;
+let saveQueue = Promise.resolve();
 let toastTimer = null;
 let dialogPreviouslyFocused = null;
 let characterList = [];
@@ -52,6 +57,7 @@ let weaponProfile = null;
 let planProfiles = new Map();
 let profileLoadSerial = 0;
 let nextPlanSerial = 0;
+let nextAccountSerial = 0;
 let syncInfo = { live: '', latest: '', listSource: 'none' };
 let uiFilters = {
   characterSearch: '',
@@ -160,6 +166,81 @@ function formatWeaponType(value) {
 
 function rarityText(value) {
   return value ? `${value}★` : '';
+}
+
+function renderPlannerAccounts() {
+  const select = document.getElementById('plannerAccountSelect');
+  if (!select) return;
+  select.replaceChildren(...state.plannerAccounts.map(account =>
+    new Option(account.name, account.id)));
+  select.value = state.activeAccountId;
+  document.getElementById('deletePlannerAccount').disabled = state.plannerAccounts.length < 2;
+}
+
+function changePlannerAccount(id) {
+  if (id === state.activeAccountId) return;
+  commitActivePlan();
+  selectPlannerAccount(state, id);
+  profileLoadSerial++;
+  planProfiles.clear();
+  officialCalculation = null;
+  state.calculationMode = 'manual';
+  refreshCalculationMode();
+  renderPlannerAccounts();
+  window.dispatchEvent(new Event('planner-account-changed'));
+  showActivePlan();
+  void reloadSelectedProfiles();
+  scheduleSave({immediate: true});
+}
+
+function addPlannerAccount() {
+  const name = window.prompt('请输入账号名称', '账号 ' + (state.plannerAccounts.length + 1));
+  if (name === null) return;
+  try {
+    commitActivePlan();
+    const id = 'account-' + Date.now().toString(36) + '-' + (++nextAccountSerial);
+    createPlannerAccount(state, id, name, cloneDefaultState());
+    profileLoadSerial++;
+    planProfiles.clear();
+    officialCalculation = null;
+    state.calculationMode = 'manual';
+    refreshCalculationMode();
+    renderPlannerAccounts();
+    showActivePlan();
+    void reloadSelectedProfiles();
+    scheduleSave({immediate: true});
+  } catch (error) { showToast(String(error.message || error), 'error'); }
+}
+
+function renameCurrentPlannerAccount() {
+  const account = state.plannerAccounts.find(entry => entry.id === state.activeAccountId);
+  if (!account) return;
+  const name = window.prompt('修改账号名称', account.name);
+  if (name === null) return;
+  try {
+    renamePlannerAccount(state, account.id, name);
+    renderPlannerAccounts();
+    scheduleSave({immediate: true});
+  } catch (error) { showToast(String(error.message || error), 'error'); }
+}
+
+function removeCurrentPlannerAccount() {
+  const account = state.plannerAccounts.find(entry => entry.id === state.activeAccountId);
+  if (!account || state.plannerAccounts.length < 2) return;
+  if (!window.confirm('删除账号“' + account.name + '”及其所有培养项和背包记录？')) return;
+  try {
+    commitActivePlan();
+    deletePlannerAccount(state, account.id);
+    profileLoadSerial++;
+    planProfiles.clear();
+    officialCalculation = null;
+    state.calculationMode = 'manual';
+    refreshCalculationMode();
+    renderPlannerAccounts();
+    showActivePlan();
+    void reloadSelectedProfiles();
+    scheduleSave({immediate: true});
+  } catch (error) { showToast(String(error.message || error), 'error'); }
 }
 
 function activePlan() {
@@ -401,7 +482,10 @@ async function persistState() {
   saveTimer = null;
   try {
     commitActivePlan();
-    await storage.set(state);
+    saveActivePlannerAccount(state);
+    const snapshot = structuredClone(state);
+    saveQueue = saveQueue.catch(() => {}).then(() => storage.set(snapshot));
+    await saveQueue;
     setSaveStatus('已自动保存');
   } catch (error) {
     console.error(error);
@@ -515,7 +599,7 @@ function materialTierColor(rank) {
       : rank === 1 ? 'white' : 'base';
 }
 
-function createMultiInventoryInput(material) {
+function createMultiInventoryInput(material, sharedCount = 0) {
   const id = String(material.id);
   const wrapper = document.createElement('label');
   const color = materialTierColor(material.rank);
@@ -529,7 +613,19 @@ function createMultiInventoryInput(material) {
   applyImageSource(icon,itemIconUrl(id),iconSlot,material.name);
   const labelText = document.createElement('span');
   labelText.className = 'item-label';
-  labelText.textContent = material.name;
+  labelText.title = material.name;
+  const name = document.createElement('span');
+  name.className = 'material-name';
+  name.textContent = material.name;
+  labelText.append(name);
+  if (sharedCount > 1) {
+    const marker = document.createElement('span');
+    marker.className = 'shared-material-badge';
+    marker.textContent = '共用';
+    marker.title = '当前账号的 ' + sharedCount + ' 个培养项共用此材料';
+    labelText.append(marker);
+    wrapper.dataset.shared = 'true';
+  }
   const inputWrap = document.createElement('span');
   inputWrap.className = 'input-wrap';
   const input = document.createElement('input');
@@ -573,7 +669,12 @@ function createMultiInventoryInput(material) {
 }
 
 function renderInventory() {
-  const result = collectInventoryCatalog(state.plans.map(plan=>({
+  const active=planProfiles.get(state.activePlanId) || {};
+  const result = collectInventoryCatalog([{
+    characterProfile:active.characterProfile || null,
+    weaponProfile:active.weaponProfile || null
+  }]);
+  const usage=planMaterialUsage(state.plans.map(plan=>({
     characterProfile:planProfiles.get(plan.id)?.characterProfile || null,
     weaponProfile:planProfiles.get(plan.id)?.weaponProfile || null
   })));
@@ -582,7 +683,7 @@ function renderInventory() {
     holder.replaceChildren();
     for (const group of sections) {
       if (!group.title) {
-        for (const row of group.rows) holder.append(createMultiInventoryInput(row));
+        for (const row of group.rows) holder.append(createMultiInventoryInput(row,usage.get(row.id) || 0));
         continue;
       }
       const section=document.createElement('section');
@@ -591,7 +692,7 @@ function renderInventory() {
       title.textContent=group.title;
       const grid=document.createElement('div');
       grid.className='input-grid';
-      for (const row of group.rows) grid.append(createMultiInventoryInput(row));
+      for (const row of group.rows) grid.append(createMultiInventoryInput(row,usage.get(row.id) || 0));
       section.append(title,grid);
       holder.append(section);
     }
@@ -864,6 +965,11 @@ function refreshAll() {
 }
 
 function bindStaticEvents() {
+  document.getElementById('plannerAccountSelect').addEventListener('change', event =>
+    changePlannerAccount(event.target.value));
+  document.getElementById('addPlannerAccount').addEventListener('click', addPlannerAccount);
+  document.getElementById('renamePlannerAccount').addEventListener('click', renameCurrentPlannerAccount);
+  document.getElementById('deletePlannerAccount').addEventListener('click', removeCurrentPlannerAccount);
   document.getElementById('clearButton').addEventListener('click', openClearDialog);
   document.getElementById('addPlanButton').addEventListener('click',addPlan);
   document.getElementById('removePlanButton').addEventListener('click',removePlan);
@@ -872,9 +978,12 @@ function bindStaticEvents() {
   }
   document.getElementById('cancelClearButton').addEventListener('click', closeClearDialog);
   document.getElementById('confirmClearButton').addEventListener('click', async () => {
-    const uid = state.inventoryUid;
-    state = cloneDefaultState();
-    state.inventoryUid = uid;
+    const existing = state.plannerAccounts;
+    const selected = state.activeAccountId;
+    state = Object.assign(cloneDefaultState(), {
+      plannerAccounts: existing,
+      activeAccountId: selected
+    });
     planProfiles.clear();
     profileLoadSerial++;
     officialCalculation = null;
@@ -885,7 +994,7 @@ function bindStaticEvents() {
     renderSourceControls();
     closeClearDialog();
     await persistState();
-    showToast('全部数据已清空。', 'success');
+    showToast('当前账号数据已清空。', 'success');
   });
 
   const dialogBackdrop = document.getElementById('confirmDialog');
@@ -915,6 +1024,8 @@ function closeClearDialog() {
 }
 
 function exportConfiguration() {
+  commitActivePlan();
+  saveActivePlannerAccount(state);
   const payload = {
     type: EXPORT_TYPE,
     version: 3,
@@ -951,6 +1062,7 @@ async function importConfiguration(event) {
     }
     state = normalizeState(candidate);
     state.calculationMode = 'manual';
+    renderPlannerAccounts();
     planProfiles.clear();
     profileLoadSerial++;
     officialCalculation = null;
@@ -1369,10 +1481,11 @@ async function initialize() {
     setSaveStatus(stored ? '已恢复上次数据' : '首次使用，数据会自动保存');
   } catch (error) {
     console.error(error);
-    state = cloneDefaultState();
+    state = normalizeState({});
     setSaveStatus('读取失败，已使用初始数据');
   }
   refreshCalculationMode();
+  renderPlannerAccounts();
   refreshAll();
   renderSourceControls();
   void testImageSources();

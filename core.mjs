@@ -34,7 +34,7 @@ export const WEAPON_ASC_DATA = [
 export const CHAR_LEVEL_LABELS = ['Lv.1', 'Lv.20', 'Lv.40', 'Lv.50', 'Lv.60', 'Lv.70', 'Lv.80'];
 
 export const DEFAULT_STATE = Object.freeze({
-  schemaVersion: 4,
+  schemaVersion: 5,
   materialInventory: {},
   materialInventoryMigrated: false,
   source: {
@@ -141,7 +141,7 @@ export function normalizeState(input) {
   const mergeRules = sourceSettings.mergeRules && typeof sourceSettings.mergeRules === 'object' ? sourceSettings.mergeRules : {};
 
   const normalized = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     inventoryUid: /^\d{6,12}$/.test(String(source.inventoryUid || '')) ? String(source.inventoryUid) : '',
     calculationMode: source.calculationMode === 'official' ? 'official' : 'manual',
     hybridInventory: normalizeHybridInventory(source.hybridInventory),
@@ -242,6 +242,37 @@ export function normalizeState(input) {
     }
   }
   normalized.materialInventoryMigrated = source.materialInventoryMigrated === true;
+  const snapshotKeys = [
+    'plans', 'activePlanId', 'source', 'config', 'materialInventory',
+    'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
+    'verifiedInventory', 'manualInventoryImportUid'
+  ];
+  const snapshot = (value) => Object.fromEntries(snapshotKeys.map(key => [key, structuredClone(value[key])]));
+  const records = Array.isArray(source.plannerAccounts) && source.plannerAccounts.length
+    ? source.plannerAccounts.slice(0, 20) : null;
+  if (records) {
+    const usedIds = new Set();
+    const usedNames = new Set();
+    normalized.plannerAccounts = records.map((entry, index) => {
+      const raw = entry && typeof entry === 'object' ? entry : {};
+      const id = /^[-a-zA-Z0-9_]{1,64}$/.test(String(raw.id || ''))
+        && !usedIds.has(String(raw.id)) ? String(raw.id) : 'account-' + index;
+      usedIds.add(id);
+      let name = String(raw.name || '').trim().slice(0,32) || '账号 ' + (index+1);
+      if (usedNames.has(name)) name = '账号 ' + (index+1);
+      usedNames.add(name);
+      // Normalize each account as a standalone older state; its nested account list is ignored.
+      const record = normalizeState({...raw.data, plannerAccounts: null});
+      return {id, name, data:snapshot(record)};
+    });
+    const selected = normalized.plannerAccounts.find(account => account.id === source.activeAccountId)
+      || normalized.plannerAccounts[0];
+    normalized.activeAccountId = selected.id;
+    for (const key of snapshotKeys) normalized[key] = structuredClone(selected.data[key]);
+  } else {
+    normalized.activeAccountId = 'account-1';
+    normalized.plannerAccounts = [{id:'account-1',name:'账号 1',data:snapshot(normalized)}];
+  }
   return normalized;
 }
 
