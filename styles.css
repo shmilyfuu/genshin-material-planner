@@ -459,21 +459,29 @@ summary:focus-visible {
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
 }
 
-.result-header {
+.result-card > summary.result-header {
+  align-items: center;
   padding: 14px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.20);
   background: #1e293b;
+  color: #f8fafc;
 }
 
-.result-header h2 {
-  margin: 0;
-  font-size: 15px;
+.result-card > summary.result-header::after {
+  color: #b8c5d8;
 }
 
-.result-header p {
-  margin: 4px 0 0;
-  color: #98a6bb;
+.result-header .result-heading {
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.result-header #saveStatus {
+  margin-left: auto;
+  color: #a8b6ca;
   font-size: 10px;
+  text-align: right;
 }
 
 .result-content {
