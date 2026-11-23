@@ -46,6 +46,10 @@ const iconPaths={
   spear:'<path d="m20 2-3 7-5-2 8-5ZM15 9 4 20M3 21l3-3"/>',
   bow:'<path d="M5 3c12 0 14 6 14 9s-2 9-14 9M4 3l16 18M5 12h15M16 10l4 2-4 2"/>',
   book:'<path d="M4 4c3-1 6 0 8 2 2-2 5-3 8-2v15c-3-1-6 0-8 2-2-2-5-3-8-2V4ZM12 6v15"/>',
+  'all-elements':'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5M12 16v5M3 12h5M16 12h5"/>',
+  'all-weapons':'<path d="M4 4l16 16M20 4L4 20M3 8l5-5M16 21l5-5M16 3l5 5M3 16l5 5"/>',
+  pause:'<rect x="5" y="4" width="5" height="16" rx="1"/><rect x="14" y="4" width="5" height="16" rx="1"/>',
+  play:'<path d="M8 4.5 19 12 8 19.5Z"/>',
   star:'<path d="m12 2 3 7 7 .5-5.5 5 1.5 7.5-6-4-6 4 1.5-7.5L2 9.5 9 9l3-7Z"/>'
 };
 function svg(name){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name]||iconPaths.star}</svg>`;}
@@ -238,15 +242,20 @@ function renderGoals(){
     const kind=goalKind(goal),row=kind==='character'?charRow(goalObjectId(goal)):weaponRow(goalObjectId(goal));
     const card=document.createElement('div');card.className='goal-card'+(selectedGoalId===goal.id?' selected':'')+(goal.enabled===false?' paused':'');
     card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',objName(goal)+'，单击选择，双击编辑');
-    card.append(thumb(row?.icon,objName(goal),'goal-art'));
+    const artwork=thumb(row?.icon,objName(goal),'goal-art');
+    if(goal.enabled===false){
+      const badge=document.createElement('span');badge.className='goal-paused';badge.textContent='暂停';
+      artwork.append(badge);
+    }
+    card.append(artwork);
     const description=document.createElement('span');description.className='goal-description';
     const title=document.createElement('strong');title.textContent=objName(goal);
     const info=document.createElement('small');
     const obj=weaponInstance(state,goal.weaponInstanceId);
     info.textContent=kind==='weapon'?(obj?`Lv.${obj.level} · R${obj.refinement}${obj.location?' · '+obj.location:''}`:'武器培养目标'):'角色培养目标';
     description.append(title,info);card.append(description);
-    if(goal.enabled===false){const tag=document.createElement('span');tag.className='goal-paused';tag.textContent='暂停';card.append(tag);}
-    const toggle=document.createElement('button');toggle.type='button';toggle.className='goal-toggle';toggle.textContent=goal.enabled===false?'▶':'Ⅱ';
+    const toggle=document.createElement('button');toggle.type='button';toggle.className='goal-toggle';
+    toggle.innerHTML=svg(goal.enabled===false?'play':'pause');
     toggle.title=goal.enabled===false?'恢复计算':'暂停计算';toggle.setAttribute('aria-label',toggle.title);
     toggle.onclick=e=>{e.stopPropagation();goal.enabled=goal.enabled===false;renderAll();save();};card.append(toggle);
     clickOrEdit(card,()=>selectGoal(goal.id),()=>openEditor(goal));root.append(card);
@@ -258,12 +267,15 @@ function typeIcon(def,kind){
   img.addEventListener('error',()=>{img.remove();holder.innerHTML=svg(def.icon);});
   holder.append(img);return holder;
 }
-function makeChip(label,iconDef,selected,onClick){
-  const btn=document.createElement('button');btn.type='button';btn.className='filter-chip'+(selected?' active':'');
+function makeChip(label,iconDef,selected,onClick,iconOnly=false){
+  const btn=document.createElement('button');btn.type='button';
+  btn.className='filter-chip'+(selected?' active':'')+(iconOnly?' icon-only':'');
+  btn.title=label;btn.setAttribute('aria-label',label);btn.setAttribute('aria-pressed',String(selected));
   if(iconDef){btn.append(typeof iconDef==='object'
     ?typeIcon(iconDef,elementDefs.includes(iconDef)?'elements':'weapons')
     :Object.assign(document.createElement('span'),{innerHTML:svg(iconDef),className:'filter-icon'}));}
-  const name=document.createElement('span');name.textContent=label;btn.append(name);btn.onclick=onClick;return btn;
+  if(!iconOnly){const name=document.createElement('span');name.textContent=label;btn.append(name);}
+  btn.onclick=onClick;return btn;
 }
 function badgeIcon(container,def,kind){const img=document.createElement('img');img.alt='';img.src=`icons/${kind}/${def.asset}`;
   img.onerror=()=>{img.remove();container.innerHTML=svg(def.icon);};container.append(img);}
@@ -273,11 +285,11 @@ function renderFilters(){const isChar=filter.tab==='character';
   stars.append(makeChip('全部',null,filter.star===0,()=>{filter.star=0;renderFilters();renderRoster();}));
   for(const n of (isChar?[5,4]:[5,4,3,2,1]))stars.append(makeChip(n+'★','star',filter.star===n,()=>{filter.star=n;renderFilters();renderRoster();}));
   const elems=$('elementFilters');elems.replaceChildren();elems.hidden=!isChar;
-  if(isChar){elems.append(makeChip('全部元素',null,!filter.element,()=>{filter.element='';renderFilters();renderRoster();}));
-    for(const el of elementDefs)elems.append(makeChip(el.label,el,filter.element===el.id,()=>{filter.element=el.id;renderFilters();renderRoster();}));}
+  if(isChar){elems.append(makeChip('全部元素','all-elements',!filter.element,()=>{filter.element='';renderFilters();renderRoster();},true));
+    for(const el of elementDefs)elems.append(makeChip(el.label,el,filter.element===el.id,()=>{filter.element=el.id;renderFilters();renderRoster();},true));}
   const wps=$('weaponFilters');wps.replaceChildren();
-  wps.append(makeChip('全部武器类型',null,!filter.weapon,()=>{filter.weapon='';renderFilters();renderRoster();}));
-  for(const wp of weaponDefs)wps.append(makeChip(wp.label,wp,filter.weapon===wp.id,()=>{filter.weapon=wp.id;renderFilters();renderRoster();}));
+  wps.append(makeChip('全部武器类型','all-weapons',!filter.weapon,()=>{filter.weapon='';renderFilters();renderRoster();},true));
+  for(const wp of weaponDefs)wps.append(makeChip(wp.label,wp,filter.weapon===wp.id,()=>{filter.weapon=wp.id;renderFilters();renderRoster();},true));
   for(const tab of document.querySelectorAll('[data-tab]')){
     const yes=tab.dataset.tab===filter.tab;tab.classList.toggle('active',yes);tab.setAttribute('aria-selected',String(yes));}
 }
@@ -555,10 +567,19 @@ function renderCalendar(){
   ['周一','周二','周三','周四','周五','周六','周日'].forEach((day,i)=>{
     const cell=document.createElement('div');cell.className='calendar-day';
     const label=document.createElement('strong');label.textContent=day;
-    const rows=plan.days[i];const info=document.createElement('span');info.textContent=rows.length?rows.map(x=>x.name).slice(0,2).join('、'):'—';
-    info.title=rows.map(x=>`${x.name} · 缺 ${x.lack}`).join('\n');cell.append(label,info);box.append(cell);
+    const tray=document.createElement('div');tray.className='calendar-materials';
+    for(const material of plan.days[i]){
+      const icon=document.createElement('span');icon.className='calendar-material '+(material.highlight?'needed':'fulfilled');
+      icon.title=material.name+(material.highlight?' · 缺 '+displayNum(material.lack):' · 已满足');
+      icon.setAttribute('role','img');icon.setAttribute('aria-label',icon.title);
+      const img=document.createElement('img');img.alt='';img.loading='lazy';
+      img.src=itemIconUrl(material.id);img.onerror=()=>img.remove();
+      icon.append(img);tray.append(icon);
+    }
+    if(!tray.childElementCount){const empty=document.createElement('span');empty.className='calendar-empty';empty.textContent='—';tray.append(empty);}
+    cell.append(label,tray);box.append(cell);
   });
-  $('calendarNote').textContent=plan.unknown.length?`${plan.unknown.length} 种材料的开放日待补充`:'按当前培养材料缺口显示';
+  $('calendarNote').textContent=plan.unknown.length?`${plan.unknown.length} 种材料的开放日待补充`:'高亮当前需要刷取的材料';
 }
 function renderAll(){renderAccounts();renderGoals();renderFilters();renderRoster();renderInventory();renderResults();renderCalendar();}
 async function loadLists(force=false){
