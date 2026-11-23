@@ -655,7 +655,9 @@ function renderCalendar(){
     if(!tray.childElementCount){const empty=document.createElement('span');empty.className='calendar-empty';empty.textContent='—';tray.append(empty);}
     cell.append(label,tray);box.append(cell);
   });
-  $('calendarNote').textContent=plan.unknown.length?`${plan.unknown.length} 种材料的开放日待补充`:'高亮当前需要刷取的材料';
+  const note=$('calendarNote');
+  note.textContent=plan.unknown.length?`${plan.unknown.length} 种材料的开放日待核对`:'高亮当前需要刷取的材料';
+  note.title=plan.unknown.map(item=>item.name||item.id).join('、');
 }
 function renderAll(){renderAccounts();renderGoals();renderFilters();renderRoster();renderInventory();renderResults();renderCalendar();}
 async function loadLists(force=false){
