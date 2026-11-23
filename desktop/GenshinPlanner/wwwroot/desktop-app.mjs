@@ -309,7 +309,9 @@ function rosterCard(row){
     addCopy.textContent='+';addCopy.title='增加一把'+row.name;addCopy.setAttribute('aria-label','增加一把'+row.name);
     addCopy.onclick=ev=>{ev.stopPropagation();const fresh=makeWeaponInstance(row);
       const created=makeGoal('weapon',row,{instanceId:fresh.id,current:fresh});
-      state.weaponInstances.push(fresh);state.plans.push(created);renderAll();save();openEditor(created);};
+      state.weaponInstances.push(fresh);state.plans.push(created);
+      selectedGoalId=created.id;inventoryGoalId=created.id;state.activePlanId=created.id;
+      renderAll();save();void reloadAllProfiles();};
     card.append(addCopy);
   }
   card.append(box,title,meta);
