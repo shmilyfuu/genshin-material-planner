@@ -44,8 +44,21 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path desktop/dist, desktop/publish/data | Out-Null
-          Compress-Archive -Path desktop/publish/* -DestinationPath desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip -Force
-          (Get-FileHash desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip -Algorithm SHA256).Hash.ToLower() | Set-Content desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip.sha256
+          Add-Type -AssemblyName System.IO.Compression.ZipFile
+          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.2.1-win-x64.zip'
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            (Resolve-Path desktop/publish).Path,
+            $zipPath,
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false
+          )
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+          try {
+            if (-not $archive.GetEntry('data/')) { throw 'Portable data directory missing from ZIP' }
+          } finally {
+            $archive.Dispose()
+          }
+          (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower() | Set-Content ($zipPath + '.sha256')
       - uses: actions/upload-artifact@v4
         with:
           name: GenshinPlanner-WebView2-v0.2.1-win-x64
