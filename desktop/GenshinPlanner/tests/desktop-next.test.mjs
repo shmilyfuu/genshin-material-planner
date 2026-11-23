@@ -7,6 +7,7 @@ import {initializePlanner,makeGoal,makeWeaponInstance,visibleRoster,setLink,acti
 import {importGOOD} from '../wwwroot/good-import.mjs';
 import {saveActivePlannerAccount} from '../wwwroot/planner-accounts.mjs';
 import {calculateMultiPlan,materialContributions} from '../wwwroot/multi-planner.mjs';
+import {calendarForEntries,weeklyMaterialDay} from '../wwwroot/calendar-days.mjs';
 const char=(id,name,en)=>({id:String(id),name,en,goodKey:en,rarity:5,version:'6.3'});
 const weapon=(id,name,en,rarity=4)=>({id:String(id),name,en,goodKey:en,rarity,version:'6.3'});
 const character=char(100001,'芙宁娜','Furina');
@@ -148,4 +149,33 @@ test('重复武器的材料明细包含实例编号',()=>{
   const a=makeGoal('weapon',sword,{instanceId:'w-1'}),b=makeGoal('weapon',sword,{instanceId:'w-2'});
   const material=fakeWeaponProfile();const rows=materialContributions([{plan:a,weaponProfile:material},{plan:b,weaponProfile:material}]).get('2101');
   assert.deepEqual(rows.map(x=>x.name),['西风剑 #1','西风剑 #2']);
+});
+
+test('挪德卡莱刷取日历按系列合并图标并优先显示材料缺口',()=>{
+  const books=[{id:7001,name:'「月光」的教导'},
+    {id:7002,name:'「月光」的指引'},{id:7003,name:'「月光」的哲学'}];
+  const weapons=[{id:8001,name:'终北遗嗣的哀荣'},
+    {id:8002,name:'终北遗嗣的祷献'},{id:8003,name:'终北遗嗣的煌熠'}];
+  const entries=[{characterProfile:{materials:{books}},
+    weaponProfile:{materials:{weapGems:weapons}}}];
+  const deficits={groups:[{rows:[
+    {id:'7001',count:9,lack:0},{id:'7002',count:6,lack:2},{id:'7003',count:1,lack:0},
+    {id:'8001',count:5,lack:0},{id:'8002',count:1,lack:0},{id:'8003',count:1,lack:0}
+  ]}]};
+  const week=calendarForEntries(entries,deficits);
+  assert.deepEqual(week.days[0].map(row=>row.id),['7003']);
+  assert.equal(week.days[0][0].highlight,true);
+  assert.equal(week.days[0][0].lack,2);
+  assert.deepEqual(week.days[2].map(row=>row.id),['8003']);
+  assert.equal(week.days[2][0].highlight,false);
+  assert.deepEqual(week.days[6].map(row=>row.id),['7003','8003']);
+  assert.equal(week.unknown.length,0);
+  assert.equal(weeklyMaterialDay('「乐园」的教导','talent'),2);
+  assert.equal(weeklyMaterialDay('「浪迹」的哲学','talent'),3);
+  assert.equal(weeklyMaterialDay('奇巧秘器的残件','weapon'),1);
+  assert.equal(weeklyMaterialDay('长夜燧火的余烬','weapon'),2);
+  assert.equal(weeklyMaterialDay('终北遗嗣的祷献','weapon'),3);
+  assert.equal(weeklyMaterialDay('贡祭炽心的决绝','weapon'),1);
+  assert.equal(weeklyMaterialDay('谵妄圣主的朽败','weapon'),2);
+  assert.equal(weeklyMaterialDay('神合秘烟的思绪','weapon'),3);
 });
