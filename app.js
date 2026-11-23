@@ -1172,6 +1172,8 @@ async function syncAllLists({ force = false } = {}) {
     weaponList = [];
     characterProfile = null;
     weaponProfile = null;
+    planProfiles.clear();
+    profileLoadSerial++;
     updateMergeRules();
     setSourceStatus(`同步失败，已启用手动模式：${error.message}`, 'error');
     renderSourceControls();
@@ -1186,72 +1188,99 @@ function updateMergeRules() {
   state.source.mergeRules = detectMergeRules(characterProfile, weaponProfile);
 }
 
-async function loadCharacterProfile({ force = false } = {}) {
-  const selected = getSelectedCharacterEntry();
-  if (!selected) {
-    state.source.selectedCharacterId = '';
-    state.source.selectedCharacterName = '';
-    state.source.selectedCharacterVersion = '';
-    state.source.selectedCharacterTag = '';
-    characterProfile = null;
-    return;
-  }
-  const response = await requestHakushin(`/gi/${encodeURIComponent(selected.version)}/zh/character/${encodeURIComponent(selected.id)}.json`, { force, maxAge: 24 * 60 * 60 * 1000 });
-  characterProfile = parseCharacterDetail(response.data, selected);
-  state.source.selectedCharacterName = characterProfile.name;
-  state.source.selectedCharacterVersion = selected.version;
-  state.source.selectedCharacterTag = selected.sourceTag;
+async function fetchPlanProfiles(plan,{force=false}={}) {
+  const charId=String(plan.source.selectedCharacterId || '');
+  const weaponId=String(plan.source.selectedWeaponId || '');
+  const selectedChar=characterList.find(row=>row.id===charId);
+  const selectedWeapon=weaponList.find(row=>row.id===weaponId);
+  const getCharacter=async()=>{
+    if(!charId)return null;
+    if(!selectedChar)throw new Error('角色 '+(plan.source.selectedCharacterName||charId)+' 未进入当前数据列表');
+    const response=await requestHakushin(
+      '/gi/'+encodeURIComponent(selectedChar.version)+'/zh/character/'+encodeURIComponent(charId)+'.json',
+      {force,maxAge:24*60*60*1000}
+    );
+    return parseCharacterDetail(response.data,selectedChar);
+  };
+  const getWeapon=async()=>{
+    if(!weaponId)return null;
+    if(!selectedWeapon)throw new Error('武器 '+(plan.source.selectedWeaponName||weaponId)+' 未进入当前数据列表');
+    const response=await requestHakushin(
+      '/gi/'+encodeURIComponent(selectedWeapon.version)+'/zh/weapon/'+encodeURIComponent(weaponId)+'.json',
+      {force,maxAge:24*60*60*1000}
+    );
+    return parseWeaponDetail(response.data,selectedWeapon);
+  };
+  const results=await Promise.allSettled([getCharacter(),getWeapon()]);
+  const problems=results.filter(result=>result.status==='rejected')
+    .map(result=>String(result.reason?.message || result.reason));
+  return {
+    characterProfile:results[0].status==='fulfilled' ? results[0].value : null,
+    weaponProfile:results[1].status==='fulfilled' ? results[1].value : null,
+    errors:problems
+  };
 }
 
-async function loadWeaponProfile({ force = false } = {}) {
-  const selected = getSelectedWeaponEntry();
-  if (!selected) {
-    state.source.selectedWeaponId = '';
-    state.source.selectedWeaponName = '';
-    state.source.selectedWeaponVersion = '';
-    state.source.selectedWeaponTag = '';
-    weaponProfile = null;
-    return;
+async function reloadSelectedProfiles({force=false}={}) {
+  commitActivePlan();
+  const token=++profileLoadSerial;
+  setSourceStatus('正在读取培养项资料…');
+  const items=await Promise.all(state.plans.map(plan=>fetchPlanProfiles(plan,{force})));
+  if(token!==profileLoadSerial)return;
+  planProfiles=new Map();
+  const problems=[];
+  for(let i=0;i<state.plans.length;i++){
+    const plan=state.plans[i], profiles=items[i];
+    planProfiles.set(plan.id,profiles);
+    if(profiles.characterProfile){
+      plan.source.selectedCharacterName=profiles.characterProfile.name;
+      plan.source.selectedCharacterVersion=profiles.characterProfile.version;
+      plan.source.selectedCharacterTag=profiles.characterProfile.sourceTag;
+    }
+    if(profiles.weaponProfile){
+      plan.source.selectedWeaponName=profiles.weaponProfile.name;
+      plan.source.selectedWeaponVersion=profiles.weaponProfile.version;
+      plan.source.selectedWeaponTag=profiles.weaponProfile.sourceTag;
+    }
+    for(const problem of profiles.errors) problems.push('培养项 '+(i+1)+'：'+problem);
   }
-  const response = await requestHakushin(`/gi/${encodeURIComponent(selected.version)}/zh/weapon/${encodeURIComponent(selected.id)}.json`, { force, maxAge: 24 * 60 * 60 * 1000 });
-  weaponProfile = parseWeaponDetail(response.data, selected);
-  state.source.selectedWeaponName = weaponProfile.name;
-  state.source.selectedWeaponVersion = selected.version;
-  state.source.selectedWeaponTag = selected.sourceTag;
+  const active=activePlan();
+  state.source=structuredClone(active.source);
+  state.config=structuredClone(active.config);
+  const profiles=planProfiles.get(active.id) || {};
+  characterProfile=profiles.characterProfile || null;
+  weaponProfile=profiles.weaponProfile || null;
+  updateMergeRules();
+  commitActivePlan();
+
+  if(!state.materialInventoryMigrated){
+    const original=state.plans[0];
+    const originalProfiles=planProfiles.get(original.id)||{};
+    const hasInput=Object.values(state.inv).some(value=>Array.isArray(value)
+      ? value.some(row=>String(row).trim())
+      : String(value).trim());
+    const canMigrate=(!original.source.selectedCharacterId || originalProfiles.characterProfile)
+      && (!original.source.selectedWeaponId || originalProfiles.weaponProfile);
+    if(canMigrate){
+      const legacy=migrateLegacyInventory(state.inv,originalProfiles.characterProfile,
+        originalProfiles.weaponProfile,original.source.mergeRules);
+      state.materialInventory={...legacy,...state.materialInventory};
+      state.materialInventoryMigrated=true;
+    } else if(!hasInput) {
+      state.materialInventoryMigrated=true;
+    }
+  }
+
+  renderSourceControls();
+  refreshAll();
+  await persistState();
+  setSourceStatus(problems.length
+    ? '部分培养项资料读取失败：'+problems.join('；')
+    : '已载入 '+state.plans.length+' 个培养项',
+    problems.length ? 'error' : 'ok');
 }
 
-async function reloadSelectedProfiles({ force = false } = {}) {
-  try {
-    const tasks = [];
-    if (state.source.selectedCharacterId) tasks.push(loadCharacterProfile({ force }));
-    else characterProfile = null;
-    if (state.source.selectedWeaponId) tasks.push(loadWeaponProfile({ force }));
-    else weaponProfile = null;
-    if (tasks.length) {
-      setSourceStatus('正在读取已选对象详情…');
-      await Promise.all(tasks);
-    }
-    updateMergeRules();
-    renderSourceControls();
-    renderInventory();
-    renderResults();
-    await persistState();
-    if (!tasks.length) {
-      setSourceStatus('当前为手动模式，可直接使用现有计算逻辑。', 'ok');
-    } else {
-      setSourceStatus('角色与武器数据已载入', 'ok');
-    }
-  } catch (error) {
-    console.error(error);
-    if (String(error.message || '').includes('武器')) weaponProfile = null;
-    if (String(error.message || '').includes('角色')) characterProfile = null;
-    updateMergeRules();
-    renderSourceControls();
-    renderInventory();
-    renderResults();
-    setSourceStatus(`详情读取失败，已保留通用计算：${error.message}`, 'error');
-  }
-}
+
 
 function bindSourceEvents() {
   document.getElementById('syncButton').addEventListener('click', () => {
@@ -1286,12 +1315,18 @@ function bindSourceEvents() {
 
   document.getElementById('characterSelect').addEventListener('change', async (event) => {
     state.source.selectedCharacterId = event.target.value;
-    await persistState();
+    state.source.selectedCharacterName = '';
+    state.source.selectedCharacterVersion = '';
+    state.source.selectedCharacterTag = '';
+    commitActivePlan();
     await reloadSelectedProfiles();
   });
   document.getElementById('weaponSelect').addEventListener('change', async (event) => {
     state.source.selectedWeaponId = event.target.value;
-    await persistState();
+    state.source.selectedWeaponName = '';
+    state.source.selectedWeaponVersion = '';
+    state.source.selectedWeaponTag = '';
+    commitActivePlan();
     await reloadSelectedProfiles();
   });
 }
