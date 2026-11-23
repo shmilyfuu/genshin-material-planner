@@ -15,7 +15,7 @@ import {
   mergeSourceLists,
   itemIconUrl
 } from './hakushin.mjs';
-import {buildNanokaDemand, evaluateNanokaDemand, mapManualInventory} from './hybrid-calculator.mjs';
+import {buildNanokaDemand, evaluateNanokaDemand} from './hybrid-calculator.mjs';
 import {calculateMultiPlan,migrateLegacyInventory,collectInventoryCatalog} from './multi-planner.mjs';
 
 const STORAGE_KEY = 'materialPlannerHakushinBetaState';
@@ -217,14 +217,20 @@ function renderPlanItems() {
 }
 
 function addPlan() {
+  if (state.plans.length >= 40) {
+    showToast('最多可添加 40 个培养项。', 'error');
+    return;
+  }
   commitActivePlan();
   const defaults = cloneDefaultState();
   const id = 'item-' + Date.now().toString(36) + '-' + (++nextPlanSerial);
   state.plans.push({id,source:defaults.source,config:defaults.config});
   state.activePlanId = id;
+  profileLoadSerial++;
   officialCalculation = null;
   showActivePlan();
   scheduleSave({immediate:true});
+  if (characterList.length || weaponList.length) void reloadSelectedProfiles();
 }
 
 function removePlan() {
@@ -239,9 +245,11 @@ function removePlan() {
     state.plans=defaults.plans;
   }
   state.activePlanId=state.plans[Math.min(index,state.plans.length-1)].id;
+  profileLoadSerial++;
   officialCalculation=null;
   showActivePlan();
   scheduleSave({immediate:true});
+  if (characterList.length || weaponList.length) void reloadSelectedProfiles();
 }
 
 function currentMultiCalculation() {
@@ -293,16 +301,15 @@ export function chooseInventoryUid(uid) {
 
 function importSavedManualInventory(uid) {
   if (!uid || state.manualInventoryImportUid) return;
-  const mapped = mapManualInventory({
-    inventory: state.inv,
-    characterProfile,
-    weaponProfile,
-    mergeRules: getMergeRules()
-  });
-  if (!Object.keys(mapped.values).length) return;
+  const values = {};
+  for (const [id,expression] of Object.entries(state.materialInventory)) {
+    if (!String(expression).trim()) continue;
+    values[id] = safeEval(expression);
+  }
+  if (!Object.keys(values).length) return;
   state.verifiedInventory[uid] = {
     ...(state.verifiedInventory[uid] || {}),
-    ...mapped.values
+    ...values
   };
   state.manualInventoryImportUid = uid;
   scheduleSave();
@@ -539,8 +546,19 @@ function createMultiInventoryInput(material) {
     input.classList.toggle('has-preview',Boolean(preview.textContent));
   };
   input.addEventListener('input',() => {
-    if (input.value.trim()) state.materialInventory[id] = input.value;
+    const value = input.value.trim();
+    if (value) state.materialInventory[id] = input.value;
     else delete state.materialInventory[id];
+    const uid=currentUid();
+    if (uid) {
+      const verified = state.verifiedInventory[uid] ||= {};
+      if (value && /^[0-9+-*/×xX÷()（）,.，\s]+$/.test(value)
+        && !/[+\-*/×xX÷]$/.test(value)) {
+        verified[id] = safeEval(value);
+      } else {
+        delete verified[id];
+      }
+    }
     updatePreview();
     renderResults();
     scheduleSave();
