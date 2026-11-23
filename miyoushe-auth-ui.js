@@ -19,7 +19,7 @@ async function mysSend(type, fields = {}) {
 }
 
 function buildMiyoushePanel() {
-  const target = document.querySelector('.inventory-body');
+  const target = document.getElementById('mysModeContent');
   if (!target || document.getElementById('mysAuthCard')) return;
 
   const panel = mysEl('section', '', 'mys-auth');

@@ -33,11 +33,18 @@
         </div>
         <button id="syncButton" class="button button-secondary" type="button">重新同步</button>
       </div>
+      <div class="plan-toolbar">
+        <div id="planItems" class="plan-items" role="group" aria-label="培养项"></div>
+        <div class="plan-actions">
+          <button id="addPlanButton" class="button button-secondary" type="button">添加培养项</button>
+          <button id="removePlanButton" class="button button-danger" type="button">删除当前项</button>
+        </div>
+      </div>
       <div class="source-columns">
         <section class="picker-group" aria-labelledby="characterPickerTitle">
           <div class="picker-head">
             <h3 id="characterPickerTitle">角色</h3>
-            <span class="picker-hint">可选手动模式</span>
+            <span class="picker-hint">可留空</span>
           </div>
           <label>
             <span>搜索角色</span>
@@ -64,7 +71,7 @@
         <section class="picker-group" aria-labelledby="weaponPickerTitle">
           <div class="picker-head">
             <h3 id="weaponPickerTitle">武器</h3>
-            <span class="picker-hint">可选手动模式</span>
+            <span class="picker-hint">可留空</span>
           </div>
           <label>
             <span>搜索武器</span>
@@ -124,10 +131,14 @@
         <span class="summary-hint">支持 38*2、100+25 等算式</span>
       </summary>
       <div class="card-body inventory-body">
-        <div class="calculation-modes" role="group" aria-label="计算方式">
-          <button type="button" data-calc-mode="manual" aria-pressed="true">手动背包</button>
-          <button type="button" data-calc-mode="official" aria-pressed="false">米游社计算</button>
-        </div>
+        <details class="miyoushe-options" id="miyousheOptions">
+          <summary>米游社计算（可选）</summary>
+          <div class="calculation-modes" role="group" aria-label="计算方式">
+            <button type="button" data-calc-mode="manual" aria-pressed="true">手动背包</button>
+            <button type="button" data-calc-mode="official" aria-pressed="false">米游社计算</button>
+          </div>
+          <div id="mysModeContent"></div>
+        </details>
         <div id="manualInventoryGroups">
         <details class="inventory-group" open>
           <summary>基础与专属材料</summary>
