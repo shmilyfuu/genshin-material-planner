@@ -465,6 +465,10 @@ function renderSelectors() {
   selectorDefinitions.forEach((definition) => {
     document.getElementById(definition.container).append(createLevelSelector(definition));
   });
+  document.getElementById('characterSelectors').closest('.target-group').hidden =
+    !state.source.selectedCharacterId;
+  document.getElementById('weaponSelectors').closest('.target-group').hidden =
+    !state.source.selectedWeaponId;
 }
 
 function getMergeRules() {
@@ -495,12 +499,16 @@ function getCultMaterial(index) {
   return null;
 }
 
+function materialTierColor(rank) {
+  return rank >= 5 ? 'gold' : rank === 4 ? 'purple'
+    : rank === 3 ? 'blue' : rank === 2 ? 'green'
+      : rank === 1 ? 'white' : 'base';
+}
+
 function createMultiInventoryInput(material) {
   const id = String(material.id);
   const wrapper = document.createElement('label');
-  const color = material.rank >= 5 ? 'gold' : material.rank === 4 ? 'purple'
-    : material.rank === 3 ? 'blue' : material.rank === 2 ? 'green'
-      : material.rank === 1 ? 'white' : 'base';
+  const color = materialTierColor(material.rank);
   wrapper.className = 'item-input color-' + color;
   const iconSlot = document.createElement('span');
   iconSlot.className = 'material-icon-slot inventory-icon-slot slot-' + color;
@@ -781,7 +789,7 @@ function renderResults() {
       const section = createResultSection(group.title + suffix);
       for (const row of group.rows) {
         if (!row.lack) continue;
-        section.rows.append(createResultRow(row.name,row.lack,'base',itemIconUrl(row.id)));
+        section.rows.append(createResultRow(row.name,row.lack,materialTierColor(row.rank),itemIconUrl(row.id)));
       }
       container.append(section.section);
     } else {
@@ -791,7 +799,7 @@ function renderResults() {
         singleSections.set(group.title,section);
       }
       for (const row of group.rows) {
-        if (row.lack) section.rows.append(createResultRow(row.name,row.lack,'base',itemIconUrl(row.id)));
+        if (row.lack) section.rows.append(createResultRow(row.name,row.lack,materialTierColor(row.rank),itemIconUrl(row.id)));
       }
     }
   }

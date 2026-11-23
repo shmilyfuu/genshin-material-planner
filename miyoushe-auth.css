@@ -113,3 +113,5 @@
 .miyoushe-options > summary { cursor: pointer; font-size: 12px; }
 .miyoushe-options[open] { display: grid; gap: 10px; }
 #mysModeContent { min-width: 0; }
+
+.target-group[hidden] { display: none !important; }

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {calculateMultiPlan,migrateLegacyInventory,collectInventoryCatalog} from '../multi-planner.mjs';
+import {calculateResult} from '../core.mjs';
 
 const defaults=()=>({charAsc:[0,6],weapAsc:[0,6],talentA:[0,0],talentE:[0,0],talentQ:[0,0]});
 const character=(id,spec,books=[301,302,303])=>({
@@ -96,4 +97,40 @@ test('养成目标尚未设置时也提供角色与武器所有材料的背包�
   assert.ok(all.some(r=>r.id==='114004'));
   assert.equal(all.filter(r=>r.id==='110201').length,1);
   assert.equal(new Set(all.map(r=>r.id)).size,all.length);
+});
+
+
+test('同一角色武器组合的完整缺口与原单项计算器一致',()=>{
+  const c=character(1,501);
+  const w=weapon(15,[110202,110203,110204]);
+  const config=defaults();
+  config.talentA=[0,9];
+  config.talentE=[0,8];
+  const inv={
+    gold:'15660349',spec:'47',boss:'12',weekly:'3',crown:'1',
+    books:['3','6','4'],cult:['40','35','12','0'],
+    charGems:['1','5','4','0'],
+    weapGems:['1','2','2','0'],
+    matA:['90','40','0'],matB:['15','12','6']
+  };
+  const rules={matAIntoCult:true,matBIntoCult:false};
+  const legacyState={config,inv,source:{mergeRules:rules}};
+  const legacy=calculateResult(legacyState);
+  const mapped=migrateLegacyInventory(inv,c,w,rules);
+  const multi=calculateMultiPlan([{
+    plan:plan(1,15,config),characterProfile:c,weaponProfile:w
+  }],mapped);
+  const row=(id)=>multi.groups.flatMap(g=>g.rows).find(r=>r.id===String(id));
+  assert.equal(row(202).lack,legacy.flat.gold);
+  assert.equal(row(501).lack,legacy.flat.spec);
+  assert.equal(row(910).lack,legacy.flat.boss);
+  for(const [i,id] of [110201,110202,110203,110204].entries()){
+    assert.equal(row(id).lack,legacy.groups.cult.optimal[i]);
+  }
+  for(const [i,id] of [301,302,303].entries()){
+    assert.equal(row(id).lack,legacy.groups.books.optimal[i]);
+  }
+  for(const [i,id] of [114001,114002,114003,114004].entries()){
+    assert.equal(row(id).lack,legacy.groups.weapGems.optimal[i]);
+  }
 });
