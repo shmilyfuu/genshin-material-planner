@@ -206,6 +206,7 @@ function addPlannerAccount() {
     state.calculationMode = 'manual';
     refreshCalculationMode();
     renderPlannerAccounts();
+    window.dispatchEvent(new Event('planner-account-changed'));
     showActivePlan();
     void reloadSelectedProfiles();
     scheduleSave({immediate: true});
@@ -237,6 +238,7 @@ function removeCurrentPlannerAccount() {
     state.calculationMode = 'manual';
     refreshCalculationMode();
     renderPlannerAccounts();
+    window.dispatchEvent(new Event('planner-account-changed'));
     showActivePlan();
     void reloadSelectedProfiles();
     scheduleSave({immediate: true});
