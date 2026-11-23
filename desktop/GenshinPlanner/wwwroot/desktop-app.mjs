@@ -83,7 +83,7 @@ let profiles=new Map();
 let listVersion={live:'',latest:''};
 let profileLoadToken=0;
 let filter={tab:'character',search:'',element:'',weapon:'',star:0};
-let selectedGoalId=null,inventoryGoalId=null,rosterClickTimer=null,goalEditor=null;
+let selectedGoalId=null,inventoryGoalId=null,selectedRosterKey=null,rosterClickTimer=null,goalEditor=null;
 let saveTimer=null,writeChain=Promise.resolve(),toastTimeout=null;
 let currentModalResolve=null;
 
@@ -224,6 +224,7 @@ function clickOrEdit(node,onSelect,onEdit){
   });
 }
 function selectGoal(id){
+  selectedRosterKey=null;
   if(id===selectedGoalId)selectedGoalId=null;
   else {selectedGoalId=id;inventoryGoalId=id;}
   renderGoals();renderRoster();renderInventory();renderResults();
@@ -282,10 +283,11 @@ function renderFilters(){const isChar=filter.tab==='character';
 }
 function rosterCard(row){
   const kind=filter.tab,goal=row.goal||null;
+  const selectionKey=kind==='weapon'&&row.instance?`weapon:${row.instance.id}`:`${kind}:${row.id}`;
   const card=document.createElement('div');card.className='avatar-card';card.tabIndex=0;
   card.setAttribute('role','button');card.setAttribute('aria-label',row.name+'，单击选择，双击编辑');
   card.dataset.rarity=String(row.rarity||'');
-  card.classList.toggle('selected',Boolean(goal&&selectedGoalId===goal.id));
+  card.classList.toggle('selected',Boolean(goal&&selectedGoalId===goal.id)||(!goal&&selectedRosterKey===selectionKey));
   card.classList.toggle('planned',Boolean(goal&&!goal.completed));
   card.classList.toggle('completed',Boolean(goal?.completed));
   card.classList.toggle('owned',Boolean(row.owned));
@@ -310,16 +312,16 @@ function rosterCard(row){
     addCopy.onclick=ev=>{ev.stopPropagation();const fresh=makeWeaponInstance(row);
       const created=makeGoal('weapon',row,{instanceId:fresh.id,current:fresh});
       state.weaponInstances.push(fresh);state.plans.push(created);
-      selectedGoalId=created.id;inventoryGoalId=created.id;state.activePlanId=created.id;
+      selectedRosterKey=null;selectedGoalId=created.id;inventoryGoalId=created.id;state.activePlanId=created.id;
       renderAll();save();void reloadAllProfiles();};
     card.append(addCopy);
   }
   card.append(box,title,meta);
   if(row.sourceTag){const tag=document.createElement('span');tag.className='avatar-preview';tag.textContent=row.sourceTag;card.append(tag);}
   clickOrEdit(card,()=>{
-    if(goal)selectGoal(goal.id);
-    else if(kind==='weapon'&&row.instance){selectedGoalId=null;inventoryGoalId=null;renderAll();toast('此武器尚未设置培养目标，双击可创建。');}
-    else{selectedGoalId=null;renderAll();toast('双击头像设置培养目标。');}
+    if(goal){selectGoal(goal.id);return;}
+    selectedRosterKey=selectedRosterKey===selectionKey?null:selectionKey;
+    selectedGoalId=null;inventoryGoalId=null;renderAll();
   },()=>openEditor(goal,{kind,row,instance:row.instance||null}));
   return card;
 }
@@ -433,7 +435,7 @@ async function saveEditor(){
   if(mode==='weapon'&&!goal.weaponInstanceId){
     const w=weaponInstance(state,editor.instance?.id);if(w)goal.weaponInstanceId=w.id;
   }
-  state.activePlanId=goal.id;selectedGoalId=goal.completed?null:goal.id;inventoryGoalId=goal.id;
+  state.activePlanId=goal.id;selectedRosterKey=null;selectedGoalId=goal.completed?null:goal.id;inventoryGoalId=goal.id;
   $('goalModal').hidden=true;goalEditor=null;
   renderAll();save();await reloadAllProfiles();
 }
@@ -471,8 +473,13 @@ const categories=[['basicInventory','基础与专属材料'],['cultInventory','�
 function renderInventory(){
   const holder=$('inventoryGroups');holder.replaceChildren();
   const id=selectedGoalId||inventoryGoalId;const goal=goalById(id);
-  $('inventoryTarget').textContent=goal?objName(goal):'选择培养目标';
-  if(!goal){holder.innerHTML='<div class="empty-hint">点击顶部培养卡片，可查看当前目标需要填写的背包材料。</div>';return;}
+  const rosterName=selectedRosterKey?(selectedRosterKey.startsWith('weapon:')
+    ?weaponRow(weaponInstance(state,selectedRosterKey.slice(7))?.weaponId)?.name
+    :charRow(selectedRosterKey.slice(10))?.name):'';
+  $('inventoryTarget').textContent=goal?objName(goal):rosterName||'选择培养目标';
+  if(!goal){holder.innerHTML=selectedRosterKey
+    ?'<div class="empty-hint">双击当前对象设置培养目标。</div>'
+    :'<div class="empty-hint">点击顶部培养卡片，可查看当前目标需要填写的背包材料。</div>';return;}
   const selected=entries().find(e=>e.plan.id===id);
   const catalog=collectInventoryCatalog(selected?[selected]:[]);
   const all=entries().filter(e=>e.plan.enabled!==false&&!e.plan.completed);
@@ -613,7 +620,7 @@ async function renameAccount(){const record=state.plannerAccounts.find(x=>x.id==
 async function removeAccount(){if(state.plannerAccounts.length<=1)return;
   const ok=await modal({title:'删除规划账号',description:'该账号所有培养项、扫描数据及材料记录将被删除。',requiresText:false,confirm:'删除'});
   if(ok===null)return;deletePlannerAccount(state,state.activeAccountId);resetAccountView();save();void reloadAllProfiles();}
-function resetAccountView(){initializePlanner(state);selectedGoalId=null;inventoryGoalId=null;profiles.clear();profileLoadToken++;
+function resetAccountView(){initializePlanner(state);selectedGoalId=null;inventoryGoalId=null;selectedRosterKey=null;profiles.clear();profileLoadToken++;
   filter={tab:'character',search:'',element:'',weapon:'',star:0};renderAll();}
 function switchAccount(id){if(id===state.activeAccountId)return;selectPlannerAccount(state,id);resetAccountView();save();void reloadAllProfiles();}
 async function exportAll(){try{const ok=await bridge('storage.export',{state:{type:'material-planner-desktop-config',version:2,exportedAt:new Date().toISOString(),data:snapshot()}});
