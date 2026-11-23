@@ -83,7 +83,8 @@ export function cloneDefaultState() {
   const state = JSON.parse(JSON.stringify(DEFAULT_STATE));
   state.plans = [{id: 'plan-1',
     source: JSON.parse(JSON.stringify(state.source)),
-    config: JSON.parse(JSON.stringify(state.config))
+    config: JSON.parse(JSON.stringify(state.config)),
+    enabled: true
   }];
   state.activePlanId = 'plan-1';
   return state;
@@ -226,7 +227,7 @@ export function normalizeState(input) {
       ? proposed : 'plan-' + (index + 1);
     const uniqueId = used.has(id) ? 'plan-item-' + index : id;
     used.add(uniqueId);
-    return {id:uniqueId, source:planSource(value.source),config:planConfig(value.config)};
+    return {id:uniqueId, source:planSource(value.source),config:planConfig(value.config),enabled:value.enabled !== false};
   });
   normalized.activePlanId = normalized.plans.some(item => item.id === source.activePlanId)
     ? source.activePlanId : normalized.plans[0].id;

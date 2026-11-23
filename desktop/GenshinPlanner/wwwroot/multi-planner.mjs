@@ -49,6 +49,7 @@ export function calculateMultiPlan(entries, inventory = {}) {
 
   for (const entry of entries) {
     const plan = entry?.plan;
+    if (plan?.enabled === false) continue;
     const charId = String(plan?.source?.selectedCharacterId || '');
     const weaponId = String(plan?.source?.selectedWeaponId || '');
     if (!charId && !weaponId) continue;
@@ -193,9 +194,9 @@ export function collectInventoryCatalog(entries) {
     }
     if (weapon) {
       const materials=weapon.materials || {};
-      add('weaponInventory','武器突破秘境材料',materials.weapGems || []);
-      add('weaponInventory','武器素材 A',materials.matA || []);
-      add('weaponInventory','武器素材 B',materials.matB || []);
+      add('weaponInventory','武器突破材料',materials.weapGems || []);
+      add('cultInventory','培养素材',materials.matA || []);
+      add('cultInventory','培养素材',materials.matB || []);
     }
   }
   return sections;

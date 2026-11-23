@@ -1,4 +1,6 @@
 using Microsoft.Web.WebView2.Core;
+using System.ComponentModel;
+using System.Globalization;
 using Microsoft.Win32;
 using System.IO;
 using System.Net.Http;
@@ -22,11 +24,14 @@ public partial class MainWindow : Window
     private readonly string _dataDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GenshinPlanner");
     private string StateFile => Path.Combine(_dataDir, "planner.json");
+    private string LayoutFile => Path.Combine(_dataDir, "desktop-layout.json");
+    private readonly object _layoutLock = new();
     private string CacheDir => Path.Combine(_dataDir, "NanokaCache");
 
     public MainWindow()
     {
         InitializeComponent();
+        RestoreWindowLayout();
         Loaded += OnLoaded;
     }
 
@@ -70,6 +75,8 @@ public partial class MainWindow : Window
             var data = message["params"] as JsonObject;
             object? result = type switch
             {
+                "ui.layout.load" => ReadLayout(),
+                "ui.layout.save" => SaveColumns(data),
                 "storage.load" => await LoadStateAsync(),
                 "storage.save" => await SaveStateAsync(data),
                 "data.fetch" => await FetchNanokaAsync(data),
@@ -88,6 +95,102 @@ public partial class MainWindow : Window
     private void Reply(object response)
     {
         Browser.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(response));
+    }
+
+    private JsonObject ReadLayout()
+    {
+        lock (_layoutLock)
+        {
+            try
+            {
+                if (File.Exists(LayoutFile))
+                    return JsonNode.Parse(File.ReadAllText(LayoutFile)) as JsonObject ?? new JsonObject();
+            }
+            catch (Exception) { /* An invalid layout uses the default window geometry. */ }
+            return new JsonObject();
+        }
+    }
+
+    private void WriteLayout(JsonObject settings)
+    {
+        lock (_layoutLock)
+        {
+            Directory.CreateDirectory(_dataDir);
+            string temporary = LayoutFile + ".tmp";
+            File.WriteAllText(temporary, settings.ToJsonString());
+            File.Move(temporary, LayoutFile, true);
+        }
+    }
+
+    private bool SaveColumns(JsonObject? data)
+    {
+        if (data?["layout"]?["columns"] is not JsonArray values || values.Count != 4)
+            throw new InvalidDataException("列宽配置格式错误。");
+        var columns = new double[4];
+        for (int index = 0; index < 4; index++)
+        {
+            if (!double.TryParse(values[index]?.ToString(), NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out var value) ||
+                !double.IsFinite(value) || value < 100 || value > 4000)
+                throw new InvalidDataException("列宽超出范围。");
+            columns[index] = value;
+        }
+        var layout = ReadLayout();
+        layout["columns"] = new JsonArray(columns.Select(v => JsonValue.Create(v)).ToArray());
+        WriteLayout(layout);
+        return true;
+    }
+
+    private void RestoreWindowLayout()
+    {
+        var settings = ReadLayout()["window"] as JsonObject;
+        if (settings is null) return;
+        try
+        {
+            double x = settings["left"]!.GetValue<double>();
+            double y = settings["top"]!.GetValue<double>();
+            double width = settings["width"]!.GetValue<double>();
+            double height = settings["height"]!.GetValue<double>();
+            if (!double.IsFinite(x) || !double.IsFinite(y) ||
+                !double.IsFinite(width) || !double.IsFinite(height) ||
+                width < MinWidth || height < MinHeight || width > 6000 || height > 4000) return;
+            var virtualBounds = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+            var savedBounds = new Rect(x, y, width, height);
+            // Require a usable portion of the title bar to remain on a connected display.
+            if (!virtualBounds.IntersectsWith(savedBounds) ||
+                x > virtualBounds.Right - 120 || y > virtualBounds.Bottom - 60 ||
+                x + width < virtualBounds.Left + 120 || y + height < virtualBounds.Top + 60) return;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = x;
+            Top = y;
+            Width = width;
+            Height = height;
+            if (settings["maximized"]?.GetValue<bool>() == true) WindowState = WindowState.Maximized;
+        }
+        catch (Exception) { /* Use the initial 1600 x 900 window. */ }
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        try
+        {
+            var bounds = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+            if (bounds.Width >= MinWidth && bounds.Height >= MinHeight)
+            {
+                var settings = ReadLayout();
+                settings["window"] = new JsonObject
+                {
+                    ["left"] = bounds.Left, ["top"] = bounds.Top,
+                    ["width"] = bounds.Width, ["height"] = bounds.Height,
+                    ["maximized"] = WindowState == WindowState.Maximized
+                };
+                WriteLayout(settings);
+            }
+        }
+        catch (Exception) { /* Layout persistence must not prevent the window closing. */ }
+        base.OnClosing(e);
     }
 
     private async Task<JsonNode?> LoadStateAsync()

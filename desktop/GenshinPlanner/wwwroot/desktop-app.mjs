@@ -11,20 +11,20 @@ import {
 } from './planner-accounts.mjs';
 
 const elementDefs = [
-  {id:'Pyro',label:'火',color:'#ed8b55',icon:'flame'},
-  {id:'Hydro',label:'水',color:'#68a8dd',icon:'droplet'},
-  {id:'Electro',label:'雷',color:'#af83e4',icon:'zap'},
-  {id:'Cryo',label:'冰',color:'#75c2d8',icon:'snowflake'},
-  {id:'Anemo',label:'风',color:'#69c3aa',icon:'wind'},
-  {id:'Geo',label:'岩',color:'#d8b76b',icon:'gem'},
-  {id:'Dendro',label:'草',color:'#87b955',icon:'leaf'}
+  {id:'Pyro',label:'火',color:'#ed8b55',icon:'flame',asset:'pyro.webp'},
+  {id:'Hydro',label:'水',color:'#68a8dd',icon:'droplet',asset:'hydro.webp'},
+  {id:'Electro',label:'雷',color:'#af83e4',icon:'zap',asset:'electro.webp'},
+  {id:'Cryo',label:'冰',color:'#75c2d8',icon:'snowflake',asset:'cryo.webp'},
+  {id:'Anemo',label:'风',color:'#69c3aa',icon:'wind',asset:'anemo.webp'},
+  {id:'Geo',label:'岩',color:'#d8b76b',icon:'gem',asset:'geo.webp'},
+  {id:'Dendro',label:'草',color:'#87b955',icon:'leaf',asset:'dendro.webp'}
 ];
 const weaponDefs = [
-  {id:'Sword',label:'单手剑',icon:'sword'},
-  {id:'Claymore',label:'双手剑',icon:'claymore'},
-  {id:'Polearm',label:'长柄武器',icon:'spear'},
-  {id:'Bow',label:'弓',icon:'bow'},
-  {id:'Catalyst',label:'法器',icon:'book'}
+  {id:'Sword',label:'单手剑',icon:'sword',asset:'sword.webp'},
+  {id:'Claymore',label:'双手剑',icon:'claymore',asset:'claymore.png'},
+  {id:'Polearm',label:'长柄武器',icon:'spear',asset:'polearm.png'},
+  {id:'Bow',label:'弓',icon:'bow',asset:'bow.png'},
+  {id:'Catalyst',label:'法器',icon:'book',asset:'catalyst.webp'}
 ];
 const weaponAliases = {
   WEAPON_SWORD_ONE_HAND:'Sword', WEAPON_CLAYMORE:'Claymore',
@@ -58,6 +58,8 @@ async function bridge(type,params={}){
   if(host){const id=String(++sequence);return new Promise((resolve,reject)=>{
     pending.set(id,{resolve,reject});host.postMessage({id,type,params});
   });}
+  if(type==='ui.layout.load')return JSON.parse(localStorage.getItem('genshin-planner-desktop-layout')||'null');
+  if(type==='ui.layout.save'){localStorage.setItem('genshin-planner-desktop-layout',JSON.stringify(params.layout));return true;}
   if(type==='storage.load')return JSON.parse(localStorage.getItem('genshin-planner-desktop')||'null');
   if(type==='storage.save'){localStorage.setItem('genshin-planner-desktop',JSON.stringify(params.state));return true;}
   if(type==='data.fetch'){
@@ -80,6 +82,89 @@ let profileLoadToken=0;
 let filter={tab:'character',search:'',element:'',weapon:'',star:0};
 let saveTimer=null,writeChain=Promise.resolve(),toastTimeout=null;
 let currentModalResolve=null;
+
+const COLUMN_MIN=[180,410,230,240];
+const DEFAULT_COLUMNS=[210,660,310,402];
+const RESIZER_WIDTH=6;
+let columnWidths=[...DEFAULT_COLUMNS],layoutSaveTimer=null,layoutSaveChain=Promise.resolve();
+function fittedColumns(proposed,total){
+  const result=proposed.map((v,i)=>Number.isFinite(v)?Math.max(COLUMN_MIN[i],Math.round(v)):DEFAULT_COLUMNS[i]);
+  const target=Math.max(COLUMN_MIN.reduce((a,b)=>a+b,0),Math.round(total)-RESIZER_WIDTH*3);
+  let delta=target-result.reduce((a,b)=>a+b,0);
+  if(delta>=0){result[1]+=delta;return result;}
+  for(const index of [1,3,2,0]){
+    const removable=Math.min(-delta,Math.max(0,result[index]-COLUMN_MIN[index]));
+    result[index]-=removable;delta+=removable;
+    if(delta>=0)break;
+  }
+  return result;
+}
+function displayColumns(){
+  const root=$('workbench');
+  columnWidths=fittedColumns(columnWidths,root.clientWidth);
+  root.style.gridTemplateColumns=columnWidths.map((v,i)=>i<3?`${v}px ${RESIZER_WIDTH}px`:`${v}px`).join(' ');
+  for(const handle of root.querySelectorAll('.column-resizer')){
+    const index=Number(handle.dataset.divider);
+    handle.setAttribute('aria-valuenow',String(columnWidths.slice(0,index+1).reduce((a,b)=>a+b,0)));
+  }
+}
+function saveColumns(){
+  clearTimeout(layoutSaveTimer);
+  const layout={columns:[...columnWidths]};
+  layoutSaveChain=layoutSaveChain.then(()=>bridge('ui.layout.save',{layout})).catch(e=>setStatus('保存列宽失败：'+e.message,'error'));
+}
+function deferSaveColumns(){
+  clearTimeout(layoutSaveTimer);
+  layoutSaveTimer=setTimeout(saveColumns,350);
+}
+async function initializeColumns(){
+  const root=$('workbench');
+  try{
+    const saved=await bridge('ui.layout.load');
+    if(Array.isArray(saved?.columns)&&saved.columns.length===4&&saved.columns.every(v=>Number.isFinite(v)&&v>0)){
+      columnWidths=saved.columns.map(Number);
+    }
+  }catch(e){setStatus('读取列宽失败：'+e.message,'error');}
+  displayColumns();
+  const observer=new ResizeObserver(()=>{displayColumns();deferSaveColumns();});
+  observer.observe(root);
+  for(const handle of root.querySelectorAll('.column-resizer')){
+    const index=Number(handle.dataset.divider);
+    handle.addEventListener('pointerdown',ev=>{
+      if(ev.button!==0)return;
+      const starting=[...columnWidths],startX=ev.clientX;
+      handle.setPointerCapture(ev.pointerId);
+      handle.classList.add('dragging');document.body.classList.add('resizing-columns');
+      const drag=move=>{
+        const delta=Math.round(move.clientX-startX);
+        const bounded=Math.max(COLUMN_MIN[index]-starting[index],
+          Math.min(starting[index+1]-COLUMN_MIN[index+1],delta));
+        columnWidths=[...starting];columnWidths[index]+=bounded;columnWidths[index+1]-=bounded;
+        displayColumns();
+      };
+      const finish=()=>{
+        handle.removeEventListener('pointermove',drag);
+        handle.removeEventListener('pointerup',finish);
+        handle.removeEventListener('pointercancel',finish);
+        handle.classList.remove('dragging');document.body.classList.remove('resizing-columns');
+        saveColumns();
+      };
+      handle.addEventListener('pointermove',drag);
+      handle.addEventListener('pointerup',finish);
+      handle.addEventListener('pointercancel',finish);
+    });
+    handle.addEventListener('keydown',ev=>{
+      if(ev.key!=='ArrowLeft'&&ev.key!=='ArrowRight')return;
+      ev.preventDefault();
+      const delta=ev.key==='ArrowRight'?12:-12;
+      const bounded=Math.max(COLUMN_MIN[index]-columnWidths[index],
+        Math.min(columnWidths[index+1]-COLUMN_MIN[index+1],delta));
+      columnWidths[index]+=bounded;columnWidths[index+1]-=bounded;
+      displayColumns();saveColumns();
+    });
+  }
+}
+
 
 const activePlan=()=>state.plans.find(p=>p.id===state.activePlanId)||state.plans[0];
 const activeEntry=()=>({plan:activePlan(),characterProfile:profiles.get(activePlan().id)?.characterProfile||null,
@@ -107,11 +192,12 @@ function renderAccounts(){
   $('deleteAccountButton').disabled=state.plannerAccounts.length<=1;
 }
 function renderPlans(){
-  const list=$('planList');list.replaceChildren();$('planCounter').textContent=state.plans.length+' 项';
+  const list=$('planList');list.replaceChildren();$('planCounter').textContent=state.plans.filter(p=>p.enabled!==false).length+' / '+state.plans.length+' 项启用';
   state.plans.forEach((p,i)=>{
-    const box=document.createElement('button');box.type='button';
+    const box=document.createElement('div');box.tabIndex=0;
     box.className='plan-item'+(p.id===state.activePlanId?' active':'');
-    box.setAttribute('role','option');box.setAttribute('aria-selected',String(p.id===state.activePlanId));
+    box.setAttribute('role','listitem');box.setAttribute('aria-current',p.id===state.activePlanId?'true':'false');
+    box.classList.toggle('disabled',p.enabled===false);
     const src=p.source;const art=characterList.find(x=>x.id===src.selectedCharacterId)?.icon||
       weaponList.find(x=>x.id===src.selectedWeaponId)?.icon||'';
     const image=document.createElement('div');image.className='plan-art';
@@ -120,7 +206,18 @@ function renderPlans(){
     const title=document.createElement('strong');title.textContent='培养项 '+(i+1);
     const sub=document.createElement('span');sub.textContent=[src.selectedCharacterName,src.selectedWeaponName].filter(Boolean).join(' + ')||'选择角色或武器';
     label.append(title,sub);box.append(image,label);
-    box.addEventListener('click',()=>{if(p.id===state.activePlanId)return;state.activePlanId=p.id;renderAll();scheduleSave();});
+    const toggle=document.createElement('button');toggle.type='button';toggle.className='plan-toggle';
+    toggle.setAttribute('role','switch');toggle.setAttribute('tabindex','0');
+    toggle.setAttribute('aria-label',`培养项 ${i+1} ${p.enabled===false?'已关闭，点击启用':'已启用，点击关闭'}`);
+    toggle.setAttribute('aria-checked',String(p.enabled!==false));
+    const update=()=>{p.enabled=p.enabled===false;renderPlans();renderInventory();renderResults();scheduleSave();const refreshed=list.querySelector(`[data-plan-id="${p.id}"] .plan-toggle`);refreshed?.focus();};
+    toggle.addEventListener('click',ev=>{ev.stopPropagation();update();});
+
+    box.dataset.planId=p.id;
+    box.append(toggle);
+    const selectPlan=()=>{if(p.id===state.activePlanId)return;state.activePlanId=p.id;renderAll();scheduleSave();};
+    box.addEventListener('click',selectPlan);
+    box.addEventListener('keydown',ev=>{if(ev.target===box&&(ev.key==='Enter'||ev.key===' ')){ev.preventDefault();selectPlan();}});
     list.append(box);
   });
   $('addPlanButton').disabled=state.plans.length>=40;
@@ -128,11 +225,29 @@ function renderPlans(){
   $('activePlanLabel').textContent='培养项 '+i;
   $('activePlanTitle').textContent=[p.source.selectedCharacterName,p.source.selectedWeaponName].filter(Boolean).join(' + ')||'选择培养对象';
 }
-function makeChip(label,iconName,selected,onClick,color=''){
+function typeIcon(def,kind){
+  const holder=document.createElement('span');holder.className='filter-icon';
+  const img=document.createElement('img');img.alt='';img.src=`icons/${kind}/${def.asset}`;
+  img.addEventListener('error',()=>{img.remove();holder.innerHTML=svg(def.icon);});
+  holder.append(img);return holder;
+}
+function makeChip(label,iconDef,selected,onClick,color=''){
   const btn=document.createElement('button');btn.type='button';btn.className='filter-chip'+(selected?' active':'');
-  if(iconName){const slot=document.createElement('span');slot.className='filter-icon';slot.innerHTML=svg(iconName);if(color)slot.style.color=color;btn.append(slot);}
+  if(iconDef){
+    const def=typeof iconDef==='object'?iconDef:null;
+    const slot=def?typeIcon(def,elementDefs.includes(def)?'elements':'weapons'):document.createElement('span');
+    if(!def){slot.className='filter-icon';slot.innerHTML=svg(iconDef);}
+    if(color)slot.style.color=color;
+    btn.append(slot);
+  }
   const name=document.createElement('span');name.textContent=label;btn.append(name);btn.addEventListener('click',onClick);return btn;
 }
+function badgeIcon(container,def,kind){
+  const img=document.createElement('img');img.alt='';img.src=`icons/${kind}/${def.asset}`;
+  img.addEventListener('error',()=>{img.remove();container.innerHTML=svg(def.icon);});
+  container.append(img);
+}
+
 function renderFilters(){
   const isChar=filter.tab==='character';
   $('searchInput').placeholder=isChar?'搜索角色名称':'搜索武器名称';
@@ -143,11 +258,11 @@ function renderFilters(){
   const elem=$('elementFilters');elem.hidden=!isChar;elem.replaceChildren();
   if(isChar){
     elem.append(makeChip('全部元素',null,!filter.element,()=>{filter.element='';renderFilters();renderRoster();}));
-    for(const e of elementDefs)elem.append(makeChip(e.label,e.icon,filter.element===e.id,()=>{filter.element=e.id;renderFilters();renderRoster();},e.color));
+    for(const e of elementDefs)elem.append(makeChip(e.label,e,filter.element===e.id,()=>{filter.element=e.id;renderFilters();renderRoster();},e.color));
   }
   const wp=$('weaponFilters');wp.replaceChildren();
   wp.append(makeChip('全部武器类型',null,!filter.weapon,()=>{filter.weapon='';renderFilters();renderRoster();}));
-  for(const w of weaponDefs)wp.append(makeChip(w.label,w.icon,filter.weapon===w.id,()=>{filter.weapon=w.id;renderFilters();renderRoster();}));
+  for(const w of weaponDefs)wp.append(makeChip(w.label,w,filter.weapon===w.id,()=>{filter.weapon=w.id;renderFilters();renderRoster();}));
   for(const tab of document.querySelectorAll('[data-tab]')){
     const active=tab.dataset.tab===filter.tab;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));
   }
@@ -163,9 +278,9 @@ function rosterItem(row){
   if(row.icon){const img=document.createElement('img');img.loading='lazy';img.alt='';img.src=row.icon;img.onerror=()=>img.remove();box.append(img);}
   if(isChar){
     const e=element(row.element),w=weapon(row.weaponType);
-    if(e){const badge=document.createElement('span');badge.className='card-badge element';badge.style.color=e.color;badge.title=e.label+'元素';badge.innerHTML=svg(e.icon);box.append(badge);}
-    if(w){const badge=document.createElement('span');badge.className='card-badge weapon';badge.title=w.label;badge.innerHTML=svg(w.icon);box.append(badge);}
-  }else{const w=weapon(row.weaponType);if(w){const badge=document.createElement('span');badge.className='card-badge weapon';badge.title=w.label;badge.innerHTML=svg(w.icon);box.append(badge);}}
+    if(e){const badge=document.createElement('span');badge.className='card-badge element';badge.style.color=e.color;badge.title=e.label+'元素';badgeIcon(badge,e,'elements');box.append(badge);}
+    if(w){const badge=document.createElement('span');badge.className='card-badge weapon';badge.title=w.label;badgeIcon(badge,w,'weapons');box.append(badge);}
+  }else{const w=weapon(row.weaponType);if(w){const badge=document.createElement('span');badge.className='card-badge weapon';badge.title=w.label;badgeIcon(badge,w,'weapons');box.append(badge);}}
   const title=document.createElement('span');title.className='avatar-name';title.textContent=row.name;title.title=row.name;
   const meta=document.createElement('span');meta.className='avatar-meta';meta.textContent='★'.repeat(Math.min(Number(row.rarity)||0,5));
   card.append(box,title,meta);
@@ -241,6 +356,11 @@ function makeLevelSelect(def,pos){
   });
   return select;
 }
+function updateMaterialCount(id,value){
+  if(String(value).trim())state.materialInventory[id]=String(value);
+  else delete state.materialInventory[id];
+  renderResults();scheduleSave();
+}
 function materialRow(item,shared){
   const row=document.createElement('div');row.className='material-row';
   const imageSlot=document.createElement('div');imageSlot.className='material-img';imageSlot.dataset.rank=String(item.rank);
@@ -248,15 +368,23 @@ function materialRow(item,shared){
   const title=document.createElement('div');title.className='material-item-copy';
   const name=document.createElement('div');name.className='material-name';name.textContent=item.name;name.title=item.name;title.append(name);
   if(shared){const label=document.createElement('div');label.className='material-share';label.textContent='共用 · '+shared;title.append(label);}
-  const input=document.createElement('input');input.type='text';input.inputMode='numeric';input.value=state.materialInventory[item.id]||'';input.placeholder='0';
+  const controls=document.createElement('div');controls.className='material-number';
+  const arrows=document.createElement('div');arrows.className='material-arrows';
+  const input=document.createElement('input');input.type='text';input.inputMode='numeric';input.value=state.materialInventory[item.id]??'';input.placeholder='0';
   input.setAttribute('aria-label',item.name+'背包数量');
-  input.addEventListener('input',()=>{
-    const value=input.value;
-    if(value.trim())state.materialInventory[item.id]=value;else delete state.materialInventory[item.id];
-    renderResults();scheduleSave();
-  });
-  row.append(imageSlot,title,input);return row;
+  const step=direction=>{
+    const next=Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,safeEval(input.value)+direction));
+    input.value=String(next);updateMaterialCount(item.id,input.value);
+  };
+  for(const [direction,text] of [[1,'▲'],[-1,'▼']]){
+    const button=document.createElement('button');button.type='button';button.textContent=text;
+    button.setAttribute('aria-label',item.name+(direction>0?'增加 1':'减少 1'));
+    button.addEventListener('click',()=>step(direction));arrows.append(button);
+  }
+  input.addEventListener('input',()=>updateMaterialCount(item.id,input.value));
+  controls.append(arrows,input);row.append(imageSlot,title,controls);return row;
 }
+
 function renderInventory(){
   const holder=$('inventoryGroups');holder.replaceChildren();
   const entry=activeEntry();
@@ -265,9 +393,9 @@ function renderInventory(){
     empty.textContent='选择角色或武器后显示对应背包材料';holder.append(empty);return;
   }
   const catalogue=collectInventoryCatalog([entry]);
-  const all=allEntries();const usage=planMaterialUsage(all);
+  const all=allEntries();const usage=planMaterialUsage(all.filter(x=>x.plan.enabled!==false));
   const categories=[
-    ['basicInventory','基础与专属材料'],['cultInventory','角色培养素材'],
+    ['basicInventory','基础与专属材料'],['cultInventory','培养素材'],
     ['talentInventory','天赋与角色突破'],['weaponInventory','武器突破材料']
   ];
   let shown=0;
@@ -294,29 +422,52 @@ function renderInventory(){
   if(!shown){const empty=document.createElement('div');empty.className='empty-hint';empty.textContent=entry.plan.source.selectedCharacterId||entry.plan.source.selectedWeaponId?'正在读取当前培养项材料…':'选择角色或武器后显示对应背包材料';holder.append(empty);}
 }
 function renderResults(){
-  const result=calculateMultiPlan(allEntries(),state.materialInventory);
+  const included=allEntries().filter(entry=>entry.plan.enabled!==false);
+  const result=calculateMultiPlan(included,state.materialInventory);
   const holder=$('resultContent');holder.replaceChildren();
-  const rows=result.groups.flatMap(g=>g.rows).filter(r=>r.lack>0);
+  const missing=result.groups.flatMap(group=>group.rows).filter(row=>row.lack>0);
   const summary=$('resultSummary');
-  if(result.unavailable.length){summary.textContent=result.unavailable.length+' 项材料资料等待加载';}
-  else if(!result.hasAnyTarget){summary.textContent='选择目标后查看合并需求';}
-  else if(rows.length){summary.textContent='共 '+rows.length+' 种材料仍需补齐';}
-  else {summary.textContent='当前培养目标已满足';}
-  if(!rows.length&&!result.incomplete.length&&!result.unavailable.length){
-    const empty=document.createElement('div');empty.className='empty-hint';empty.style.color='#c4d0de';empty.textContent=result.hasAnyTarget?'背包材料已覆盖所有培养项的目标需求':'设置培养目标后显示全部需求';holder.append(empty);return;
+  if(result.unavailable.length)summary.textContent=result.unavailable.length+' 项材料资料等待加载';
+  else if(!result.hasAnyTarget)summary.textContent='选择目标后查看合并需求';
+  else if(missing.length)summary.textContent='共 '+missing.length+' 种材料仍需补齐';
+  else summary.textContent='当前培养目标已满足';
+  if(!missing.length&&!result.incomplete.length&&!result.unavailable.length){
+    const empty=document.createElement('div');empty.className='empty-hint';
+    empty.textContent=result.hasAnyTarget?'背包材料已覆盖所有启用培养项的目标需求':'设置培养目标后显示全部需求';
+    holder.append(empty);return;
   }
-  for(const group of result.groups){
-    const lacking=group.rows.filter(r=>r.lack>0);if(!lacking.length)continue;
-    const section=document.createElement('div');section.className='deficit-group';
-    const title=document.createElement('h3');title.textContent=group.title;section.append(title);
-    for(const row of lacking){const line=document.createElement('div');line.className='deficit-row';const name=document.createElement('span');name.textContent=row.name;
-      const value=document.createElement('strong');value.textContent='缺 × '+numberFormat(row.lack);line.append(name,value);section.append(line);}
+  const categories=[
+    ['basicInventory','基础与专属材料'],
+    ['cultInventory','培养素材'],
+    ['talentInventory','天赋与角色突破'],
+    ['weaponInventory','武器突破材料']
+  ];
+  const catalog=collectInventoryCatalog(included);
+  const categoryById=new Map();
+  for(const [key] of categories)for(const group of catalog[key])for(const row of group.rows){
+    if(!categoryById.has(row.id))categoryById.set(row.id,key);
+  }
+  for(const [key,title] of categories){
+    const rows=missing.filter(row=>categoryById.get(String(row.id))===key);
+    if(!rows.length)continue;
+    const section=document.createElement('section');section.className='deficit-group';
+    const header=document.createElement('h3');header.textContent=title;section.append(header);
+    for(const row of rows){
+      const line=document.createElement('div');line.className='deficit-row';
+      const image=document.createElement('span');image.className='material-img deficit-img';image.dataset.rank=String(row.rank);
+      const img=document.createElement('img');img.loading='lazy';img.alt='';img.src=itemIconUrl(row.id);img.onerror=()=>img.remove();image.append(img);
+      const label=document.createElement('span');label.className='deficit-name';label.textContent=row.name;label.title=row.name;
+      const amount=document.createElement('strong');amount.textContent='× '+numberFormat(row.lack);
+      line.append(image,label,amount);section.append(line);
+    }
     holder.append(section);
   }
   for(const message of [...result.unavailable,...result.incomplete.map(m=>m.plan+' · '+m.title)]){
-    const warning=document.createElement('div');warning.className='deficit-group';warning.textContent=message+' · 材料资料待补充';holder.append(warning);
+    const warning=document.createElement('div');warning.className='deficit-group';
+    warning.textContent=message+' · 材料资料待补充';holder.append(warning);
   }
 }
+
 function renderAll(){renderAccounts();renderPlans();renderFilters();renderRoster();renderTargets();renderInventory();renderResults();}
 
 async function loadLists(force=false){
@@ -397,7 +548,7 @@ function switchAccount(id){if(!id||id===state.activeAccountId)return;
   selectPlannerAccount(state,id);profiles.clear();profileLoadToken++;filter={tab:'character',search:'',element:'',weapon:'',star:0};
   renderAll();scheduleSave();void reloadAllProfiles();}
 function addPlan(){if(state.plans.length>=40)return toast('最多可创建 40 个培养项');const defaults=cloneDefaultState();
-  const plan={id:'item-'+uid(),source:defaults.source,config:defaults.config};state.plans.push(plan);state.activePlanId=plan.id;
+  const plan={id:'item-'+uid(),source:defaults.source,config:defaults.config,enabled:true};state.plans.push(plan);state.activePlanId=plan.id;
   renderAll();scheduleSave();}
 async function removePlan(){const p=activePlan();if(!p)return;
   if(state.plans.length===1){const def=cloneDefaultState();state.plans=def.plans;state.activePlanId=def.activePlanId;}
@@ -432,6 +583,7 @@ async function start(){
   document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{
     filter.tab=btn.dataset.tab;filter.search='';filter.element='';filter.weapon='';filter.star=0;renderFilters();renderRoster();
   }));
+  await initializeColumns();
   try{const saved=await bridge('storage.load');if(saved)state=normalizeState(saved);}catch(e){toast('读取本地规划失败：'+e.message);}
   renderAll();await loadLists();
 }

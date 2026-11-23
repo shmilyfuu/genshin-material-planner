@@ -22,7 +22,7 @@
       </div>
     </header>
 
-    <div class="workbench">
+    <div class="workbench" id="workbench">
       <aside class="account-rail">
         <div class="rail-label">当前规划账号</div>
         <div class="account-picker"><select id="accountSelect" aria-label="选择账号"></select></div>
@@ -33,10 +33,11 @@
         </div>
         <div class="rail-rule"></div>
         <div class="rail-heading"><strong>培养项</strong><span id="planCounter">0 项</span></div>
-        <div class="plan-list" id="planList" role="listbox" aria-label="培养项"></div>
+        <div class="plan-list" id="planList" role="list" aria-label="培养项"></div>
         <button class="new-plan" type="button" id="addPlanButton">＋ 添加培养项</button>
         <div class="rail-bottom"><span>所有培养项使用当前账号的同一份背包</span></div>
       </aside>
+      <div class="column-resizer" data-divider="0" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整账号与培养编辑区宽度"></div>
 
       <main class="editor">
         <div class="editor-heading">
@@ -65,18 +66,19 @@
           <div class="target-groups" id="targetGroups"></div>
         </section>
       </main>
+      <div class="column-resizer" data-divider="1" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整培养编辑区与背包宽度"></div>
 
       <aside class="inventory-rail">
         <div class="inventory-heading"><div><strong>背包材料</strong><span>当前培养项</span></div><div class="inventory-tag">手动数量</div></div>
         <p class="inventory-note">共用材料按 ID 同步，同一账号只扣除一次库存。</p>
         <div class="inventory-scroll" id="inventoryGroups"></div>
       </aside>
+      <div class="column-resizer" data-divider="2" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整背包与材料缺口宽度"></div>
+      <aside class="deficit-rail">
+        <div class="deficit-heading"><strong>全部培养项 · 材料缺口</strong><span id="resultSummary">选择目标后查看合并需求</span></div>
+        <div class="deficit-content" id="resultContent" aria-live="polite"></div>
+      </aside>
     </div>
-
-    <details class="deficit-drawer" id="deficitDrawer">
-      <summary><span class="drawer-arrow" aria-hidden="true">▾</span><strong>全部培养项 · 材料缺口</strong><span id="resultSummary">选择目标后查看合并需求</span><span class="drawer-end">展开详情</span></summary>
-      <div class="drawer-content" id="resultContent"></div>
-    </details>
   </div>
 
   <div class="modal-backdrop" id="modal" hidden>

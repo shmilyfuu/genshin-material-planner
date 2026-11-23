@@ -69,13 +69,26 @@ function normalizeListEntry(id, row, kind) {
   };
 }
 
+
+export function newestFirst(a,b){
+  if(Boolean(a.sourceTag)!==Boolean(b.sourceTag))return a.sourceTag?-1:1;
+  const va=String(a.version||'').split('.').map(Number),vb=String(b.version||'').split('.').map(Number);
+  if(a.version&&b.version){
+    for(let i=0;i<Math.max(va.length,vb.length);i++){
+      const d=(vb[i]||0)-(va[i]||0);if(d)return d;
+    }
+  }
+  const ai=Number(a.id),bi=Number(b.id);
+  if(Number.isSafeInteger(ai)&&Number.isSafeInteger(bi)&&ai!==bi)return bi-ai;
+  return a.name.localeCompare(b.name,'zh-CN');
+}
 export function normalizeCharacterList(raw) {
   const source = raw?.data && typeof raw.data === 'object' ? raw.data : raw;
   if (!source || typeof source !== 'object') return [];
   return Object.entries(source)
     .map(([id, value]) => normalizeListEntry(id, value || {}, 'character'))
     .filter((row) => row.name)
-    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+    .sort(newestFirst);
 }
 
 export function normalizeWeaponList(raw) {
@@ -84,7 +97,7 @@ export function normalizeWeaponList(raw) {
   return Object.entries(source)
     .map(([id, value]) => normalizeListEntry(id, value || {}, 'weapon'))
     .filter((row) => row.name)
-    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+    .sort(newestFirst);
 }
 
 export function mergeSourceLists(liveList, latestList, _tagForLive = '', tagForLatest = '前瞻') {
@@ -97,7 +110,7 @@ export function mergeSourceLists(liveList, latestList, _tagForLive = '', tagForL
     const isPreviewOnly = !liveIds.has(row.id);
     map.set(row.id, { ...row, sourceTag: isPreviewOnly ? tagForLatest : '' });
   }
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+  return [...map.values()].sort(newestFirst);
 }
 
 function aggregateMaterialInfos(infos) {
