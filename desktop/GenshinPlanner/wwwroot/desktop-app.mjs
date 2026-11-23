@@ -8,6 +8,7 @@ import {calculateMultiPlan, collectInventoryCatalog, planMaterialUsage, migrateL
 import {initializePlanner,makeGoal,makeWeaponInstance,characterGoal,weaponGoal,weaponInstance,goalKind,goalObjectId,activeGoals,visibleRoster,setLink,newId} from './planner-model.mjs';
 import {importGOOD,validateGOOD} from './good-import.mjs';
 import {calendarForEntries} from './calendar-days.mjs';
+import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
 import {
   saveActivePlannerAccount, selectPlannerAccount, createPlannerAccount,
   renamePlannerAccount, deletePlannerAccount
@@ -86,7 +87,7 @@ let characterList=[],weaponList=[];
 let profiles=new Map();
 let listVersion={live:'',latest:''};
 let profileLoadToken=0;
-let filter={tab:'character',search:'',element:'',weapon:'',star:0};
+let filter=createRosterFilter();
 let selectedGoalId=null,inventoryGoalId=null,selectedRosterKey=null,rosterClickTimer=null,goalEditor=null;
 let saveTimer=null,writeChain=Promise.resolve(),toastTimeout=null;
 let currentModalResolve=null;
@@ -279,19 +280,37 @@ function makeChip(label,iconDef,selected,onClick,iconOnly=false){
 }
 function badgeIcon(container,def,kind){const img=document.createElement('img');img.alt='';img.src=`icons/${kind}/${def.asset}`;
   img.onerror=()=>{img.remove();container.innerHTML=svg(def.icon);};container.append(img);}
-function renderFilters(){const isChar=filter.tab==='character';
-  $('searchInput').placeholder=isChar?'搜索角色名称':'搜索武器名称';$('searchInput').value=filter.search;
+function renderFilters(){
+  const isChar=filter.tab==='character';
+  $('searchInput').placeholder=isChar?'搜索角色名称':'搜索武器名称';
+  $('searchInput').value=filter.search;
+  const redraw=(key,value)=>{
+    toggleRosterFilter(filter,key,value);
+    renderFilters();renderRoster();
+  };
+  const reset=key=>{filter[key]=[];renderFilters();renderRoster();};
   const stars=$('starFilters');stars.replaceChildren();
-  stars.append(makeChip('全部',null,filter.star===0,()=>{filter.star=0;renderFilters();renderRoster();}));
-  for(const n of (isChar?[5,4]:[5,4,3,2,1]))stars.append(makeChip(n+'★','star',filter.star===n,()=>{filter.star=n;renderFilters();renderRoster();}));
+  stars.append(makeChip('全部',null,filter.star.length===0,()=>reset('star')));
+  for(const n of (isChar?[5,4]:[5,4,3,2,1])){
+    stars.append(makeChip(n+'★','star',filter.star.includes(n),()=>redraw('star',n)));
+  }
   const elems=$('elementFilters');elems.replaceChildren();elems.hidden=!isChar;
-  if(isChar){elems.append(makeChip('全部元素','all-elements',!filter.element,()=>{filter.element='';renderFilters();renderRoster();},true));
-    for(const el of elementDefs)elems.append(makeChip(el.label,el,filter.element===el.id,()=>{filter.element=el.id;renderFilters();renderRoster();},true));}
-  const wps=$('weaponFilters');wps.replaceChildren();
-  wps.append(makeChip('全部武器类型','all-weapons',!filter.weapon,()=>{filter.weapon='';renderFilters();renderRoster();},true));
-  for(const wp of weaponDefs)wps.append(makeChip(wp.label,wp,filter.weapon===wp.id,()=>{filter.weapon=wp.id;renderFilters();renderRoster();},true));
+  if(isChar){
+    elems.append(makeChip('全部',null,filter.element.length===0,()=>reset('element')));
+    for(const el of elementDefs){
+      elems.append(makeChip(el.label,el,filter.element.includes(el.id),()=>redraw('element',el.id),true));
+    }
+  }
+  const weapons=$('weaponFilters');weapons.replaceChildren();
+  weapons.append(makeChip('全部',null,filter.weapon.length===0,()=>reset('weapon')));
+  for(const weapon of weaponDefs){
+    weapons.append(makeChip(weapon.label,weapon,filter.weapon.includes(weapon.id),()=>redraw('weapon',weapon.id),true));
+  }
   for(const tab of document.querySelectorAll('[data-tab]')){
-    const yes=tab.dataset.tab===filter.tab;tab.classList.toggle('active',yes);tab.setAttribute('aria-selected',String(yes));}
+    const yes=tab.dataset.tab===filter.tab;
+    tab.classList.toggle('active',yes);
+    tab.setAttribute('aria-selected',String(yes));
+  }
 }
 function rosterCard(row){
   const kind=filter.tab,goal=row.goal||null;
@@ -303,33 +322,53 @@ function rosterCard(row){
   card.classList.toggle('planned',Boolean(goal&&!goal.completed));
   card.classList.toggle('completed',Boolean(goal?.completed));
   card.classList.toggle('owned',Boolean(row.owned));
-  const box=thumb(row.icon,row.name,'avatar-portrait');
+  const artwork=thumb(row.icon,row.name,'avatar-portrait');
+  const badge=(definition,kind,position)=>{
+    if(!definition)return;
+    const holder=document.createElement('span');
+    holder.className='card-badge '+position;holder.title=definition.label;
+    badgeIcon(holder,definition,kind);artwork.append(holder);
+  };
   if(kind==='character'){
-    const el=elementDefs.find(x=>x.id===row.element),wp=weaponDefs.find(x=>x.id===(weaponAliases[row.weaponType]||row.weaponType));
-    for(const [d,k] of [[el,'elements'],[wp,'weapons']])if(d){const badge=document.createElement('span');badge.className='card-badge '+(k==='elements'?'element':'weapon');badge.title=d.label;badgeIcon(badge,d,k);box.append(badge);}
+    badge(elementDefs.find(x=>x.id===row.element),'elements','element');
+    badge(weaponDefs.find(x=>x.id===(weaponAliases[row.weaponType]||row.weaponType)),'weapons','weapon');
   }else{
-    const wp=weaponDefs.find(x=>x.id===(weaponAliases[row.weaponType]||row.weaponType));
-    if(wp){const badge=document.createElement('span');badge.className='card-badge weapon';badgeIcon(badge,wp,'weapons');box.append(badge);}
+    badge(weaponDefs.find(x=>x.id===(weaponAliases[row.weaponType]||row.weaponType)),'weapons','weapon');
   }
-  if(goal?.completed){const tag=document.createElement('span');tag.className='avatar-status done';tag.textContent='✓';box.append(tag);}
-  else if(goal){const tag=document.createElement('span');tag.className='avatar-status active';tag.textContent='培养中';box.append(tag);}
-  else if(row.owned){const tag=document.createElement('span');tag.className='avatar-status owned';tag.textContent=kind==='character'?'已有角色':'已有武器';box.append(tag);}
-  const title=document.createElement('span');title.className='avatar-name';title.textContent=row.name;title.title=row.name;
-  const meta=document.createElement('span');meta.className='avatar-meta';
-  meta.textContent=kind==='weapon'&&row.instance?`Lv.${row.instance.level} R${row.instance.refinement}`:kind==='character'&&row.owned?`Lv.${row.owned.level}`:'★'.repeat(Math.min(Number(row.rarity)||0,5));
-  if(row.instance){const short=document.createElement('span');short.className='avatar-instance';short.textContent='#'+String((state.weaponInstances.filter(w=>w.weaponId===row.id).findIndex(w=>w.id===row.instance.id))+1);box.append(short);}
+  if(goal&&!goal.completed){
+    const training=document.createElement('span');training.className='card-badge training';
+    training.title=goal.enabled===false?'培养目标已暂停':'正在培养';
+    const symbol=document.createElement('img');symbol.src='icons/development.webp';symbol.alt='';
+    training.append(symbol);artwork.append(training);
+  }else if(goal?.completed){
+    const done=document.createElement('span');done.className='avatar-status done';done.textContent='✓';
+    done.title='养成结束';artwork.append(done);
+  }
+  if(row.instance){
+    const ordinal=state.weaponInstances.filter(w=>w.weaponId===row.id).findIndex(w=>w.id===row.instance.id)+1;
+    const marker=document.createElement('span');marker.className='avatar-instance';
+    marker.textContent='#'+String(ordinal);artwork.append(marker);
+  }
+  if(row.sourceTag){
+    const preview=document.createElement('span');preview.className='avatar-preview';
+    preview.textContent=row.sourceTag;artwork.append(preview);
+  }
+  const title=document.createElement('span');title.className='avatar-name';
+  title.textContent=row.name;title.title=row.name;
+  card.append(artwork,title);
   if(kind==='weapon'){
     const addCopy=document.createElement('button');addCopy.type='button';addCopy.className='avatar-add-copy';
-    addCopy.textContent='+';addCopy.title='增加一把'+row.name;addCopy.setAttribute('aria-label','增加一把'+row.name);
-    addCopy.onclick=ev=>{ev.stopPropagation();const fresh=makeWeaponInstance(row);
+    addCopy.textContent='+';addCopy.title='增加一把'+row.name;
+    addCopy.setAttribute('aria-label','增加一把'+row.name);
+    addCopy.onclick=ev=>{
+      ev.stopPropagation();const fresh=makeWeaponInstance(row);
       const created=makeGoal('weapon',row,{instanceId:fresh.id,current:fresh});
       state.weaponInstances.push(fresh);state.plans.push(created);
       selectedRosterKey=null;selectedGoalId=created.id;inventoryGoalId=created.id;state.activePlanId=created.id;
-      renderAll();save();void reloadAllProfiles();};
+      renderAll();save();void reloadAllProfiles();
+    };
     card.append(addCopy);
   }
-  card.append(box,title,meta);
-  if(row.sourceTag){const tag=document.createElement('span');tag.className='avatar-preview';tag.textContent=row.sourceTag;card.append(tag);}
   clickOrEdit(card,()=>{
     if(goal){selectGoal(goal.id);return;}
     selectedRosterKey=selectedRosterKey===selectionKey?null:selectionKey;
@@ -344,10 +383,7 @@ function renderRoster(){
     for(let i=0;i<Math.max(va.length,vb.length);i++){const delta=(vb[i]||0)-(va[i]||0);if(delta)return delta;}
     return Number(b.id)-Number(a.id)||a.name.localeCompare(b.name,'zh-CN');
   });
-  rows=rows.filter(row=>(!filter.search||row.name.toLowerCase().includes(filter.search.toLowerCase()))
-    &&(!filter.star||Number(row.rarity)===filter.star)
-    &&(!filter.weapon||(weaponAliases[row.weaponType]||row.weaponType)===filter.weapon)
-    &&(filter.tab==='weapon'||!filter.element||row.element===filter.element));
+  rows=rows.filter(row=>matchesRosterFilter(row,filter,weaponAliases));
   $('rosterCount').textContent=rows.length+' 项';
   const area=$('rosterGrid');area.replaceChildren();
   if(!rows.length){area.innerHTML='<div class="empty-hint">暂无符合条件的对象，或正在加载资料。</div>';return;}
@@ -642,7 +678,7 @@ async function removeAccount(){if(state.plannerAccounts.length<=1)return;
   const ok=await modal({title:'删除规划账号',description:'该账号所有培养项、扫描数据及材料记录将被删除。',requiresText:false,confirm:'删除'});
   if(ok===null)return;deletePlannerAccount(state,state.activeAccountId);resetAccountView();save();void reloadAllProfiles();}
 function resetAccountView(){initializePlanner(state);selectedGoalId=null;inventoryGoalId=null;selectedRosterKey=null;profiles.clear();profileLoadToken++;
-  filter={tab:'character',search:'',element:'',weapon:'',star:0};renderAll();}
+  filter=createRosterFilter();renderAll();}
 function switchAccount(id){if(id===state.activeAccountId)return;selectPlannerAccount(state,id);resetAccountView();save();void reloadAllProfiles();}
 async function exportAll(){try{const ok=await bridge('storage.export',{state:{type:'material-planner-desktop-config',version:2,exportedAt:new Date().toISOString(),data:snapshot()}});
   if(ok)toast('配置已导出');}catch(e){toast('导出失败：'+e.message);}}
@@ -695,7 +731,7 @@ async function start(){
   $('importButton').onclick=()=>void importAll();$('importGoodButton').onclick=()=>void importScanner();
   $('searchInput').oninput=e=>{filter.search=e.target.value;renderRoster();};
   for(const tab of document.querySelectorAll('[data-tab]'))tab.onclick=()=>{
-    filter.tab=tab.dataset.tab;filter.search='';filter.element='';filter.weapon='';filter.star=0;renderFilters();renderRoster();};
+    filter=createRosterFilter(tab.dataset.tab);renderFilters();renderRoster();};
   await initializeColumns();
   try{const record=await bridge('storage.load');if(record)state=normalizeState(record);}catch(e){toast('读取本地数据失败：'+e.message);}
   initializePlanner(state);renderAll();await loadLists();
