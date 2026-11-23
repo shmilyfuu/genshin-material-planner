@@ -34,7 +34,9 @@ export const WEAPON_ASC_DATA = [
 export const CHAR_LEVEL_LABELS = ['Lv.1', 'Lv.20', 'Lv.40', 'Lv.50', 'Lv.60', 'Lv.70', 'Lv.80'];
 
 export const DEFAULT_STATE = Object.freeze({
-  schemaVersion: 3,
+  schemaVersion: 4,
+  materialInventory: {},
+  materialInventoryMigrated: false,
   source: {
     selectedCharacterId: '',
     selectedCharacterName: '',
@@ -78,7 +80,13 @@ export const DEFAULT_STATE = Object.freeze({
 });
 
 export function cloneDefaultState() {
-  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+  const state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  state.plans = [{id: 'plan-1',
+    source: JSON.parse(JSON.stringify(state.source)),
+    config: JSON.parse(JSON.stringify(state.config))
+  }];
+  state.activePlanId = 'plan-1';
+  return state;
 }
 
 function clampInt(value, min, max) {
@@ -132,8 +140,8 @@ export function normalizeState(input) {
   const sourceSettings = source.source && typeof source.source === 'object' ? source.source : {};
   const mergeRules = sourceSettings.mergeRules && typeof sourceSettings.mergeRules === 'object' ? sourceSettings.mergeRules : {};
 
-  return {
-    schemaVersion: 3,
+  const normalized = {
+    schemaVersion: 4,
     inventoryUid: /^\d{6,12}$/.test(String(source.inventoryUid || '')) ? String(source.inventoryUid) : '',
     calculationMode: source.calculationMode === 'official' ? 'official' : 'manual',
     hybridInventory: normalizeHybridInventory(source.hybridInventory),
@@ -176,6 +184,65 @@ export function normalizeState(input) {
       matB: normalizeStringArray(inv.matB, 3)
     }
   };
+
+  const planSource = (raw) => {
+    const item = raw && typeof raw === 'object' ? raw : {};
+    const rules = item.mergeRules && typeof item.mergeRules === 'object'
+      ? item.mergeRules : {};
+    return {
+      selectedCharacterId: normalizeString(item.selectedCharacterId),
+      selectedCharacterName: normalizeString(item.selectedCharacterName),
+      selectedCharacterVersion: normalizeString(item.selectedCharacterVersion),
+      selectedCharacterTag: normalizeString(item.selectedCharacterTag),
+      selectedWeaponId: normalizeString(item.selectedWeaponId),
+      selectedWeaponName: normalizeString(item.selectedWeaponName),
+      selectedWeaponVersion: normalizeString(item.selectedWeaponVersion),
+      selectedWeaponTag: normalizeString(item.selectedWeaponTag),
+      lastSyncedAt: Number.isFinite(item.lastSyncedAt) ? Math.max(0,item.lastSyncedAt) : 0,
+      mergeRules: {
+        matAIntoCult: Boolean(rules.matAIntoCult),
+        matBIntoCult: Boolean(rules.matBIntoCult)
+      }
+    };
+  };
+  const planConfig = (value) => {
+    const item = value && typeof value === 'object' ? value : {};
+    return {
+      talentA: normalizeRange(item.talentA, 9),
+      talentE: normalizeRange(item.talentE, 9),
+      talentQ: normalizeRange(item.talentQ, 9),
+      charAsc: normalizeRange(item.charAsc, 6),
+      weapAsc: normalizeRange(item.weapAsc, 6)
+    };
+  };
+  const incoming = Array.isArray(source.plans) && source.plans.length
+    ? source.plans.slice(0, 40)
+    : [{id:'plan-1', source:normalized.source,config:normalized.config}];
+  const used = new Set();
+  normalized.plans = incoming.map((raw, index) => {
+    const value = raw && typeof raw === 'object' ? raw : {};
+    const proposed = String(value.id || '');
+    const id = /^[a-zA-Z0-9_-]{1,64}$/.test(proposed) && !used.has(proposed)
+      ? proposed : 'plan-' + (index + 1);
+    const uniqueId = used.has(id) ? 'plan-item-' + index : id;
+    used.add(uniqueId);
+    return {id:uniqueId, source:planSource(value.source),config:planConfig(value.config)};
+  });
+  normalized.activePlanId = normalized.plans.some(item => item.id === source.activePlanId)
+    ? source.activePlanId : normalized.plans[0].id;
+  const active = normalized.plans.find(item => item.id === normalized.activePlanId);
+  normalized.source = JSON.parse(JSON.stringify(active.source));
+  normalized.config = JSON.parse(JSON.stringify(active.config));
+
+  normalized.materialInventory = {};
+  if (source.materialInventory && typeof source.materialInventory === 'object'
+    && !Array.isArray(source.materialInventory)) {
+    for (const [id,value] of Object.entries(source.materialInventory).slice(0,1500)) {
+      if (/^\d{1,12}$/.test(id)) normalized.materialInventory[id] = normalizeString(value);
+    }
+  }
+  normalized.materialInventoryMigrated = source.materialInventoryMigrated === true;
+  return normalized;
 }
 
 export function safeEval(expression) {
