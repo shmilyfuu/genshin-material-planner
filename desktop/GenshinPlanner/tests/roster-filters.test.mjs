@@ -38,27 +38,31 @@ test('重复点击同一条件取消筛选，点击全部恢复该组全部结�
   assert.deepEqual(selectRows(filter).map(x=>x.id),['2']);
 });
 
-test('头像卡片只显示名字，角标使用统一定位区域并携带本地素材',()=>{
+test('卡片角标和武器加减按钮使用一致的定位规则',()=>{
   const base=new URL('../wwwroot/',import.meta.url);
   const js=readFileSync(new URL('desktop-app.mjs',base),'utf8');
   const css=readFileSync(new URL('desktop.css',base),'utf8');
-  assert.match(js,/training\.className='card-badge training'/);
-  assert.match(js,/card\.append\(artwork,title\)/);
-  assert.doesNotMatch(js,/className='avatar-meta'/);
-  assert.match(js,/artwork\.append\(preview\)/);
-  assert.match(css,/--badge-inset:4px;--badge-size:23px/);
-  assert.match(css,/\.card-badge\.training\{bottom:var\(--badge-inset\);left:var\(--badge-inset\)\}/);
-  assert.match(css,/\\.avatar-add-copy\\{position:absolute;bottom:4px;right:4px/);
-  assert.match(css,/\\.avatar-instance\\{position:absolute;top:4px;left:4px/);
-  assert.match(css,/\\.card-badge\\.element img\\{width:17px;height:17px\\}/);
-  assert.doesNotMatch(css,/\\.card-badge\\.training img\\{filter:/);
-  assert.match(js,/artwork\\.append\\(addCopy\\)/);
-  for(const path of [
-    'icons/development.webp',
-    'icons/rarity/rarity-1.png','icons/rarity/rarity-2.png',
-    'icons/rarity/rarity-3.png','icons/rarity/rarity-4.webp',
-    'icons/rarity/rarity-5.webp'
-  ])assert.ok(existsSync(new URL(path,base)),path);
+  assert.ok(js.includes("training.className='card-badge training'"));
+  assert.ok(js.includes('card.append(artwork,title)'));
+  assert.ok(!js.includes("className='avatar-meta'"));
+  assert.ok(css.includes('--badge-inset:4px;--badge-size:23px'));
+  assert.ok(css.includes('.avatar-instance{position:absolute;top:4px;left:4px'));
+  assert.ok(css.includes('.avatar-weapon-action svg{display:block;width:14px;height:14px'));
+  assert.ok(css.includes('.avatar-add-copy{top:4px}'));
+  assert.ok(css.includes('.avatar-remove-copy{bottom:4px}'));
+  assert.ok(js.includes("createAction('增加一把'+row.name,'plus','avatar-add-copy'"));
+  assert.ok(js.includes("createAction('移除'+row.name+' #'+ordinal,'minus','avatar-remove-copy'"));
+  assert.ok(js.includes('if(row.instance&&sameName.length>1)'));
+  assert.ok(js.includes("await modal({title:'移除武器实例'"));
+  assert.ok(js.includes("removeWeaponInstance(state,row.instance.id)"));
+  const card=js.slice(js.indexOf('function rosterCard('),js.indexOf('function renderRoster('));
+  assert.ok(card.includes("if(kind==='character')"));
+  assert.ok(!card.includes("}else{\n    badge(weaponDefs"));
+  for(const path of ['icons/development.webp','icons/rarity/rarity-1.png',
+    'icons/rarity/rarity-2.png','icons/rarity/rarity-3.png',
+    'icons/rarity/rarity-4.webp','icons/rarity/rarity-5.webp']){
+    assert.ok(existsSync(new URL(path,base)),path);
+  }
 });
 
 test('等级选择器直接参与四列网格，修改当前或目标等级时双向同步',()=>{
