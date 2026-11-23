@@ -1,25 +1,36 @@
-const talentPatterns = [
-  [/自由|自由的/,1],[/抗争/,2],[/诗文/,3],
-  [/繁荣/,1],[/勤劳/,2],[/黄金/,3],
-  [/浮世/,1],[/风雅/,2],[/天光/,3],
-  [/诤言/,1],[/巧思/,2],[/笃行/,3],
-  [/公平/,1],[/正义/,2],[/秩序/,3],
-  [/角逐/,1],[/焚燔/,2],[/纷争/,3],
-  [/月光/,1],[/乐园/,2],[/浪迹/,3]
-];
-const weaponPatterns = [
-  [/高塔孤王|高塔之王/,1],[/凛风奔狼/,2],[/狮牙斗士/,3],
-  [/孤云寒林/,1],[/雾海云间/,2],[/漆黑陨铁/,3],
-  [/远海夷地/,1],[/鸣神御灵/,2],[/今昔剧画/,3],
-  [/谧林涓露/,1],[/绿洲花园/,2],[/烈日威权/,3],
-  [/悠古弦音/,1],[/纯圣露滴/,2],[/无垢之海/,3],
-  [/贡祭炽心/,1],[/谵妄圣主/,2],[/神合秘烟|神秘烟霭/,3],
-  [/奇巧秘器/,1],[/长夜燧火/,2],[/终北遗嗣/,3]
-];
+// 原神精通/炼武秘境开放日。各数组依次对应周一/四、周二/五、周三/六；周日全部开放。
+// 数据：原神 BWIKI「消耗计算器」秘境周期表，2026-11-24 核对。
+// https://wiki.biligame.com/ys/消耗计算器
+export const DOMAIN_SERIES={
+  talent:[
+    ['自由','繁荣','浮世','诤言','公平','角逐','月光','慈爱'],
+    ['抗争','勤劳','风雅','巧思','正义','焚燔','乐园','坚忍'],
+    ['诗文','黄金','天光','笃行','秩序','纷争','浪迹','荣光']
+  ],
+  weapon:[
+    ['高塔孤王','孤云寒林','远海夷地','谧林涓露','悠古弦音','贡祭炽心','奇巧秘器','苍星军势'],
+    ['凛风奔狼','雾海云间','鸣神御灵','绿洲花园','纯圣露滴','谵妄圣主','长夜燧火','藏窖灵浆'],
+    ['狮牙斗士','漆黑陨铁','今昔剧画','烈日威权','无垢之海','神合秘烟','终北遗嗣','凛雪帝皇']
+  ]
+};
+const SERIES_ALIASES={
+  weapon:{'高塔之王':'高塔孤王','神秘烟霭':'神合秘烟'}
+};
+
 export function weeklyMaterialDay(name,kind){
-  const patterns=kind==='weapon'?weaponPatterns:talentPatterns;
-  const row=patterns.find(([pattern])=>pattern.test(String(name||'')));
-  return row?row[1]:null;
+  const seriesByDay=DOMAIN_SERIES[kind];
+  if(!seriesByDay)return null;
+  const text=String(name||'').normalize('NFKC');
+  if(!text)return null;
+  for(const [index,series] of seriesByDay.entries()){
+    for(const key of series){
+      if(text.includes(key))return index+1;
+    }
+  }
+  for(const [alias,canonical] of Object.entries(SERIES_ALIASES[kind]||{})){
+    if(text.includes(alias))return weeklyMaterialDay(canonical,kind);
+  }
+  return null;
 }
 
 export function calendarForEntries(entries,deficits){
