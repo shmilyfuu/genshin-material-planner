@@ -74,7 +74,7 @@ button:disabled{opacity:.42;cursor:default}
 .filter-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .filter-chip{display:flex;align-items:center;gap:5px;border:1px solid #e0e5ed;background:#fff;border-radius:7px;padding:6px 9px;color:#61718a;font-size:11px;line-height:1.1}
 .filter-chip .filter-icon{display:flex;align-items:center;justify-content:center;width:17px;height:17px}
-.filter-chip svg{width:16px;height:16px}
+.filter-chip svg,.filter-chip .filter-icon img{width:14px;height:14px;object-fit:contain;display:block}
 .filter-chip.active{background:#f0edfc;color:#6858ba;border-color:#cfc5f2;font-weight:750}
 .filter-chip:hover{border-color:#acaddc}
 .roster-scroll{flex:1;min-height:130px;overflow-y:auto;padding:11px 12px 9px}
@@ -89,7 +89,7 @@ button:disabled{opacity:.42;cursor:default}
 .avatar-fallback{font-size:20px;font-weight:700;color:#fdfdfd;position:absolute;inset:0;display:grid;place-items:center}
 .card-badge{position:absolute;z-index:3;top:2px;width:17px;height:17px;border-radius:4px;display:grid;place-items:center;box-shadow:0 1px 3px #0003;background:rgba(32,40,54,.78);color:#fff}
 .card-badge.element{left:2px}.card-badge.weapon{right:2px}
-.card-badge svg{width:12px;height:12px}
+.card-badge svg,.card-badge img{width:12px;height:12px;object-fit:contain;display:block}
 .avatar-name{font-size:10px;font-weight:750;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .avatar-meta{font-size:9px;color:#ac8b44;letter-spacing:.4px}
 .avatar-preview{position:absolute;z-index:4;top:53px;right:3px;padding:2px 3px;border-radius:3px;background:#f6e8fa;color:#9164b5;font-size:8px;font-weight:700}
