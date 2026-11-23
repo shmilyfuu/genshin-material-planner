@@ -353,6 +353,7 @@ function refreshCalculationMode() {
   if (groups) groups.hidden = official;
   const auth = document.getElementById('mysAuthCard');
   if (auth) auth.hidden = !official;
+  if (official) document.getElementById('miyousheOptions').open = true;
   const title = document.querySelector('.inventory-card .summary-title');
   if (title) title.textContent = official ? '米游社计算' : '我的背包';
   const hint = document.querySelector('.inventory-card .summary-hint');

@@ -17,6 +17,9 @@ on:
       - 'tests/miyoushe-probe.test.mjs'
       - 'tests/hybrid-calculator.test.mjs'
       - 'hybrid-calculator.mjs'
+      - 'multi-planner.mjs'
+      - 'tests/multi-planner.test.mjs'
+      - 'tests/multi-plan-state.test.mjs'
       - 'hakushin.mjs'
       - 'miyoushe-*.css'
       - 'vendor/**'
@@ -50,7 +53,8 @@ jobs:
           node --check miyoushe-calculator.js
           node --check core.mjs
           node --check hybrid-calculator.mjs
-          node --test tests/hakushin-weapon.test.mjs tests/miyoushe-calculator.test.mjs tests/miyoushe-hybrid.test.mjs tests/hybrid-calculator.test.mjs tests/miyoushe-probe.test.mjs
+          node --check multi-planner.mjs
+          node --test tests/hakushin-weapon.test.mjs tests/miyoushe-calculator.test.mjs tests/miyoushe-hybrid.test.mjs tests/hybrid-calculator.test.mjs tests/miyoushe-probe.test.mjs tests/multi-planner.test.mjs tests/multi-plan-state.test.mjs
           node - <<'NODE'
           const fs = require('fs');
           const network = fs.readFileSync('miyoushe-auth-network.js', 'utf8');
@@ -68,16 +72,16 @@ jobs:
           if (!fs.readFileSync('sidepanel.html', 'utf8').includes('miyoushe-auth-ui.js')) throw Error('Missing login UI');
           if (!fs.readFileSync('service-worker.js', 'utf8').includes('miyoushe-calculator.js')) throw Error('Missing calculator worker');
           if (!fs.readFileSync('sidepanel.html', 'utf8').includes('data-calc-mode="official"')) throw Error('Missing dual-mode control');
-          if (m.version !== '1.4.4') throw Error('Unexpected version');
+          if (m.version !== '1.5.0') throw Error('Unexpected version');
           NODE
 
       - name: Build test ZIP
         run: |
           set -euo pipefail
-          NAME='genshin-material-planner-hybrid-v1.4.4'
+          NAME='genshin-material-planner-multi-v1.5.0'
           ROOT="dist/$NAME"
           mkdir -p "$ROOT/icons" "$ROOT/vendor"
-          cp manifest.json background.js service-worker.js sidepanel.html app.js core.mjs hakushin.mjs hybrid-calculator.mjs styles.css stepper.js stepper.css "$ROOT/"
+          cp manifest.json background.js service-worker.js sidepanel.html app.js core.mjs hakushin.mjs hybrid-calculator.mjs multi-planner.mjs styles.css stepper.js stepper.css "$ROOT/"
           cp miyoushe-md5.js miyoushe-auth-network.js miyoushe-auth-state.js miyoushe-auth-ui.js miyoushe-calculator.js miyoushe-auth.css "$ROOT/"
           cp vendor/qrcode-generator.js "$ROOT/vendor/"
           cp THIRD_PARTY_NOTICES.md "$ROOT/"
@@ -89,9 +93,9 @@ jobs:
       - name: Upload test package
         uses: actions/upload-artifact@v4
         with:
-          name: genshin-material-planner-hybrid-v1.4.4
+          name: genshin-material-planner-multi-v1.5.0
           path: |
-            dist/genshin-material-planner-hybrid-v1.4.4.zip
-            dist/genshin-material-planner-hybrid-v1.4.4.zip.sha256
+            dist/genshin-material-planner-multi-v1.5.0.zip
+            dist/genshin-material-planner-multi-v1.5.0.zip.sha256
           if-no-files-found: error
           retention-days: 14
