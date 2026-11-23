@@ -124,3 +124,14 @@ test('GGScanner 装备位置可关联已有培养角色，保留用户原有关�
  importGOOD(state,good,{characters:[character],weapons:[sword]});
  assert.equal(goal.linkedWeaponInstanceId,custom.id);
 });
+
+test('GOOD 扫描新增第三把同名同练度武器时仅增加缺失实例',()=>{
+ const state=empty();const copy=()=>({key:'FavoniusSword',level:90,ascension:6,refinement:5,location:''});
+ const first=makeWeaponInstance(sword,{level:90,ascension:6,refinement:5,scanned:true});
+ const second=makeWeaponInstance(sword,{level:90,ascension:6,refinement:5,scanned:true});
+ state.weaponInstances.push(first,second);
+ const idSet=new Set(state.weaponInstances.map(w=>w.id));
+ const result=importGOOD(state,{format:'GOOD',version:3,weapons:[copy(),copy(),copy()]},{weapons:[sword]});
+ assert.equal(result.newWeapons,1);assert.equal(state.weaponInstances.length,3);
+ for(const id of idSet)assert.ok(state.weaponInstances.some(x=>x.id===id));
+});

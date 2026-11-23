@@ -83,6 +83,21 @@ export function importGOOD(state,raw,{characters=[],weapons=[],confirmAmbiguous=
     }
     const item={id:newId('weapon'),...w};existing.push(item);matched.add(item.id);newWeapons.push(item.id);
   }
+  // If a later scan contains more indistinguishable copies, preserve the
+  // existing IDs and create only the additional physical instances.
+  const byType=new Map();
+  for(const item of incoming){
+    const group=byType.get(item.weaponId)||[];group.push(item);byType.set(item.weaponId,group);
+  }
+  for(const [weaponId,scanned] of byType){
+    const present=existing.filter(item=>item.weaponId===weaponId);
+    const shortage=Math.max(0,scanned.length-present.length);
+    for(let i=0;i<shortage;i++){
+      const entry=scanned[scanned.length-shortage+i];
+      const created={...entry,id:newId('weapon')};
+      existing.push(created);newWeapons.push(created.id);
+    }
+  }
   // Adopt a scanned equipment relationship only when a character already has a
   // cultivation goal and has not explicitly linked a weapon instance.
   const charNames=new Map();

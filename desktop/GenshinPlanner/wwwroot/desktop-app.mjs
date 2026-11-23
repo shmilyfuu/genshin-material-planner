@@ -563,7 +563,10 @@ async function reloadAllProfiles(force=false){
   if(token!==profileLoadToken||account!==state.activeAccountId)return;
   profiles=new Map(plans.map((p,i)=>[p.id,results[i]]));
   if(!state.materialInventoryMigrated&&plans.length){
-    const first=plans[0],entry=profiles.get(first.id),legacy=migrateLegacyInventory(state.inv,entry.characterProfile,entry.weaponProfile,first.source.mergeRules);
+    const first=plans[0],entry=profiles.get(first.id);
+    const linked=first.linkedWeaponInstanceId?plans.find(g=>g.weaponInstanceId===first.linkedWeaponInstanceId):null;
+    const weapon=linked?profiles.get(linked.id)?.weaponProfile:entry.weaponProfile;
+    const legacy=migrateLegacyInventory(state.inv,entry.characterProfile,weapon,first.source.mergeRules);
     state.materialInventory={...legacy,...state.materialInventory};state.materialInventoryMigrated=true;
   }
   renderAll();save();
