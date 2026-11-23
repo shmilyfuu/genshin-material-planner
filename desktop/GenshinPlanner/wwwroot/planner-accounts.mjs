@@ -1,7 +1,8 @@
 const ACCOUNT_FIELDS = [
   'plans', 'activePlanId', 'source', 'config', 'materialInventory',
   'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
-  'verifiedInventory', 'manualInventoryImportUid'
+  'verifiedInventory', 'manualInventoryImportUid', 'ownedCharacters',
+  'weaponInstances', 'plannerSchema'
 ];
 
 export function plannerSnapshot(state) {

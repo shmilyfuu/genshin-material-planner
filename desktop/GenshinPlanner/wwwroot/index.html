@@ -1,95 +1,81 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>原神养成规划</title>
-  <link rel="stylesheet" href="desktop.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>原神养成规划</title><link rel="stylesheet" href="desktop.css">
 </head>
 <body>
-  <div class="app">
-    <header class="app-header">
-      <div class="app-identity">
-        <div class="app-mark">◆</div>
-        <div><strong>原神养成规划</strong><span>多培养项 · 本地手动背包</span></div>
-      </div>
-      <span class="data-status" id="dataStatus" role="status">正在读取本地数据…</span>
-      <div class="header-actions">
-        <button type="button" class="soft-btn" id="refreshButton">刷新资料</button>
-        <button type="button" class="soft-btn" id="importButton">导入</button>
-        <button type="button" class="soft-btn" id="exportButton">导出</button>
-        <button type="button" class="soft-btn disabled" disabled title="预留米游社登录入口">米游社登录 · 预留</button>
-      </div>
-    </header>
-
-    <div class="workbench" id="workbench">
-      <aside class="account-rail">
-        <div class="rail-label">当前规划账号</div>
-        <div class="account-picker"><select id="accountSelect" aria-label="选择账号"></select></div>
-        <div class="account-buttons">
-          <button id="addAccountButton" type="button">添加</button>
-          <button id="renameAccountButton" type="button">重命名</button>
-          <button id="deleteAccountButton" type="button">删除</button>
-        </div>
-        <div class="rail-rule"></div>
-        <div class="rail-heading"><strong>培养项</strong><span id="planCounter">0 项</span></div>
-        <div class="plan-list" id="planList" role="list" aria-label="培养项"></div>
-        <button class="new-plan" type="button" id="addPlanButton">＋ 添加培养项</button>
-        <div class="rail-bottom"><span>所有培养项使用当前账号的同一份背包</span></div>
-      </aside>
-      <div class="column-resizer" data-divider="0" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整账号与培养编辑区宽度"></div>
-
-      <main class="editor">
-        <div class="editor-heading">
-          <div><span class="eyebrow" id="activePlanLabel">培养项 1</span><h1 id="activePlanTitle">选择培养对象</h1></div>
-          <button class="text-danger" id="removePlanButton" type="button">删除当前项</button>
-        </div>
-        <section class="chooser-panel">
-          <div class="tabs" role="tablist" aria-label="培养对象">
-            <button type="button" class="tab active" data-tab="character" aria-selected="true">角色选择</button>
-            <button type="button" class="tab" data-tab="weapon" aria-selected="false">武器选择</button>
-            <div class="tabs-right"><button id="clearSelectionButton" type="button" class="clear-selection">清空当前选择</button></div>
-          </div>
-          <div class="filter-area">
-            <div class="filter-top">
-              <label class="searchbox"><span class="search-icon" aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索角色名称" autocomplete="off"></label>
-              <div class="filter-row" id="starFilters" aria-label="星级筛选"></div>
-            </div>
-            <div class="filter-row" id="elementFilters" aria-label="元素筛选"></div>
-            <div class="filter-row" id="weaponFilters" aria-label="武器类型筛选"></div>
-          </div>
-          <div class="roster-scroll" id="rosterScroll"><div class="roster-grid" id="rosterGrid" aria-live="polite"></div></div>
-          <div class="roster-foot"><span id="rosterCount">—</span><span>单击头像选择培养对象</span></div>
-        </section>
-        <section class="targets-panel">
-          <div class="section-title"><strong>培养目标</strong><span>每项独立设置当前等级与目标等级</span></div>
-          <div class="target-groups" id="targetGroups"></div>
-        </section>
-      </main>
-      <div class="column-resizer" data-divider="1" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整培养编辑区与背包宽度"></div>
-
-      <aside class="inventory-rail">
-        <div class="inventory-heading"><div><strong>背包材料</strong><span>当前培养项</span></div><div class="inventory-tag">手动数量</div></div>
-        <p class="inventory-note">共用材料按 ID 同步，同一账号只扣除一次库存。</p>
-        <div class="inventory-scroll" id="inventoryGroups"></div>
-      </aside>
-      <div class="column-resizer" data-divider="2" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整背包与材料缺口宽度"></div>
-      <aside class="deficit-rail">
-        <div class="deficit-heading"><strong>全部培养项 · 材料缺口</strong><span id="resultSummary">选择目标后查看合并需求</span></div>
-        <div class="deficit-content" id="resultContent" aria-live="polite"></div>
-      </aside>
+<div class="app">
+  <header class="app-header">
+    <div class="app-identity"><span class="app-mark">◆</span><div><strong>原神养成规划</strong><span>多账号 · 培养目标 · 手动背包</span></div></div>
+    <div class="account-picker"><select id="accountSelect" aria-label="切换规划账号"></select></div>
+    <button class="soft-btn" id="addAccountButton" type="button">添加账号</button>
+    <button class="soft-btn" id="renameAccountButton" type="button">重命名</button>
+    <button class="soft-btn" id="deleteAccountButton" type="button">删除账号</button>
+    <div class="header-spacer"></div><span class="data-status" id="dataStatus" role="status">正在读取本地数据…</span>
+    <div class="header-actions">
+      <button class="soft-btn" id="refreshButton" type="button">刷新资料</button>
+      <button class="soft-btn" id="importGoodButton" type="button">导入 GGScanner</button>
+      <button class="soft-btn" id="importButton" type="button">导入规划</button>
+      <button class="soft-btn" id="exportButton" type="button">导出规划</button>
+      <button class="soft-btn" disabled title="预留米游社登录入口">米游社 · 预留</button>
     </div>
+  </header>
+  <section class="calendar-strip" aria-label="每周刷取日历">
+    <div class="strip-heading"><strong>每周刷取日历</strong><span id="calendarNote">按材料缺口更新</span></div>
+    <div class="calendar-days" id="calendarDays"></div>
+  </section>
+  <section class="active-goals-strip" aria-label="正在培养">
+    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 双击编辑 · 暂停后不计入缺口</span></div>
+    <div class="active-goal-list" id="activeGoals"></div>
+  </section>
+  <div class="workbench" id="workbench">
+    <main class="editor">
+      <section class="chooser-panel">
+        <div class="tabs" role="tablist" aria-label="培养对象">
+          <button type="button" class="tab active" data-tab="character" aria-selected="true">角色</button>
+          <button type="button" class="tab" data-tab="weapon" aria-selected="false">武器</button>
+          <span class="roster-help">单击选择或取消 · 双击设置目标</span>
+        </div>
+        <div class="filter-area">
+          <div class="filter-top">
+            <label class="searchbox"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索名称" autocomplete="off"></label>
+            <div class="filter-row" id="starFilters" aria-label="星级筛选"></div>
+          </div>
+          <div class="filter-row" id="elementFilters" aria-label="元素筛选"></div>
+          <div class="filter-row" id="weaponFilters" aria-label="武器类型筛选"></div>
+        </div>
+        <div class="roster-scroll"><div class="roster-grid" id="rosterGrid" aria-live="polite"></div></div>
+        <div class="roster-foot"><span id="rosterCount">—</span><span>培养中 → 已有角色／武器 → 新到旧</span></div>
+      </section>
+    </main>
+    <div class="column-resizer" data-divider="0" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整角色与背包列宽"></div>
+    <aside class="inventory-rail">
+      <div class="inventory-heading"><strong>背包材料</strong><span id="inventoryTarget">选择培养目标</span></div>
+      <p class="inventory-note">同账号按材料 ID 共享库存。输入框左侧可增加或减少 1。</p>
+      <div class="inventory-scroll" id="inventoryGroups"></div>
+    </aside>
+    <div class="column-resizer" data-divider="1" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整背包与材料缺口列宽"></div>
+    <aside class="deficit-rail">
+      <div class="deficit-heading"><strong id="resultTitle">全部培养目标 · 材料缺口</strong><span id="resultSummary">共用背包统一扣除</span></div>
+      <div class="deficit-content" id="resultContent" aria-live="polite"></div>
+    </aside>
   </div>
-
-  <div class="modal-backdrop" id="modal" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <h2 id="modalTitle">账号名称</h2>
-      <p id="modalDescription"></p>
-      <input id="modalInput" type="text" maxlength="32" autocomplete="off">
-      <div class="modal-actions"><button type="button" id="modalCancel">取消</button><button class="primary-btn" type="button" id="modalConfirm">确认</button></div>
-    </div>
+</div>
+<div class="modal-backdrop" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h2 id="modalTitle">确认</h2><p id="modalDescription"></p>
+    <input id="modalInput" type="text" maxlength="32" autocomplete="off">
+    <div class="modal-actions"><button id="modalCancel" type="button">取消</button><button id="modalConfirm" class="primary-btn" type="button">确认</button></div>
   </div>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="desktop-app.mjs"></script>
+</div>
+<div class="modal-backdrop" id="goalModal" hidden>
+  <div class="modal goal-modal" role="dialog" aria-modal="true" aria-labelledby="goalModalTitle">
+    <h2 id="goalModalTitle">培养目标</h2><div id="goalModalBody"></div>
+    <div class="modal-actions"><button id="goalAddCopy" type="button" hidden>添加同名武器</button><button id="goalDelete" class="danger-btn" type="button">删除目标</button><span class="modal-spacer"></span><button id="goalCancel" type="button">取消</button><button id="goalSave" class="primary-btn" type="button">保存</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="desktop-app.mjs"></script>
 </body>
 </html>

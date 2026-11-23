@@ -31,10 +31,40 @@ export const WEAPON_ASC_DATA = [
   [255000, 5, 14, 14, 6, 23, 27, 41, 15, 23, 27]
 ];
 
+export const WEAPON_ASC_4STAR_DATA = [
+  [0,0,0,0,0,0,0,0,0,0,0],
+  [5000,3,0,0,0,3,0,0,2,0,0],
+  [20000,3,3,0,0,15,0,0,10,0,0],
+  [40000,3,9,0,0,15,6,0,10,6,0],
+  [70000,3,9,3,0,15,18,0,10,15,0],
+  [105000,3,9,9,0,15,18,9,10,15,6],
+  [150000,3,9,9,4,15,18,27,10,15,18]
+];
+
+export const WEAPON_ASC_3STAR_DATA = [
+  [0,0,0,0,0,0,0,0,0,0,0],
+  [5000,2,0,0,0,2,0,0,1,0,0],
+  [15000,2,2,0,0,10,0,0,6,0,0],
+  [30000,2,6,0,0,10,4,0,6,4,0],
+  [50000,2,6,2,0,10,12,0,6,10,0],
+  [75000,2,6,6,0,10,12,6,6,10,4],
+  [105000,2,6,6,3,10,12,18,6,10,12]
+];
+export function weaponAscensionTable(rarity){
+  const tier=Number(rarity);
+  if(tier===5)return WEAPON_ASC_DATA;
+  if(tier===4)return WEAPON_ASC_4STAR_DATA;
+  if(tier===3)return WEAPON_ASC_3STAR_DATA;
+  throw new Error(`暂不支持 ${tier} 星武器的突破需求`);
+}
+
 export const CHAR_LEVEL_LABELS = ['Lv.1', 'Lv.20', 'Lv.40', 'Lv.50', 'Lv.60', 'Lv.70', 'Lv.80'];
 
 export const DEFAULT_STATE = Object.freeze({
-  schemaVersion: 5,
+  schemaVersion: 6,
+  plannerSchema: 2,
+  ownedCharacters: {},
+  weaponInstances: [],
   materialInventory: {},
   materialInventoryMigrated: false,
   source: {
@@ -142,7 +172,16 @@ export function normalizeState(input) {
   const mergeRules = sourceSettings.mergeRules && typeof sourceSettings.mergeRules === 'object' ? sourceSettings.mergeRules : {};
 
   const normalized = {
-    schemaVersion: 5,
+    schemaVersion: 6,
+    plannerSchema: source.plannerSchema===2 ? 2 : 1,
+    ownedCharacters: source.ownedCharacters && typeof source.ownedCharacters==='object' && !Array.isArray(source.ownedCharacters)
+      ? structuredClone(source.ownedCharacters) : {},
+    weaponInstances: Array.isArray(source.weaponInstances) ? source.weaponInstances.slice(0,3000).map(w=>({
+      id:String(w.id||''),weaponId:String(w.weaponId||''),key:String(w.key||''),
+      level:Number(w.level)||1,ascension:Number(w.ascension)||0,
+      refinement:Number(w.refinement)||1,location:String(w.location||''),
+      lock:!!w.lock,scanned:!!w.scanned
+    })) : [],
     inventoryUid: /^\d{6,12}$/.test(String(source.inventoryUid || '')) ? String(source.inventoryUid) : '',
     calculationMode: source.calculationMode === 'official' ? 'official' : 'manual',
     hybridInventory: normalizeHybridInventory(source.hybridInventory),
@@ -216,8 +255,8 @@ export function normalizeState(input) {
       weapAsc: normalizeRange(item.weapAsc, 6)
     };
   };
-  const incoming = Array.isArray(source.plans) && source.plans.length
-    ? source.plans.slice(0, 40)
+  const incoming = Array.isArray(source.plans) && (source.plans.length || source.plannerSchema===2)
+    ? source.plans.slice(0, 300)
     : [{id:'plan-1', source:normalized.source,config:normalized.config}];
   const used = new Set();
   normalized.plans = incoming.map((raw, index) => {
@@ -227,13 +266,16 @@ export function normalizeState(input) {
       ? proposed : 'plan-' + (index + 1);
     const uniqueId = used.has(id) ? 'plan-item-' + index : id;
     used.add(uniqueId);
-    return {id:uniqueId, source:planSource(value.source),config:planConfig(value.config),enabled:value.enabled !== false};
+    return {id:uniqueId,source:planSource(value.source),config:planConfig(value.config),
+      enabled:value.enabled!==false,completed:value.completed===true,
+      kind:value.kind==='weapon'?'weapon':value.kind==='character'?'character':'',
+      weaponInstanceId:String(value.weaponInstanceId||''),
+      linkedWeaponInstanceId:String(value.linkedWeaponInstanceId||'')};
   });
   normalized.activePlanId = normalized.plans.some(item => item.id === source.activePlanId)
-    ? source.activePlanId : normalized.plans[0].id;
+    ? source.activePlanId : (normalized.plans[0]?.id || '');
   const active = normalized.plans.find(item => item.id === normalized.activePlanId);
-  normalized.source = JSON.parse(JSON.stringify(active.source));
-  normalized.config = JSON.parse(JSON.stringify(active.config));
+  if (active){normalized.source=structuredClone(active.source);normalized.config=structuredClone(active.config);}
 
   normalized.materialInventory = {};
   if (source.materialInventory && typeof source.materialInventory === 'object'
@@ -246,7 +288,8 @@ export function normalizeState(input) {
   const snapshotKeys = [
     'plans', 'activePlanId', 'source', 'config', 'materialInventory',
     'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
-    'verifiedInventory', 'manualInventoryImportUid'
+    'verifiedInventory', 'manualInventoryImportUid', 'ownedCharacters',
+    'weaponInstances', 'plannerSchema'
   ];
   const snapshot = (value) => Object.fromEntries(snapshotKeys.map(key => [key, structuredClone(value[key])]));
   const records = Array.isArray(source.plannerAccounts) && source.plannerAccounts.length

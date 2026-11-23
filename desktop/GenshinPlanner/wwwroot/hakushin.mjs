@@ -60,6 +60,8 @@ function normalizeListEntry(id, row, kind) {
   return {
     id: String(id),
     name: String(row?.zh || row?.name || row?.names?.zh || id),
+    en: String(row?.en || row?.names?.en || ''),
+    goodKey: String(row?.en || row?.names?.en || ''),
     icon: iconUrl(row?.icon),
     rarity: normalizeRarity(row?.rank ?? row?.rarity ?? 0),
     element: kind === 'character' ? String(row?.element || '') : '',
@@ -221,9 +223,14 @@ export function parseWeaponDetail(raw, fallback = {}) {
       : Object.values(materials).flatMap((value) => Array.isArray(value) ? value : [value]);
   const asc = aggregateMaterialInfos(materialStages);
 
-  const weapGems = matchWeaponMaterialSeries(asc, [5, 14, 14, 6]);
-  const matA = matchWeaponMaterialSeries(asc, [23, 27, 41]);
-  const matB = matchWeaponMaterialSeries(asc, [15, 23, 27]);
+  const rarity=normalizeRarity(data.rarity ?? data.rank ?? fallback.rarity ?? 0);
+  const specs={5:[[5,14,14,6],[23,27,41],[15,23,27]],
+    4:[[3,9,9,4],[15,18,27],[10,15,18]],
+    3:[[2,6,6,3],[10,12,18],[6,10,12]]};
+  const totals=specs[rarity]||[[],[],[]];
+  const weapGems=totals[0].length?matchWeaponMaterialSeries(asc,totals[0]):[];
+  const matA=totals[1].length?matchWeaponMaterialSeries(asc,totals[1]):[];
+  const matB=totals[2].length?matchWeaponMaterialSeries(asc,totals[2]):[];
   const warnings = [];
   if (nonNull(weapGems).length < 4) warnings.push('武器突破材料识别不完整');
   if (nonNull(matA).length < 3) warnings.push('武器素材 A 识别不完整');

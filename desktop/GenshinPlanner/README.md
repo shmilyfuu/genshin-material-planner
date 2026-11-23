@@ -1,63 +1,50 @@
-# 原神养成规划 · Windows 桌面版
+# 原神养成规划桌面版
 
-Windows WPF + WebView2 桌面端。首次运行窗口为 1600 × 900，四栏可拖动调整宽度，窗口与列宽在下次启动时恢复。
+Windows WPF + WebView2，手动背包统一计算，支持 GGScanner GOOD v3 角色与武器导入。
 
 ## 运行
 
-将 ZIP 解压至具有写入权限的文件夹，运行 `GenshinPlanner.exe`。程序自带 .NET 10 运行组件，Windows 10/11 需安装 Microsoft Edge WebView2 Runtime。
+解压发布 ZIP 到具有写入权限的文件夹，运行 `GenshinPlanner.exe`。首次窗口为 1600×900，可调整窗口大小和三栏宽度。需要 Windows 10/11 和 Microsoft Edge WebView2 Runtime。
 
 发布目录：
 
 ```text
-GenshinPlanner/
-├── GenshinPlanner.exe
-├── resources/
-│   └── wwwroot/
-│       ├── index.html
-│       ├── desktop-app.mjs
-│       ├── desktop.css
-│       ├── icons/
-│       └── ...
-└── data/
-    ├── planner.json
-    ├── desktop-layout.json
-    ├── NanokaCache/
-    └── WebView2/
+GenshinPlanner.exe
+resources/
+  wwwroot/
+    index.html
+    desktop-app.mjs
+    core.mjs
+    good-import.mjs
+    planner-model.mjs
+    ...
+data/
+  planner.json
+  desktop-layout.json
+  NanokaCache/
+  WebView2/
 ```
 
-`data/` 及其文件由程序自动创建。每个解压目录独立保存数据，整体搬移或复制程序文件夹即可携带培养计划、库存和窗口配置。
+`data/` 保存账号、武器实例、材料库存、窗口位置及缓存；程序自动创建缺少的数据文件。复制整个程序文件夹即可迁移到其他位置。
 
-请将程序解压至桌面、普通数据盘等可写目录，避免 Windows 系统保护的安装目录。运行中的 WebView2 会创建自己的数据和缓存文件。
+## 使用
 
-## 从旧版迁移数据
+在角色或武器图鉴中双击对象，配置培养等级与完成状态。点击对象选择当前缺口和背包材料，再次点击取消选择并查看合并缺口。顶部正在培养区域可暂停目标，完成目标保留在图鉴中。
 
-v0.2.0 的数据保存在 `%LOCALAPPDATA%\GenshinPlanner`：
+角色可关联已有武器实例或创建新实例，也可解除关联。每把武器实例独立保存练度及培养目标，相同名称支持多把。材料按 ID 合并，库存只扣除一次。右侧缺口可展开查看每个培养对象的材料需求贡献。
 
-- 将旧 `planner.json` 复制到新程序旁的 `data\planner.json`
-- 将旧 `desktop-layout.json` 复制到 `data\desktop-layout.json`（需要恢复窗口布局时）
-- 旧缓存可重新生成，无需迁移
+通过窗口顶部的「导入 GGScanner」选择 GOOD v3 JSON，匹配已有角色与武器的当前等级、突破、天赋及精炼。重复且不可唯一确认的武器记录会提示核对；原培养目标与手动库存保持独立。
 
-复制前关闭正在运行的程序。也可使用程序的导出／导入配置功能来迁移培养计划。旧目录中的数据由用户自行管理。
+角色和武器资料来自 Nanoka，图片素材来自相应游戏资源。米游社登录预留入口暂未接入。
 
-## 源码构建
+## 本地构建
 
-需要 .NET 10 SDK。
-
-```powershell
-dotnet restore .\GenshinPlanner.csproj
-dotnet run --project .\GenshinPlanner.csproj
-```
-
-Windows x64 便携发布：
+需要 .NET 10 SDK：
 
 ```powershell
 dotnet publish .\GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o .\publish
 ```
 
-发布目录根层放置单文件 `GenshinPlanner.exe`，前端资源放置于 `resources/wwwroot/`。WebView2 Runtime 使用用户系统上的版本。
+## 数据兼容
 
-## 计算与资料
-
-每个规划账号单独保存培养项和背包，同账号多个已启用培养项按材料 ID 汇总需求，再用本地背包和 3:1 合成算法计算缺口。角色和武器资料从 Nanoka 下载；脱机时读取已有缓存。
-
-武器突破材料专栏仅放武器突破秘境掉落，其他怪物材料归入培养素材。元素和武器类型图形使用 [GenshinUI](https://github.com/shi-zhong/genshin-ui/tree/main/packages/assets) 整理的原神素材，相关美术版权归原权利方。米游社入口为预留功能。
+从桌面 v0.2.1 升级时，原单项「角色＋武器」会迁移为独立角色与武器培养目标，保留关联和原有库存。导入旧版配置前建议先备份整个 `data` 目录。

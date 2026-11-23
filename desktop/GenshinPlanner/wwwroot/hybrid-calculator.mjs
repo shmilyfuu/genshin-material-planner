@@ -1,4 +1,4 @@
-import { TALENT_DATA, CHAR_ASC_DATA, WEAPON_ASC_DATA, calcTieredDeficit, safeEval } from './core.mjs';
+import { TALENT_DATA, CHAR_ASC_DATA, weaponAscensionTable, calcTieredDeficit, safeEval } from './core.mjs';
 
 const number = (value) => Number.isSafeInteger(value) && value >= 0;
 const itemId = (material) => {
@@ -71,12 +71,12 @@ export function buildNanokaDemand({ config, characterProfile, weaponProfile, par
   }
   if (parts?.weapon) {
     if (!weaponProfile) throw new Error('Nanoka 武器材料尚未载入，请重新选择武器。');
-    const weapon = delta(WEAPON_ASC_DATA, ...pair(config, 'weapAsc', 6));
+    const weapon = delta(weaponAscensionTable(weaponProfile.rarity), ...pair(config, 'weapAsc', 6));
     const m = weaponProfile.materials;
     add({id: 202, name: '摩拉'}, weapon[0], '摩拉', '基础材料');
-    family(m.weapGems, weapon.slice(1, 5), '武器突破秘境材料', '武器突破材料');
-    family(m.matA, weapon.slice(5, 8), '武器素材 A', '武器突破材料');
-    family(m.matB, weapon.slice(8, 11), '武器素材 B', '武器突破材料');
+    family(m.weapGems, weapon.slice(1, 5), '武器突破材料', '武器突破材料');
+    family(m.matA, weapon.slice(5, 8), '武器素材 A', '培养素材');
+    family(m.matB, weapon.slice(8, 11), '武器素材 B', '培养素材');
   }
 
   const parent = new Map([...nodes.keys()].map(id => [id, id]));

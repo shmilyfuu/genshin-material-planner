@@ -49,7 +49,7 @@ export function calculateMultiPlan(entries, inventory = {}) {
 
   for (const entry of entries) {
     const plan = entry?.plan;
-    if (plan?.enabled === false) continue;
+    if (plan?.enabled === false || plan?.completed === true) continue;
     const charId = String(plan?.source?.selectedCharacterId || '');
     const weaponId = String(plan?.source?.selectedWeaponId || '');
     if (!charId && !weaponId) continue;
@@ -209,6 +209,27 @@ export function planMaterialUsage(entries) {
     const ids = new Set(Object.values(catalog)
       .flatMap(groups => groups.flatMap(group => group.rows.map(row => row.id))));
     for (const id of ids) result.set(id, (result.get(id) || 0) + 1);
+  }
+  return result;
+}
+
+export function materialContributions(entries){
+  const result=new Map();
+  for(const entry of entries){
+    const goal=entry.plan;
+    if(goal.enabled===false||goal.completed===true)continue;
+    const character=Boolean(goal.source?.selectedCharacterId);
+    const weapon=Boolean(goal.source?.selectedWeaponId);
+    if(character&&!entry.characterProfile||weapon&&!entry.weaponProfile)continue;
+    const built=buildNanokaDemand({config:goal.config,
+      characterProfile:entry.characterProfile,weaponProfile:entry.weaponProfile,
+      parts:{character,weapon}});
+    for(const row of built.groups.flatMap(g=>g.rows)){
+      if(!row.count)continue;
+      const id=String(row.id),items=result.get(id)||[];
+      const title=character?goal.source.selectedCharacterName:goal.source.selectedWeaponName;
+      items.push({goalId:goal.id,name:title||'培养目标',count:row.count});result.set(id,items);
+    }
   }
   return result;
 }

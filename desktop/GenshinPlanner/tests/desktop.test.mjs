@@ -11,20 +11,20 @@ const html=readFileSync(new URL('index.html',path),'utf8');
 const js=readFileSync(new URL('desktop-app.mjs',path),'utf8');
 const css=readFileSync(new URL('desktop.css',path),'utf8');
 
-test('桌面窗口使用可调整四栏、常驻缺口和材料图标',()=>{
+test('桌面窗口使用可调整三栏、顶部培养区、日历和常驻缺口',()=>{
   for(const id of ['rosterGrid','starFilters','elementFilters','weaponFilters','accountSelect','inventoryGroups','workbench','resultContent']){
     assert.ok(html.includes(`id="${id}"`),id);
   }
   assert.ok(html.includes('class="deficit-rail"'));
-  assert.equal((html.match(/class="column-resizer"/g)||[]).length,3);
+  assert.equal((html.match(/class="column-resizer"/g)||[]).length,2);
   assert.ok(css.includes('minmax(78px,1fr)'));
   assert.ok(css.includes('64px'));
-  assert.ok(css.includes('17px;height:17px'));
+  assert.ok(css.includes('16px;height:16px'));
   assert.ok(js.includes("bridge('ui.layout.load')"));
   assert.ok(js.includes("bridge('ui.layout.save'"));
   assert.ok(js.includes("className='deficit-name'"));
   assert.ok(js.includes("className='material-arrows'"));
-  assert.ok(js.includes('aria-checked'));
+  assert.ok(html.includes('id="goalModal"'));\n  assert.ok(html.includes('id="activeGoals"'));\n  assert.ok(html.includes('id="calendarDays"'));
 });
 
 
