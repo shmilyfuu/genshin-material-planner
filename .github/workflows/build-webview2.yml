@@ -33,18 +33,22 @@ jobs:
           dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish /p:PublishReadyToRun=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path desktop/publish/GenshinPlanner.exe)) { throw 'Executable missing' }
-          if (-not (Test-Path desktop/publish/wwwroot/desktop-app.mjs)) { throw 'Frontend missing' }
+          if (-not (Test-Path desktop/publish/resources/wwwroot/desktop-app.mjs)) { throw 'Frontend missing' }
+          $rootFiles = @(Get-ChildItem desktop/publish -File)
+          if ($rootFiles.Count -ne 1 -or $rootFiles[0].Name -ne 'GenshinPlanner.exe') {
+            throw ('Unexpected root files: ' + (($rootFiles | ForEach-Object Name) -join ', '))
+          }
       - name: Package portable Windows app
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path desktop/dist | Out-Null
-          Compress-Archive -Path desktop/publish/* -DestinationPath desktop/dist/GenshinPlanner-WebView2-win-x64.zip -Force
-          (Get-FileHash desktop/dist/GenshinPlanner-WebView2-win-x64.zip -Algorithm SHA256).Hash.ToLower() | Set-Content desktop/dist/GenshinPlanner-WebView2-win-x64.zip.sha256
+          New-Item -ItemType Directory -Force -Path desktop/dist, desktop/publish/data | Out-Null
+          Compress-Archive -Path desktop/publish/* -DestinationPath desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip -Force
+          (Get-FileHash desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip -Algorithm SHA256).Hash.ToLower() | Set-Content desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: GenshinPlanner-WebView2-win-x64-preview
+          name: GenshinPlanner-WebView2-v0.2.1-win-x64
           path: |
-            desktop/dist/GenshinPlanner-WebView2-win-x64.zip
-            desktop/dist/GenshinPlanner-WebView2-win-x64.zip.sha256
+            desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip
+            desktop/dist/GenshinPlanner-WebView2-v0.2.1-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14

@@ -1,46 +1,63 @@
 # 原神养成规划 · Windows 桌面版
 
-Windows WPF + WebView2 桌面端，首次启动窗口为 1600 × 900。
+Windows WPF + WebView2 桌面端。首次运行窗口为 1600 × 900，四栏可拖动调整宽度，窗口与列宽在下次启动时恢复。
 
-界面采用可拖动调整宽度的四栏布局：账号及培养项、角色与武器选择、当前培养项背包、全部已启用培养项的缺口。培养项开关控制是否参与汇总计算，相关库存与目标设置继续保留。
+## 运行
 
-## 启动与构建
+将 ZIP 解压至具有写入权限的文件夹，运行 `GenshinPlanner.exe`。程序自带 .NET 10 运行组件，Windows 10/11 需安装 Microsoft Edge WebView2 Runtime。
 
-需要 Windows 10/11、Microsoft Edge WebView2 Runtime。源码构建需要 .NET 10 SDK。
+发布目录：
+
+```text
+GenshinPlanner/
+├── GenshinPlanner.exe
+├── resources/
+│   └── wwwroot/
+│       ├── index.html
+│       ├── desktop-app.mjs
+│       ├── desktop.css
+│       ├── icons/
+│       └── ...
+└── data/
+    ├── planner.json
+    ├── desktop-layout.json
+    ├── NanokaCache/
+    └── WebView2/
+```
+
+`data/` 及其文件由程序自动创建。每个解压目录独立保存数据，整体搬移或复制程序文件夹即可携带培养计划、库存和窗口配置。
+
+请将程序解压至桌面、普通数据盘等可写目录，避免 Windows 系统保护的安装目录。运行中的 WebView2 会创建自己的数据和缓存文件。
+
+## 从旧版迁移数据
+
+v0.2.0 的数据保存在 `%LOCALAPPDATA%\GenshinPlanner`：
+
+- 将旧 `planner.json` 复制到新程序旁的 `data\planner.json`
+- 将旧 `desktop-layout.json` 复制到 `data\desktop-layout.json`（需要恢复窗口布局时）
+- 旧缓存可重新生成，无需迁移
+
+复制前关闭正在运行的程序。也可使用程序的导出／导入配置功能来迁移培养计划。旧目录中的数据由用户自行管理。
+
+## 源码构建
+
+需要 .NET 10 SDK。
 
 ```powershell
 dotnet restore .\GenshinPlanner.csproj
 dotnet run --project .\GenshinPlanner.csproj
 ```
 
-Windows x64 发布：
+Windows x64 便携发布：
 
 ```powershell
 dotnet publish .\GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o .\publish
 ```
 
-运行发布目录中的 `GenshinPlanner.exe`，保留整个发布文件夹。
+发布目录根层放置单文件 `GenshinPlanner.exe`，前端资源放置于 `resources/wwwroot/`。WebView2 Runtime 使用用户系统上的版本。
 
-## 数据
+## 计算与资料
 
-账号、培养项、等级和手动背包库存存放在当前 Windows 用户目录：
+每个规划账号单独保存培养项和背包，同账号多个已启用培养项按材料 ID 汇总需求，再用本地背包和 3:1 合成算法计算缺口。角色和武器资料从 Nanoka 下载；脱机时读取已有缓存。
 
-`%LOCALAPPDATA%\GenshinPlanner\planner.json`
-
-窗口上次的位置与尺寸、各栏宽度保存在：
-
-`%LOCALAPPDATA%\GenshinPlanner\desktop-layout.json`
-
-Nanoka 角色、武器数据缓存存放在 `NanokaCache`；WebView2 运行时数据位于 `WebView2` 子目录。联网时从 `static.nanoka.cc` 获取官方已实装和前瞻资料，网络不可用时使用已缓存的数据。
-
-可通过窗口右上角导入、导出 JSON 配置。支持导入原 Chrome 养成规划面板导出的配置数据。
-
-## 计算
-
-角色突破、天赋和武器突破需求由原项目计算模块计算。当前账号内的多个培养项先按材料 ID 汇总需求，再使用一份共享背包数量进行 3:1 材料合成及缺口计算。账号之间的数据分别保存。
-
-武器突破材料分组包含武器突破秘境的材料，武器使用的怪物掉落归入培养素材。缺口持续显示在最右侧，材料图标与背包中的材料 ID 对应。
-
-元素与武器类型图标资源来自 [GenshinUI](https://github.com/shi-zhong/genshin-ui/tree/main/packages/assets) 所整理的原神游戏素材，相关游戏美术资产版权归原版权方。
-
-米游社登录入口暂作为占位控件。桌面版当前通过手动背包计算。
+武器突破材料专栏仅放武器突破秘境掉落，其他怪物材料归入培养素材。元素和武器类型图形使用 [GenshinUI](https://github.com/shi-zhong/genshin-ui/tree/main/packages/assets) 整理的原神素材，相关美术版权归原权利方。米游社入口为预留功能。

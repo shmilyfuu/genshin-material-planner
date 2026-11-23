@@ -21,8 +21,7 @@ public partial class MainWindow : Window
         Timeout = TimeSpan.FromSeconds(20)
     };
 
-    private readonly string _dataDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GenshinPlanner");
+    private readonly string _dataDir = Path.Combine(AppContext.BaseDirectory, "data");
     private string StateFile => Path.Combine(_dataDir, "planner.json");
     private string LayoutFile => Path.Combine(_dataDir, "desktop-layout.json");
     private readonly object _layoutLock = new();
@@ -48,7 +47,7 @@ public partial class MainWindow : Window
             core.Settings.IsWebMessageEnabled = true;
             core.SetVirtualHostNameToFolderMapping(
                 "planner.local",
-                Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+                Path.Combine(AppContext.BaseDirectory, "resources", "wwwroot"),
                 CoreWebView2HostResourceAccessKind.DenyCors);
             core.WebMessageReceived += OnWebMessageReceived;
             Browser.Source = new Uri("https://planner.local/index.html");
