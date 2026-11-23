@@ -50,7 +50,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path desktop/dist, desktop/publish/data | Out-Null
           Add-Type -AssemblyName System.IO.Compression.ZipFile
-          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.3.0-win-x64.zip'
+          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.3.1-win-x64.zip'
           [System.IO.Compression.ZipFile]::CreateFromDirectory(
             (Resolve-Path desktop/publish).Path,
             $zipPath,
@@ -66,9 +66,9 @@ jobs:
           (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower() | Set-Content ($zipPath + '.sha256')
       - uses: actions/upload-artifact@v4
         with:
-          name: GenshinPlanner-WebView2-v0.3.0-win-x64
+          name: GenshinPlanner-WebView2-v0.3.1-win-x64
           path: |
-            desktop/dist/GenshinPlanner-WebView2-v0.3.0-win-x64.zip
-            desktop/dist/GenshinPlanner-WebView2-v0.3.0-win-x64.zip.sha256
+            desktop/dist/GenshinPlanner-WebView2-v0.3.1-win-x64.zip
+            desktop/dist/GenshinPlanner-WebView2-v0.3.1-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14
