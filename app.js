@@ -193,6 +193,9 @@ function renderPlanItems() {
   const holder = document.getElementById('planItems');
   if (!holder) return;
   holder.replaceChildren();
+  const activeIndex=state.plans.findIndex(plan=>plan.id===state.activePlanId);
+  const hint=document.querySelector('.target-card .summary-hint');
+  if(hint) hint.textContent='培养项 '+(activeIndex+1)+' · 设置当前等级与目标等级';
   state.plans.forEach((plan,index) => {
     const source = plan.id === state.activePlanId ? state.source : plan.source;
     const names = [source.selectedCharacterName,source.selectedWeaponName].filter(Boolean);
@@ -914,7 +917,7 @@ function closeClearDialog() {
 function exportConfiguration() {
   const payload = {
     type: EXPORT_TYPE,
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     data: state
   };

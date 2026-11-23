@@ -72,6 +72,8 @@ jobs:
           if (!fs.readFileSync('sidepanel.html', 'utf8').includes('miyoushe-auth-ui.js')) throw Error('Missing login UI');
           if (!fs.readFileSync('service-worker.js', 'utf8').includes('miyoushe-calculator.js')) throw Error('Missing calculator worker');
           if (!fs.readFileSync('sidepanel.html', 'utf8').includes('data-calc-mode="official"')) throw Error('Missing dual-mode control');
+          if (!fs.readFileSync('sidepanel.html', 'utf8').includes('id="planItems"')) throw Error('Missing cultivation item list');
+          if (!fs.readFileSync('sidepanel.html', 'utf8').includes('id="miyousheOptions"')) throw Error('Missing optional Miyoushe panel');
           if (m.version !== '1.5.0') throw Error('Unexpected version');
           NODE
 

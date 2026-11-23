@@ -62,7 +62,7 @@ function buildMiyoushePanel() {
   status.setAttribute('role', 'status');
   panel.append(status);
   panel.append(mysEl('p',
-    '官方目录已收录的目标使用米游社缺口；前瞻目标使用 Nanoka 需求。库存未知时可在结果中填写。',
+    '米游社计算针对当前选中的培养项。官方收录对象使用其缺口数据；前瞻对象使用 Nanoka 需求。',
     'mys-auth-description'));
 
   target.append(panel);
