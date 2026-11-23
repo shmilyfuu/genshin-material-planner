@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {cloneDefaultState,normalizeState} from '../wwwroot/core.mjs';
 import {calculateMultiPlan,collectInventoryCatalog,planMaterialUsage} from '../wwwroot/multi-planner.mjs';
 import {selectPlannerAccount,createPlannerAccount,saveActivePlannerAccount} from '../wwwroot/planner-accounts.mjs';
+import {normalizeCharacterList} from '../wwwroot/hakushin.mjs';
 
 const path=new URL('../wwwroot/',import.meta.url);
 const html=readFileSync(new URL('index.html',path),'utf8');
@@ -53,4 +54,10 @@ test('同账号共用材料只扣一次并能在培养项间共享',()=>{
   assert.equal(material.count,36);
   assert.equal(material.stock,20);
   assert.equal(material.lack,16);
+});
+
+test('Nanoka 角色列表包含武器类型以支持头像角标和筛选',()=>{
+  const rows=normalizeCharacterList({'100001':{zh:'角色A',element:'Hydro',type:'Sword',rank:5},'100002':{zh:'角色B',element:'Pyro',weapon:'Polearm',rank:4}});
+  assert.equal(rows.find(r=>r.id==='100001').weaponType,'Sword');
+  assert.equal(rows.find(r=>r.id==='100002').weaponType,'Polearm');
 });

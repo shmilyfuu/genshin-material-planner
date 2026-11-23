@@ -219,7 +219,7 @@ function renderTargets(){
   if(!definitions.length){area.innerHTML='<div class="empty-hint">请选择角色、武器或两者组合后设置培养目标。</div>';return;}
   const groups=new Map();
   for(const def of definitions){
-    let g=groups.get(def.group);if(!g){g=document.createElement('div');g.className='target-group';const label=document.createElement('div');label.className='target-label';label.textContent=def.group;g.append(label);groups.set(def.group,g);area.append(g);}
+    let g=groups.get(def.group);if(!g){g=document.createElement('div');g.className='target-group '+(def.group==='角色与天赋'?'character-target-group':'weapon-target-group');const label=document.createElement('div');label.className='target-label';label.textContent=def.group;g.append(label);groups.set(def.group,g);area.append(g);}
     const row=document.createElement('div');row.className='level-row';
     const label=document.createElement('label');label.textContent=def.label;
     const first=makeLevelSelect(def,0);const second=makeLevelSelect(def,1);second.classList.add('target-level');

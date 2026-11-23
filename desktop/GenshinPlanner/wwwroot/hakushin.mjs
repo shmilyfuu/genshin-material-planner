@@ -63,7 +63,7 @@ function normalizeListEntry(id, row, kind) {
     icon: iconUrl(row?.icon),
     rarity: normalizeRarity(row?.rank ?? row?.rarity ?? 0),
     element: kind === 'character' ? String(row?.element || '') : '',
-    weaponType: kind === 'weapon' ? String(rawType || '') : '',
+    weaponType: String(rawType || ''),
     sourceTag: '',
     version: ''
   };
