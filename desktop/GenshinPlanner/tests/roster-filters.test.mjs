@@ -46,13 +46,30 @@ test('头像卡片只显示名字，角标使用统一定位区域并携带本�
   assert.match(js,/card\.append\(artwork,title\)/);
   assert.doesNotMatch(js,/className='avatar-meta'/);
   assert.match(js,/artwork\.append\(preview\)/);
-  assert.match(css,/--badge-inset:6px;--badge-size:23px/);
+  assert.match(css,/--badge-inset:4px;--badge-size:23px/);
   assert.match(css,/\.card-badge\.training\{bottom:var\(--badge-inset\);left:var\(--badge-inset\)\}/);
-  assert.match(css,/\.avatar-add-copy\{position:absolute;bottom:4px;right:4px/);
+  assert.match(css,/\\.avatar-add-copy\\{position:absolute;bottom:4px;right:4px/);
+  assert.match(css,/\\.avatar-instance\\{position:absolute;top:4px;left:4px/);
+  assert.match(css,/\\.card-badge\\.element img\\{width:17px;height:17px\\}/);
+  assert.doesNotMatch(css,/\\.card-badge\\.training img\\{filter:/);
+  assert.match(js,/artwork\\.append\\(addCopy\\)/);
   for(const path of [
     'icons/development.webp',
     'icons/rarity/rarity-1.png','icons/rarity/rarity-2.png',
     'icons/rarity/rarity-3.png','icons/rarity/rarity-4.webp',
     'icons/rarity/rarity-5.webp'
   ])assert.ok(existsSync(new URL(path,base)),path);
+});
+
+test('等级选择器直接参与四列网格，修改当前或目标等级时双向同步',()=>{
+  const base=new URL('../wwwroot/',import.meta.url);
+  const js=readFileSync(new URL('desktop-app.mjs',base),'utf8');
+  const css=readFileSync(new URL('desktop.css',base),'utf8');
+  const body=js.slice(js.indexOf('function levelRows('),js.indexOf('function updateLinkedWeaponField('));
+  assert.match(body,/const current=makeSelect\\(pair\\[0\\],'current'\\),target=makeSelect\\(pair\\[1\\],'target'\\)/);
+  assert.match(body,/row\\.append\\(caption,current,arrow,target\\)/);
+  assert.doesNotMatch(body,/editorSelect\\(/);
+  assert.match(body,/target\\.value=String\\(pair\\[1\\]\\)/);
+  assert.match(body,/current\\.value=String\\(pair\\[0\\]\\)/);
+  assert.match(css,/\\.goal-level-field\\{display:grid;grid-template-columns:96px minmax\\(0,1fr\\) 20px minmax\\(0,1fr\\)/);
 });
