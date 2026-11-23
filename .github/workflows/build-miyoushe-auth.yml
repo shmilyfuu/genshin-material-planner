@@ -25,6 +25,7 @@ on:
       - 'tests/multi-plan-state.test.mjs'
       - 'hakushin.mjs'
       - 'miyoushe-*.css'
+      - 'styles.css'
       - 'vendor/**'
       - '.github/workflows/build-miyoushe-auth.yml'
   pull_request:
