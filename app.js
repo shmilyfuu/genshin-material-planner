@@ -552,8 +552,8 @@ function createMultiInventoryInput(material) {
     const uid=currentUid();
     if (uid) {
       const verified = state.verifiedInventory[uid] ||= {};
-      if (value && /^[0-9+-*/×xX÷()（）,.，\s]+$/.test(value)
-        && !/[+\-*/×xX÷]$/.test(value)) {
+      if (value && /^[0-9+*/×xX÷()（）,.，\s-]+$/.test(value)
+        && !/[-+*/×xX÷]$/.test(value)) {
         verified[id] = safeEval(value);
       } else {
         delete verified[id];
