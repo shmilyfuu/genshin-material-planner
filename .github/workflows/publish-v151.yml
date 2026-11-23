@@ -1,0 +1,53 @@
+name: Publish browser planner v1.5.1
+on:
+  push:
+    branches:
+      - release/v1.5.1
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and package
+        run: |
+          set -euo pipefail
+          python -m json.tool manifest.json >/dev/null
+          node --check app.js
+          node --check core.mjs
+          node --check multi-planner.mjs
+          node --check planner-accounts.mjs
+          node --test tests/*.test.mjs
+          node - <<'NODE'
+          const fs=require('fs');
+          const css=fs.readFileSync('styles.css','utf8');
+          if(!css.includes('.result-card > summary.result-header')) throw Error('Result header style missing');
+          const m=JSON.parse(fs.readFileSync('manifest.json','utf8'));
+          if(m.version !== '1.5.1') throw Error('Unexpected version');
+          NODE
+          ROOT="dist/genshin-material-planner-v1.5.1"
+          mkdir -p "$ROOT/icons" "$ROOT/vendor"
+          cp manifest.json background.js service-worker.js sidepanel.html app.js core.mjs hakushin.mjs hybrid-calculator.mjs multi-planner.mjs planner-accounts.mjs styles.css stepper.js stepper.css "$ROOT/"
+          cp miyoushe-md5.js miyoushe-auth-network.js miyoushe-auth-state.js miyoushe-auth-ui.js miyoushe-calculator.js miyoushe-auth.css "$ROOT/"
+          cp vendor/qrcode-generator.js "$ROOT/vendor/"
+          cp THIRD_PARTY_NOTICES.md "$ROOT/"
+          cp icons/icon16.png icons/icon32.png icons/icon48.png icons/icon128.png "$ROOT/icons/"
+          (cd dist && zip -qr genshin-material-planner-v1.5.1.zip genshin-material-planner-v1.5.1)
+          (cd dist && sha256sum genshin-material-planner-v1.5.1.zip > genshin-material-planner-v1.5.1.zip.sha256)
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v1.5.1 >/dev/null 2>&1; then
+            gh release upload v1.5.1 dist/genshin-material-planner-v1.5.1.zip dist/genshin-material-planner-v1.5.1.zip.sha256 --clobber
+          else
+            gh release create v1.5.1 dist/genshin-material-planner-v1.5.1.zip dist/genshin-material-planner-v1.5.1.zip.sha256 \
+              --target "$GITHUB_SHA" \
+              --title "全能养成规划面板 v1.5.1" \
+              --notes "多规划账号、多培养项、手动背包共享材料与合并计算。修复折叠的缺口计算标题栏配色。"
+          fi
