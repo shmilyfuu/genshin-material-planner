@@ -42,6 +42,7 @@ public partial class MainWindow : Window
             var environment = await CoreWebView2Environment.CreateAsync(
                 userDataFolder: Path.Combine(_dataDir, "WebView2"));
             await Browser.EnsureCoreWebView2Async(environment);
+            Browser.ZoomFactor = 1.20;
             var core = Browser.CoreWebView2;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsWebMessageEnabled = true;
