@@ -135,3 +135,10 @@ test('GOOD 扫描新增第三把同名同练度武器时仅增加缺失实例',(
  assert.equal(result.newWeapons,1);assert.equal(state.weaponInstances.length,3);
  for(const id of idSet)assert.ok(state.weaponInstances.some(x=>x.id===id));
 });
+
+test('暂停的培养目标保留图鉴优先排序，退出缺口计算',()=>{
+ const state=empty(),a=char(1,'角色A','A'),b=char(2,'角色B','B');
+ const goal=makeGoal('character',a);goal.enabled=false;state.plans.push(goal);
+ assert.equal(visibleRoster(state,'character',[b,a],[],(x,y)=>Number(y.id)-Number(x.id))[0].id,'1');
+ assert.equal(activeGoals(state).length,0);
+});

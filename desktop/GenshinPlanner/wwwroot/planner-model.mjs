@@ -117,4 +117,4 @@ export function visibleRoster(state,tab,characters,weapons,sortByNewest){
     ||Number(b.instance?.level||0)-Number(a.instance?.level||0)
     ||String(a.instance?.id||'').localeCompare(String(b.instance?.id||'')));
 }
-function aR(g){return g && g.enabled!==false && g.completed!==true;}
+function aR(g){return g && g.completed!==true;}
