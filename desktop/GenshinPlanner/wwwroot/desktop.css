@@ -74,6 +74,7 @@ button:disabled{opacity:.42;cursor:default}
 .filter-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .filter-chip{display:flex;align-items:center;gap:5px;border:1px solid #e0e5ed;background:#fff;border-radius:7px;padding:6px 9px;color:#61718a;font-size:11px;line-height:1.1}
 .filter-chip .filter-icon{display:flex;align-items:center;justify-content:center;width:17px;height:17px}
+.filter-chip .filter-icon.weapon-type{width:19px;height:19px;background:#6e7e99;border-radius:5px}
 .filter-chip svg,.filter-chip .filter-icon img{width:14px;height:14px;object-fit:contain;display:block}
 .filter-chip.active{background:#f0edfc;color:#6858ba;border-color:#cfc5f2;font-weight:750}
 .filter-chip:hover{border-color:#acaddc}

@@ -226,7 +226,7 @@ function renderPlans(){
   $('activePlanTitle').textContent=[p.source.selectedCharacterName,p.source.selectedWeaponName].filter(Boolean).join(' + ')||'选择培养对象';
 }
 function typeIcon(def,kind){
-  const holder=document.createElement('span');holder.className='filter-icon';
+  const holder=document.createElement('span');holder.className='filter-icon'+(kind==='weapons'?' weapon-type':'');
   const img=document.createElement('img');img.alt='';img.src=`icons/${kind}/${def.asset}`;
   img.addEventListener('error',()=>{img.remove();holder.innerHTML=svg(def.icon);});
   holder.append(img);return holder;
