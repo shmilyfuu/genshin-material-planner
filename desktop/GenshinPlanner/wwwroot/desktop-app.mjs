@@ -188,7 +188,14 @@ const entries=()=>state.plans.map(plan=>({plan,characterProfile:profileFor(plan)
 const sourceFor=(row,kind)=>({name:row.name,id:String(row.id),version:row.version||'',tag:row.sourceTag||'',kind});
 const tierColor=rank=>Number(rank)===5?'gold':Number(rank)===4?'purple':'blue';
 const displayNum=n=>Number(n||0).toLocaleString('zh-CN');
-const objName=goal=>goal?.source?.[goalKind(goal)==='character'?'selectedCharacterName':'selectedWeaponName']||'未知对象';
+const objName=goal=>{
+  const name=goal?.source?.[goalKind(goal)==='character'?'selectedCharacterName':'selectedWeaponName']||'未知对象';
+  if(goalKind(goal)!=='weapon')return name;
+  const all=state.weaponInstances.filter(w=>w.weaponId===goalObjectId(goal));
+  if(all.length<=1)return name;
+  const index=all.findIndex(w=>w.id===goal.weaponInstanceId);
+  return index>=0?`${name} #${index+1}`:name;
+};
 const charRow=id=>characterList.find(x=>x.id===String(id));
 const weaponRow=id=>weaponList.find(x=>x.id===String(id));
 function save(){saveActivePlannerAccount(state);scheduleSave();}

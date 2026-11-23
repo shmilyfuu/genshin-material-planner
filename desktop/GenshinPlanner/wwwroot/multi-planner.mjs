@@ -215,8 +215,20 @@ export function planMaterialUsage(entries) {
 
 export function materialContributions(entries){
   const result=new Map();
+  const counts=new Map(),ordinals=new Map();
+  for(const {plan} of entries){
+    const id=String(plan?.source?.selectedWeaponId||'');
+    if(id)counts.set(id,(counts.get(id)||0)+1);
+  }
   for(const entry of entries){
     const goal=entry.plan;
+    const weaponId=String(goal?.source?.selectedWeaponId||'');
+    let name=goal?.source?.selectedCharacterName||goal?.source?.selectedWeaponName||'培养目标';
+    if(weaponId){
+      const ordinal=(ordinals.get(weaponId)||0)+1;
+      ordinals.set(weaponId,ordinal);
+      if(counts.get(weaponId)>1)name+=` #${ordinal}`;
+    }
     if(goal.enabled===false||goal.completed===true)continue;
     const character=Boolean(goal.source?.selectedCharacterId);
     const weapon=Boolean(goal.source?.selectedWeaponId);
@@ -227,8 +239,7 @@ export function materialContributions(entries){
     for(const row of built.groups.flatMap(g=>g.rows)){
       if(!row.count)continue;
       const id=String(row.id),items=result.get(id)||[];
-      const title=character?goal.source.selectedCharacterName:goal.source.selectedWeaponName;
-      items.push({goalId:goal.id,name:title||'培养目标',count:row.count});result.set(id,items);
+      items.push({goalId:goal.id,name,count:row.count});result.set(id,items);
     }
   }
   return result;

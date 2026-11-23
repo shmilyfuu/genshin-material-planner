@@ -136,9 +136,16 @@ test('GOOD 扫描新增第三把同名同练度武器时仅增加缺失实例',(
  for(const id of idSet)assert.ok(state.weaponInstances.some(x=>x.id===id));
 });
 
+
 test('暂停的培养目标保留图鉴优先排序，退出缺口计算',()=>{
  const state=empty(),a=char(1,'角色A','A'),b=char(2,'角色B','B');
  const goal=makeGoal('character',a);goal.enabled=false;state.plans.push(goal);
  assert.equal(visibleRoster(state,'character',[b,a],[],(x,y)=>Number(y.id)-Number(x.id))[0].id,'1');
  assert.equal(activeGoals(state).length,0);
+});
+
+test('重复武器的材料明细包含实例编号',()=>{
+  const a=makeGoal('weapon',sword,{instanceId:'w-1'}),b=makeGoal('weapon',sword,{instanceId:'w-2'});
+  const material=fakeWeaponProfile();const rows=materialContributions([{plan:a,weaponProfile:material},{plan:b,weaponProfile:material}]).get('2101');
+  assert.deepEqual(rows.map(x=>x.name),['西风剑 #1','西风剑 #2']);
 });
