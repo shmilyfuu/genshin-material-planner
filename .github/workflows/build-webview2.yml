@@ -34,6 +34,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path desktop/publish/GenshinPlanner.exe)) { throw 'Executable missing' }
           if (-not (Test-Path desktop/publish/resources/wwwroot/desktop-app.mjs)) { throw 'Frontend missing' }
+          # Package XML documentation is only used by development tooling.
+          Get-ChildItem desktop/publish -File -Filter 'Microsoft.Web.WebView2.*.xml' | Remove-Item -Force
           $rootFiles = @(Get-ChildItem desktop/publish -File)
           if ($rootFiles.Count -ne 1 -or $rootFiles[0].Name -ne 'GenshinPlanner.exe') {
             throw ('Unexpected root files: ' + (($rootFiles | ForEach-Object Name) -join ', '))
