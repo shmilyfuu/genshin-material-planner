@@ -13,7 +13,7 @@ test('旧版单项配置转换为首个培养项并保留原始背包',()=>{
     },
     inv:{gold:'15660349',spec:'47',books:['38*2','0','11']}
   });
-  assert.equal(result.schemaVersion,4);
+  assert.equal(result.schemaVersion,5);
   assert.equal(result.plans.length,1);
   assert.equal(result.plans[0].source.selectedCharacterId,'10000111');
   assert.equal(result.plans[0].source.selectedWeaponId,'15517');
