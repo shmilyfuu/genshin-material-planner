@@ -474,7 +474,7 @@ function renderInventory(){
   const holder=$('inventoryGroups');holder.replaceChildren();
   const id=selectedGoalId||inventoryGoalId;const goal=goalById(id);
   const rosterName=selectedRosterKey?(selectedRosterKey.startsWith('weapon:')
-    ?weaponRow(weaponInstance(state,selectedRosterKey.slice(7))?.weaponId)?.name
+    ?weaponRow(weaponInstance(state,selectedRosterKey.slice(7))?.weaponId||selectedRosterKey.slice(7))?.name
     :charRow(selectedRosterKey.slice(10))?.name):'';
   $('inventoryTarget').textContent=goal?objName(goal):rosterName||'选择培养目标';
   if(!goal){holder.innerHTML=selectedRosterKey
