@@ -367,7 +367,7 @@ function rosterCard(row){
       selectedRosterKey=null;selectedGoalId=created.id;inventoryGoalId=created.id;state.activePlanId=created.id;
       renderAll();save();void reloadAllProfiles();
     };
-    card.append(addCopy);
+    artwork.append(addCopy);
   }
   clickOrEdit(card,()=>{
     if(goal){selectGoal(goal.id);return;}
@@ -414,9 +414,25 @@ function levelRows(kind,goal,body){
     const caption=document.createElement('span');caption.textContent=label;
     const pair=goal.config[key];
     const options=Array.from({length:max+1},(_,i)=>[String(i),max===9?`${i+1} 级`:CHAR_LEVEL_LABELS[i]]);
-    const current=editorSelect('',options,pair[0],v=>{pair[0]=Number(v);if(pair[1]<pair[0])pair[1]=pair[0];});
-    const target=editorSelect('',options,pair[1],v=>{pair[1]=Number(v);if(pair[0]>pair[1])pair[0]=pair[1];});
-    row.append(caption,current,document.createTextNode('→'),target);body.append(row);
+    const makeSelect=(value,side)=>{
+      const select=document.createElement('select');
+      select.setAttribute('aria-label',label+(side==='current'?'当前等级':'目标等级'));
+      for(const [id,text] of options)select.add(new Option(text,id));
+      select.value=String(value);
+      return select;
+    };
+    const current=makeSelect(pair[0],'current'),target=makeSelect(pair[1],'target');
+    current.onchange=()=>{
+      pair[0]=Number(current.value);
+      if(pair[1]<pair[0]){pair[1]=pair[0];target.value=String(pair[1]);}
+    };
+    target.onchange=()=>{
+      pair[1]=Number(target.value);
+      if(pair[0]>pair[1]){pair[0]=pair[1];current.value=String(pair[0]);}
+    };
+    const arrow=document.createElement('span');arrow.className='goal-level-arrow';arrow.textContent='→';
+    row.append(caption,current,arrow,target);
+    body.append(row);
   }
 }
 function updateLinkedWeaponField(goal,body){
