@@ -58,15 +58,17 @@ test('账号信息紧跟下拉框，状态栏位于工作区底部，更新进�
  assert.ok(app.includes("Math.floor(completed/total*100)"));
 });
 
-test('紧凑日历和培养条共享29px高度与6px间距，日期自适应宽度',()=>{
+test('紧凑日历和培养条共享29px内容高度、4px间距及37px区域高度',()=>{
  const html=read('index.html'),css=read('desktop.css'),app=read('desktop-app.mjs');
  const calendar=html.match(/<section class="calendar-strip"[\s\S]*?<\/section>/)[0];
  const goals=html.match(/<section class="active-goals-strip"[\s\S]*?<\/section>/)[0];
  assert.ok(calendar.includes('<strong>刷取日历</strong>'));
  assert.ok(goals.includes('<strong>正在培养</strong>'));
  assert.ok(!html.includes('strip-hint'));
- assert.ok(css.includes('--strip-height:29px;--strip-gap:6px'));
- assert.ok(css.match(/\.calendar-day\{[^}]*flex:0 0 auto[^}]*padding:0 0 0 var\(--strip-gap\)/));
+ assert.ok(css.includes('--strip-height:29px;--strip-gap:4px;--strip-padding:4px'));
+ assert.ok(css.includes('--strip-total:calc(var(--strip-height) + 2 * var(--strip-padding))'));
+ assert.ok(css.includes('padding:var(--strip-padding) 0'));
+ assert.ok(css.match(/\.calendar-day\{[^}]*flex:0 0 auto[^}]*padding:0 var\(--strip-gap\)/));
  assert.ok(css.match(/\.calendar-materials\{[^}]*gap:0/));
  assert.ok(css.match(/\.goal-card\{[^}]*gap:var\(--strip-gap\)[^}]*padding:0 var\(--strip-gap\) 0 0/));
  assert.ok(css.match(/\.goal-art\{[^}]*width:var\(--strip-height\);height:var\(--strip-height\)/));
@@ -81,4 +83,15 @@ test('顶部图标使用原始透明度与按钮文字颜色，无投影',()=>{
  const rule=css.match(/\.header-icon-btn \.header-icon\{[^}]*\}/)[0];
  assert.ok(rule.includes('background:currentColor'));assert.ok(rule.includes('mask:var(--header-icon)'));
  assert.ok(!rule.includes('filter:'));assert.ok(!css.includes('.header-icon-btn img{'));
+});
+
+test('培养卡片星级背景、透明按钮及选中描边覆盖图片',()=>{
+ const css=read('desktop.css'),app=read('desktop-app.mjs');
+ assert.ok(app.includes('if(row?.rarity)artwork.dataset.rank=String(row.rarity)'));
+ for(let rank=1;rank<=5;rank++)assert.ok(css.includes('[data-rank="'+rank+'"]:is(.material-img,.calendar-material,.weapon-picker-icon,.goal-art)'));
+ assert.ok(css.match(/\.goal-toggle\{[^}]*border:0;background:transparent/));
+ assert.ok(css.match(/\.goal-card\{[^}]*isolation:isolate/));
+ assert.ok(css.match(/\.goal-card::after\{[^}]*z-index:3[^}]*pointer-events:none/));
+ assert.ok(css.includes('.goal-card.selected::after,.goal-card:focus-visible::after{box-shadow:inset 0 0 0 2px #fff}'));
+ assert.ok(!css.includes('.goal-card.selected{background:var(--surface-hover);outline'));
 });

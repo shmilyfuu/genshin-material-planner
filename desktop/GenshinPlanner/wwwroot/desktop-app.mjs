@@ -281,6 +281,7 @@ function renderGoals(){
     const card=document.createElement('div');card.className='goal-card'+(selectedGoalId===goal.id?' selected':'')+(goal.enabled===false?' paused':'');
     card.tabIndex=0;card.dataset.goalId=goal.id;card.setAttribute('role','button');card.setAttribute('aria-label',objName(goal)+'，单击选择');
     const artwork=thumb(row?.icon,objName(goal),'goal-art');
+    if(row?.rarity)artwork.dataset.rank=String(row.rarity);
     const obj=weaponInstance(state,goal.weaponInstanceId);
     const detail=kind==='weapon'&&obj?`Lv.${obj.level} · R${obj.refinement}${obj.location?' · '+obj.location:''}`:'';
     card.title=[objName(goal),detail,goal.enabled===false?'已暂停':''].filter(Boolean).join(' · ');
