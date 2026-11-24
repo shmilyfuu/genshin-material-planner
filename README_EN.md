@@ -4,7 +4,7 @@
 
 A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-**Release: [v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)** · **Development: v0.5.0**
+**[Download latest release](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**
 
 [Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
@@ -20,11 +20,11 @@ A Windows desktop planner for Genshin Impact character and weapon upgrades, shar
 - GGScanner GOOD v3 imports for character and weapon progression.
 - Manual inventory editing and planner configuration import/export.
 
-### Miyoushe inventory synchronization (v0.5.0 development)
+### Miyoushe inventory synchronization
 
 QR login, saved accounts, token refresh, and mainland China Genshin UID selection. Material requests use the complete official character and weapon calculator catalogs.
 
-Raw inventory is recovered per crafting family using demand, shortages and direct surplus observations. Additional requests resolve uncertain tiers; proven lower bounds are marked separately. Each planner account stores separate manual and synchronized inventories. The selected mode controls shortages and the weekly schedule. Synchronized inventory is read-only; manual inventory is editable. Unknown quantities remain empty. A completed synchronization replaces the synchronized inventory snapshot. Automated builds have passed; live account login and inventory synchronization require validation.
+Raw inventory is recovered per crafting family using demand, shortages and direct surplus observations. Additional requests resolve uncertain tiers; proven lower bounds are marked separately. Each planner account stores separate manual and synchronized inventories. The selected mode controls shortages and the weekly schedule. Synchronized inventory is read-only; manual inventory is editable. Compare the two inventories and apply all confirmed quantities to manual inventory, including zero. Lower bounds and unknown quantities leave manual records intact. Unknown quantities remain empty. A completed synchronization replaces the synchronized inventory snapshot. Some material quantities may remain unknown or available only as lower bounds.
 
 ## Installation and updates
 
@@ -32,7 +32,7 @@ Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshi
 
 Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. The .NET runtime is included.
 
-Click a catalog card to view its materials, and use the settings button on the card to configure its goal.
+Click a catalog card to view its materials, and use the upgrade button on the card to configure its goal.
 
 Back up the `data/` folder before updating. Replace application files with the new release while retaining this folder.
 

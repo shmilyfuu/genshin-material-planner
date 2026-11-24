@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cloneDefaultState,normalizeState} from '../wwwroot/core.mjs';
 import {createPlannerAccount,saveActivePlannerAccount,selectPlannerAccount} from '../wwwroot/planner-accounts.mjs';
-import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory} from '../wwwroot/inventory-mode.mjs';
+import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory,compareInventoryMaterial,summarizeInventoryApplication,applyInventoryToManual} from '../wwwroot/inventory-mode.mjs';
 import {readFileSync} from 'node:fs';
 const fresh=()=>normalizeState(cloneDefaultState());
 const uid='123456789';
@@ -46,4 +46,32 @@ test('材料缺口及日历统一读取当前库存模式',()=>{
  const source=readFileSync(new URL('../wwwroot/desktop-app.mjs',import.meta.url),'utf8');
  assert.equal((source.match(/calculateMultiPlan\([^\n]+activeMaterialInventory\(state\)\)/g)||[]).length,3);
  assert.ok(source.includes('applySyncedInventory(state,result)'));
+});
+
+test('应用全部准确库存（含零），保留未知和下限，独立同步快照不变',()=>{
+ const s=fresh();s.materialInventory={'1':'100+25','2':'7','3':'88','4':'9','6':'5','7':'15'};
+ applySyncedInventory(s,{uid,replace:true,materials:[{id:1,num:130},{id:2,num:0},{id:3,num:10,minimum:true},{id:5,num:12},{id:6,num:5},{id:8,num:100,minimum:true}]});
+ selectInventoryMode(s,'synced');
+ const snapshot=structuredClone(s.syncedMaterialInventory),flags=structuredClone(s.syncedInventoryMinimum);
+ assert.deepEqual(compareInventoryMaterial(s,'1'),{manual:125,synced:130,status:'exact',delta:5});
+ assert.deepEqual(compareInventoryMaterial(s,'2'),{manual:7,synced:0,status:'exact',delta:-7});
+ assert.deepEqual(compareInventoryMaterial(s,'3'),{manual:88,synced:10,status:'minimum',delta:null});
+ assert.deepEqual(compareInventoryMaterial(s,'4'),{manual:9,synced:null,status:'unknown',delta:null});
+ assert.deepEqual(compareInventoryMaterial(s,'5'),{manual:null,synced:12,status:'exact',delta:null});
+ assert.deepEqual(summarizeInventoryApplication(s),{exact:4,changed:2,added:1,minimum:2,unknown:2});
+ applyInventoryToManual(s);
+ assert.equal(s.inventoryMode,'manual');
+ assert.deepEqual(s.materialInventory,{'1':'130','2':'0','3':'88','4':'9','5':'12','6':'5','7':'15'});
+ assert.deepEqual(s.syncedMaterialInventory,snapshot);assert.deepEqual(s.syncedInventoryMinimum,flags);
+ setManualMaterial(s,'1','131');assert.equal(s.syncedMaterialInventory['1'],'130');
+ applySyncedInventory(s,{uid,replace:true,materials:[{id:1,num:135}]});
+ assert.equal(s.materialInventory['1'],'131');assert.equal(compareInventoryMaterial(s,'1').delta,4);
+});
+test('只有下限时禁止应用，其他规划账号不受影响',()=>{
+ const s=fresh();s.materialInventory={'1':'9'};
+ applySyncedInventory(s,{uid,materials:[{id:1,num:2,minimum:true}]});
+ assert.throws(()=>applyInventoryToManual(s),/暂无/);assert.equal(s.materialInventory['1'],'9');
+ createPlannerAccount(s,'other','Other',fresh());
+ applySyncedInventory(s,{uid:'987654321',materials:[{id:1,num:7}]});applyInventoryToManual(s);
+ selectPlannerAccount(s,'account-1');assert.equal(s.materialInventory['1'],'9');assert.equal(s.syncedMaterialInventory['1'],'2');
 });

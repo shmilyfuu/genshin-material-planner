@@ -1,3 +1,4 @@
+import {safeEval} from './core.mjs';
 export function activeMaterialInventory(state){
   return state.inventoryMode==='synced' ? state.syncedMaterialInventory : state.materialInventory;
 }
@@ -25,4 +26,39 @@ export function applySyncedInventory(state,result){
   state.inventoryUid=uid;
   state.syncedMaterialInventory=inventory;
   state.syncedInventoryMinimum=minimum;
+}
+
+export function compareInventoryMaterial(state,id){
+  const raw=state.materialInventory[id],manual=raw===undefined||String(raw).trim()===''?null:safeEval(raw);
+  if(!Object.hasOwn(state.syncedMaterialInventory,id))return {manual,synced:null,status:'unknown',delta:null};
+  const synced=Number(state.syncedMaterialInventory[id]);
+  if(!Number.isSafeInteger(synced)||synced<0)return {manual,synced:null,status:'unknown',delta:null};
+  const status=state.syncedInventoryMinimum[id]===true?'minimum':'exact';
+  return {manual,synced,status,delta:status==='exact'&&manual!==null?synced-manual:null};
+}
+export function summarizeInventoryApplication(state){
+  const summary={exact:0,changed:0,added:0,minimum:0,unknown:0};
+  const ids=new Set([...Object.keys(state.materialInventory),...Object.keys(state.syncedMaterialInventory)]);
+  for(const id of ids){
+    const row=compareInventoryMaterial(state,id);
+    if(row.status==='exact'){
+      summary.exact++;
+      if(row.manual===null)summary.added++;
+      else if(row.delta!==0)summary.changed++;
+    }else if(row.status==='minimum')summary.minimum++;
+    else if(row.manual!==null)summary.unknown++;
+  }
+  return summary;
+}
+export function applyInventoryToManual(state){
+  const summary=summarizeInventoryApplication(state);
+  if(!summary.exact)throw Error('暂无已确认数量的同步材料。');
+  const manual={...state.materialInventory};
+  for(const id of Object.keys(state.syncedMaterialInventory)){
+    const row=compareInventoryMaterial(state,id);
+    if(row.status==='exact')manual[id]=String(row.synced);
+  }
+  state.materialInventory=manual;
+  selectInventoryMode(state,'manual');
+  return summary;
 }

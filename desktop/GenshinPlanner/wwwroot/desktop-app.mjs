@@ -11,7 +11,7 @@ import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
 import {installMiyoushePanel} from './mys-panel.mjs';
 import {bindMysAccount,unbindMysAccount,plannerBindingOwner,normalizeMysBinding} from './mys-binding.mjs';
-import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory} from './inventory-mode.mjs';
+import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory,compareInventoryMaterial,summarizeInventoryApplication,applyInventoryToManual} from './inventory-mode.mjs';
 import {indexBannerReleases,mergeBannerReleases,parseReleaseTable,attachReleaseDates,compareRosterRelease} from './release-order.mjs';
 import {
   saveActivePlannerAccount, selectPlannerAccount, createPlannerAccount,
@@ -258,7 +258,7 @@ function renderGoals(){
   const root=$('activeGoals');root.replaceChildren();
   const pending=state.plans.filter(g=>!g.completed&&goalObjectId(g));
   $('activeGoalCount').textContent=`${pending.filter(g=>g.enabled!==false).length} 项培养中`;
-  if(!pending.length){root.innerHTML='<span class="empty-strip">点击角色或武器卡片的设置按钮，添加培养目标。</span>';return;}
+  if(!pending.length){root.innerHTML='<span class="empty-strip">点击角色或武器卡片的提升按钮，添加培养目标。</span>';return;}
   for(const goal of pending){
     const kind=goalKind(goal),row=kind==='character'?charRow(goalObjectId(goal)):weaponRow(goalObjectId(goal));
     const card=document.createElement('div');card.className='goal-card'+(selectedGoalId===goal.id?' selected':'')+(goal.enabled===false?' paused':'');
@@ -357,7 +357,7 @@ function rosterCard(row){
   if(goal&&!goal.completed){
     const training=document.createElement('span');training.className='card-badge training';
     training.title=goal.enabled===false?'培养目标已暂停':'正在培养';
-    const symbol=document.createElement('img');symbol.src='icons/development.webp';symbol.alt='';
+    const symbol=document.createElement('img');symbol.src='icons/training-active.png';symbol.alt='';
     training.append(symbol);artwork.append(training);
   }else if(goal?.completed){
     const done=document.createElement('span');done.className='avatar-status done';done.textContent='✓';
@@ -370,7 +370,7 @@ function rosterCard(row){
   }
   if(row.sourceTag){
     const preview=document.createElement('span');preview.className='avatar-preview';
-    preview.textContent=row.sourceTag;artwork.append(preview);
+    preview.textContent='*';preview.title=row.sourceTag;preview.setAttribute('aria-label',row.sourceTag);artwork.append(preview);
   }
   const title=document.createElement('span');title.className='avatar-name';
   title.textContent=row.name;title.title=row.name;
@@ -579,6 +579,17 @@ function materialRow(item,shared){
   const input=document.createElement('input');input.type='text';input.inputMode='numeric';input.value=inventory[item.id]??'';input.placeholder=synced?'—':'0';
   input.setAttribute('aria-label',item.name+'背包数量');
   input.readOnly=synced;
+  if(synced){
+    const comparison=compareInventoryMaterial(state,item.id);
+    const {manual,status,delta,synced:quantity}=comparison;
+    if(status!=='exact'||manual===null||delta!==0){
+      const detail=document.createElement('div');detail.className='inventory-difference';
+      const manualText=manual===null?'未记录':displayNum(manual);
+      const reason=status==='minimum'?(manual!==null&&manual<quantity?' · 至少差 '+displayNum(quantity-manual):' · 下限待核对')
+        :status==='unknown'?' · 未取得':delta===null?' · 新记录':' · 差值 '+(delta>0?'+':'')+displayNum(delta);
+      detail.textContent='手动：'+manualText+reason;detail.title=detail.textContent;copy.append(detail);
+    }
+  }
   if(synced&&state.syncedInventoryMinimum?.[item.id]){input.title='米游社探测下限：实际库存可能更多';input.classList.add('inventory-minimum');}
   if(!synced){
     const step=delta=>{input.value=String(Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,safeEval(input.value)+delta)));updateMaterialCount(item.id,input.value);};
@@ -600,6 +611,8 @@ function renderInventory(){
   $('inventoryModeNote').textContent=synced
     ?(Object.keys(state.syncedMaterialInventory).length?'米游社库存 · 虚线表示下限，未知库存按 0 估算缺口。':'尚未同步材料，请通过米游社同步。')
     :'手动库存 · 输入框左侧可增加或减少 1。';
+  const apply=$('applyInventoryButton');apply.hidden=!synced;
+  apply.disabled=!Object.keys(state.syncedMaterialInventory).some(id=>state.syncedInventoryMinimum[id]!==true);
   const holder=$('inventoryGroups');holder.replaceChildren();
   const id=selectedGoalId||inventoryGoalId;const goal=goalById(id);
   const rosterName=selectedRosterKey?(selectedRosterKey.startsWith('weapon:')
@@ -607,7 +620,7 @@ function renderInventory(){
     :charRow(selectedRosterKey.slice(10))?.name):'';
   $('inventoryTarget').textContent=goal?objName(goal):rosterName||'选择培养目标';
   if(!goal){holder.innerHTML=selectedRosterKey
-    ?'<div class="empty-hint">点击设置按钮配置培养目标。</div>'
+    ?'<div class="empty-hint">点击提升按钮配置培养目标。</div>'
     :'<div class="empty-hint">点击顶部培养卡片，可查看当前目标需要填写的背包材料。</div>';return;}
   const selected=entries().find(e=>e.plan.id===id);
   const catalog=collectInventoryCatalog(selected?[selected]:[]);
@@ -625,6 +638,20 @@ function renderInventory(){
     section.append(body);holder.append(section);
   }
   if(!holder.childElementCount)holder.innerHTML='<div class="empty-hint">材料正在载入，请稍后检查。</div>';
+}
+async function confirmInventoryApplication(){
+  if(state.inventoryMode!=='synced'||mysPanel?.isBusy()){toast('请等待当前同步结束后再应用。');return;}
+  const summary=summarizeInventoryApplication(state);
+  if(!summary.exact){toast('暂无已确认数量的同步材料。');return;}
+  const account=state.activeAccountId,source=state.syncedMaterialInventory,flags=state.syncedInventoryMinimum;
+  const accepted=await modal({title:'应用到手动背包',description:`将应用全部 ${summary.exact} 种已确认材料（其中 ${summary.changed} 种数量不同、${summary.added} 种新增记录）。\n保留 ${summary.minimum} 种仅有下限的材料，以及 ${summary.unknown} 种未取得同步数量的手动记录。\n应用后自动切换到手动背包。`,requiresText:false,confirm:'确认应用'});
+  if(accepted===null)return;
+  if(state.activeAccountId!==account||state.syncedMaterialInventory!==source||state.syncedInventoryMinimum!==flags||mysPanel?.isBusy()){
+    toast('同步库存已变化，请重新核对后应用。');return;
+  }
+  try{
+    applyInventoryToManual(state);renderInventory();renderResults();renderCalendar();await flushSave();toast('已应用 '+summary.exact+' 种材料到手动背包');
+  }catch(e){toast(e.message);}
 }
 function renderResults(){
   const all=entries().filter(e=>e.plan.enabled!==false&&!e.plan.completed);
@@ -864,6 +891,7 @@ async function start(){
   };
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)closeModal(false);else if(!$('goalModal').hidden)closeEditor();}});
   $('accountSelect').onchange=e=>switchAccount(e.target.value);
+  $('applyInventoryButton').onclick=()=>void confirmInventoryApplication();
   for(const button of document.querySelectorAll('[data-inventory-mode]'))button.onclick=()=>{
     selectInventoryMode(state,button.dataset.inventoryMode);renderInventory();renderResults();renderCalendar();save();
   };

@@ -35,7 +35,7 @@
     <div class="calendar-days" id="calendarDays"></div>
   </section>
   <section class="active-goals-strip" aria-label="正在培养">
-    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 提升指南按钮编辑 · 暂停后不计入缺口</span></div>
+    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 提升按钮编辑 · 暂停后不计入缺口</span></div>
     <div class="active-goal-list" id="activeGoals"></div>
   </section>
   <div class="workbench" id="workbench">
@@ -44,7 +44,7 @@
         <div class="tabs" role="tablist" aria-label="培养对象">
           <button type="button" class="tab active" data-tab="character" aria-selected="true">角色</button>
           <button type="button" class="tab" data-tab="weapon" aria-selected="false">武器</button>
-          <span class="roster-help">单击选择或取消 · 提升指南按钮编辑</span>
+          <span class="roster-help">单击选择或取消 · 提升按钮编辑</span>
         </div>
         <div class="filter-area">
           <div class="filter-top">
@@ -62,6 +62,7 @@
     <aside class="inventory-rail">
       <div class="inventory-heading"><strong>背包材料</strong><span id="inventoryTarget">选择培养目标</span></div>
       <div class="inventory-mode-switch" role="group" aria-label="库存模式"><button type="button" data-inventory-mode="manual" class="active" aria-pressed="true">手动背包</button><button type="button" data-inventory-mode="synced" aria-pressed="false">同步背包</button></div>
+      <button class="inventory-apply" id="applyInventoryButton" type="button" hidden>应用到手动背包</button>
       <p class="inventory-note" id="inventoryModeNote">手动库存 · 输入框左侧可增加或减少 1。</p>
       <div class="inventory-scroll" id="inventoryGroups"></div>
     </aside>
