@@ -9,6 +9,7 @@ import {initializePlanner,makeGoal,makeWeaponInstance,characterGoal,weaponGoal,w
 import {importGOOD,validateGOOD} from './good-import.mjs';
 import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
+import {indexBannerReleases,mergeBannerReleases,parseReleaseTable,attachReleaseDates,compareRosterRelease} from './release-order.mjs';
 import {
   saveActivePlannerAccount, selectPlannerAccount, createPlannerAccount,
   renamePlannerAccount, deletePlannerAccount
@@ -378,12 +379,7 @@ function rosterCard(row){
   return card;
 }
 function renderRoster(){
-  let rows=visibleRoster(state,filter.tab,characterList,weaponList,(a,b)=>{
-    if(Boolean(a.sourceTag)!==Boolean(b.sourceTag))return a.sourceTag?-1:1;
-    const va=String(a.version||'').split('.').map(Number),vb=String(b.version||'').split('.').map(Number);
-    for(let i=0;i<Math.max(va.length,vb.length);i++){const delta=(vb[i]||0)-(va[i]||0);if(delta)return delta;}
-    return Number(b.id)-Number(a.id)||a.name.localeCompare(b.name,'zh-CN');
-  });
+  let rows=visibleRoster(state,filter.tab,characterList,weaponList,compareRosterRelease);
   rows=rows.filter(row=>matchesRosterFilter(row,filter,weaponAliases));
   $('rosterCount').textContent=rows.length+' 项';
   const area=$('rosterGrid');area.replaceChildren();
@@ -683,6 +679,16 @@ function renderCalendar(){
   note.title=plan.unknown.map(item=>item.name||item.id).join('、');
 }
 function renderAll(){renderAccounts();renderGoals();renderFilters();renderRoster();renderInventory();renderResults();renderCalendar();}
+async function loadReleaseMetadata(force){
+  const [bundled,banners,characters,weapons]=await Promise.allSettled([
+    fetch('./release-index.json').then(r=>{if(!r.ok)throw Error('release index');return r.json();}),
+    bridge('release.fetch',{source:'banners',force}).then(r=>indexBannerReleases(JSON.parse(r.content))),
+    bridge('release.fetch',{source:'characters',force}).then(r=>parseReleaseTable(r.content)),
+    bridge('release.fetch',{source:'weapons',force}).then(r=>parseReleaseTable(r.content))
+  ]);
+  const value=r=>r.status==='fulfilled'?r.value:undefined;
+  return {bannerIndex:mergeBannerReleases(value(bundled),value(banners)),characterDates:value(characters),weaponDates:value(weapons)};
+}
 async function loadLists(force=false){
   setStatus('正在读取 Nanoka 角色和武器资料…');
   try{
@@ -693,6 +699,9 @@ async function loadLists(force=false){
     ].map(async([type,version])=>({version,data:(await bridge('data.fetch',{path:`/gi/${encodeURIComponent(version)}/${type}.json`,force,maxAge:43200000})).data})));
     characterList=mergeSourceLists(normalizeCharacterList(reqs[0].data).map(x=>({...x,version:versions.live})),normalizeCharacterList(reqs[1].data).map(x=>({...x,version:versions.latest})));
     weaponList=mergeSourceLists(normalizeWeaponList(reqs[2].data).map(x=>({...x,version:versions.live})),normalizeWeaponList(reqs[3].data).map(x=>({...x,version:versions.latest})));
+    const release=await loadReleaseMetadata(force);
+    characterList=attachReleaseDates(characterList,'character',release.characterDates,release.bannerIndex);
+    weaponList=attachReleaseDates(weaponList,'weapon',release.weaponDates,release.bannerIndex);
     await reloadAllProfiles(force);
     setStatus(`已载入 ${characterList.length} 名角色、${weaponList.length} 类武器`,'success');
   }catch(e){setStatus('资料读取失败：'+e.message,'error');toast('检查网络后刷新资料');}

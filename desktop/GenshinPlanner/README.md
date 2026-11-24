@@ -48,3 +48,10 @@ dotnet publish .\GenshinPlanner.csproj -c Release -r win-x64 --self-contained tr
 ## 数据兼容
 
 从桌面 v0.2.1 升级时，原单项「角色＋武器」会迁移为独立角色与武器培养目标，保留关联和原有库存。导入旧版配置前建议先备份整个 `data` 目录。
+
+### 图鉴排序资料
+
+角色与武器统一按照培养及拥有状态、前瞻状态、首次推出日期、星级、内部 ID 排列。首次推出日期使用 GachaTracker 角色及武器列表，Snap.Metadata 历史卡池的首次 UP 日期用于补充缺失资料；非卡池物品缺少发布时间时按星级和 ID 排列。时间资料随刷新更新，缓存及内置卡池索引用于离线回退。
+
+- [GachaTracker](https://www.gachatracker.app/games/genshin/)
+- [Snap.Metadata](https://github.com/SnapHutaoRemasteringProject/Snap.Metadata)

@@ -7,7 +7,8 @@
     <Nullable>enable</Nullable>
     <AssemblyName>GenshinPlanner</AssemblyName>
     <RootNamespace>GenshinPlanner</RootNamespace>
-    <Version>0.3.6</Version>
+    <Version>0.3.7</Version>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
@@ -15,6 +16,7 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
+    <Resource Include="Assets\AppIcon.ico" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3856.49" />
     <Content Include="wwwroot\**\*">
       <TargetPath>resources\wwwroot\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>

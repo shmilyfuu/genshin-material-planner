@@ -80,6 +80,7 @@ public partial class MainWindow : Window
                 "storage.load" => await LoadStateAsync(),
                 "storage.save" => await SaveStateAsync(data),
                 "data.fetch" => await FetchNanokaAsync(data),
+                "release.fetch" => await FetchReleaseSourceAsync(data),
                 "storage.export" => ExportState(data),
                 "storage.import" => await ImportStateAsync(),
                 _ => throw new InvalidOperationException("未知操作。")
@@ -241,6 +242,50 @@ public partial class MainWindow : Window
         catch when (File.Exists(cacheFile))
         {
             return new JsonObject { ["data"] = JsonNode.Parse(await File.ReadAllTextAsync(cacheFile)), ["source"] = "stale-cache" };
+        }
+    }
+
+    private static readonly HttpClient ReleaseHttp = new() { Timeout = TimeSpan.FromSeconds(8) };
+
+    private async Task<JsonObject> FetchReleaseSourceAsync(JsonObject? data)
+    {
+        var key = data?["source"]?.GetValue<string>() ?? "";
+        var url = key switch
+        {
+            "banners" => "https://raw.githubusercontent.com/SnapHutaoRemasteringProject/Snap.Metadata/main/Genshin/CHS/GachaEvent.json",
+            "characters" => "https://www.gachatracker.app/games/genshin/characters/",
+            "weapons" => "https://www.gachatracker.app/games/genshin/weapons/",
+            _ => throw new InvalidOperationException("发布时间数据来源无效。")
+        };
+        var dir = Path.Combine(_dataDir, "ReleaseCache");
+        Directory.CreateDirectory(dir);
+        var cache = Path.Combine(dir, key + ".txt");
+        var force = data?["force"]?.GetValue<bool>() ?? false;
+        bool Valid(string content)
+        {
+            if (key == "banners") return JsonNode.Parse(content) is JsonArray { Count: > 0 };
+            return content.Contains("Release Date", StringComparison.OrdinalIgnoreCase)
+                && content.Contains("<table", StringComparison.OrdinalIgnoreCase);
+        }
+        if (!force && File.Exists(cache) && DateTime.UtcNow - File.GetLastWriteTimeUtc(cache) < TimeSpan.FromHours(12))
+        {
+            var cached = await File.ReadAllTextAsync(cache);
+            if (Valid(cached)) return new JsonObject { ["content"] = cached };
+        }
+        try
+        {
+            using var response = await ReleaseHttp.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var content = await response.Content.ReadAsStringAsync();
+            if (!Valid(content)) throw new InvalidDataException("发布时间资料格式无效。");
+            await File.WriteAllTextAsync(cache, content);
+            return new JsonObject { ["content"] = content };
+        }
+        catch when (File.Exists(cache))
+        {
+            var cached = await File.ReadAllTextAsync(cache);
+            if (!Valid(cached)) throw;
+            return new JsonObject { ["content"] = cached };
         }
     }
 

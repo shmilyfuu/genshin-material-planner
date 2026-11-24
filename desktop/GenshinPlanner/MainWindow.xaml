@@ -4,7 +4,7 @@
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         Title="原神养成规划" Width="1600" Height="900"
         MinWidth="1200" MinHeight="720" WindowStartupLocation="CenterScreen"
-        Background="#F3F5F9">
+        Background="#F3F5F9" Icon="Assets/AppIcon.ico">
     <Grid>
         <wv2:WebView2 x:Name="Browser"/>
     </Grid>

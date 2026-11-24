@@ -136,7 +136,7 @@ export function visibleRoster(state,tab,characters,weapons,sortByNewest){
     else values.push({...row,instance:null,goal:null,owned:false});
   }
   const tier=r=>aR(r.goal)?0:r.owned||r.goal?.completed?1:2;
-  return values.sort((a,b)=>tier(a)-tier(b)||Number(b.rarity)-Number(a.rarity)||sortByNewest(a,b)
+  return values.sort((a,b)=>tier(a)-tier(b)||sortByNewest(a,b)
     ||Number(b.instance?.level||0)-Number(a.instance?.level||0)
     ||String(a.instance?.id||'').localeCompare(String(b.instance?.id||'')));
 }
