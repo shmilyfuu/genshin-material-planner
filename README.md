@@ -1,143 +1,84 @@
-# 全能养成规划面板
+# 原神养成规划
 
 [English](README_EN.md)
 
-一个用于原神角色、天赋和武器养成材料规划的 Chrome 侧边栏扩展。
+面向原神的 Windows 桌面养成规划工具，支持多角色、多武器培养计划、共享材料库存与每周刷取日历。
 
-当前版本：**v1.2.12**
+**正式版：[v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**　|　**开发版：v0.4.0**
 
-> 本项目为非官方工具，与米哈游、HoYoverse、Nanoka 或 Lunaris 无隶属或合作关系。
+[下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ## 功能
 
-- 在 Chrome 侧边栏中选择角色与武器。
-- 支持角色名称搜索、属性筛选和星级筛选。
-- 支持武器名称搜索、类型筛选和星级筛选。
-- 设置角色等级、天赋等级和武器等级目标。
-- 根据当前目标计算摩拉、经验材料、角色突破材料、天赋材料和武器突破材料缺口。
-- 使用一套全局背包数据，角色与武器的同名材料会自动合并。
-- 自动保存已选对象、目标等级和背包数量。
-- 每个背包数量输入框提供上下微调按钮，每次增加或减少 1。
-- 支持 `38*2`、`100+25` 等算式；点击微调按钮时会先计算当前表达式，再进行加减。
-- 支持配置导入和导出。
-- 合并正式服与最新数据；仅存在于最新数据中的对象显示“前瞻”标记。
-- 材料图片按 `Nanoka → Lunaris → 品质色占位` 的顺序读取。
-- Nanoka 与 Lunaris 图片源检测成功时保持隐藏，读取失败时显示错误信息。
-- 数据读取失败时可进入手动模式，继续使用基础计算功能。
+- 角色、武器图鉴，支持名称搜索、星级、元素和武器类型筛选。
+- 独立配置角色等级、突破、天赋和武器等级，支持多项培养计划、暂停及完成状态。
+- 同名武器支持多个独立实例，角色可关联武器实例。
+- 按培养与拥有状态、前瞻状态、首次推出日期及星级统一排列角色和武器。
+- 多个培养目标共享材料库存，按材料 ID 汇总需求并计算缺口，支持单项与全部目标对照。
+- 每周刷取日历，显示当前培养目标所需秘境材料。
+- 多规划账号独立保存培养目标、角色、武器和库存。
+- 导入 GGScanner GOOD v3 数据，匹配角色及武器的当前练度。
+- 支持材料数量手动输入、微调及规划配置导入导出。
+
+### 米游社材料同步（v0.4.0 开发版）
+
+支持扫码登录、账号切换、凭证刷新及国服原神 UID 选择。通过米游社官方养成计算器的角色和武器目录进行全量材料探测，覆盖官方已收录的未拥有角色与武器。
+
+库存通过 `num - lack_num` 反推，跨批次取最大观测值；达到探测上限的材料标记为下限。未返回的材料保留本地库存。开发版已通过自动化构建，实际账号登录及库存同步仍需验证。
+
+## 下载与使用
+
+1. 前往 [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) 下载 Windows x64 ZIP。
+2. 将压缩包解压到有写入权限的固定目录。
+3. 运行 `GenshinPlanner.exe`。
+
+系统要求：Windows 10/11 x64，Microsoft Edge WebView2 Runtime。发布包包含 .NET 运行时。
+
+单击角色或武器卡片可查看材料与缺口，点击卡片右上角设置按钮可配置培养目标。再次单击选中卡片可返回全部目标视图。
+
+## 更新与本地数据
+
+升级前备份 `data/`，将新版文件覆盖到原程序目录，并保留原有 `data/`。
+
+```text
+GenshinPlanner.exe
+resources/wwwroot/
+data/
+  planner.json
+  desktop-layout.json
+  NanokaCache/
+  ReleaseCache/
+  Miyoushe/
+  WebView2/
+```
+
+规划数据与缓存存放在程序目录。米游社登录凭证使用 Windows DPAPI 当前用户加密，保存在 `data/Miyoushe/`，规划导出文件仅包含规划与库存数据。更换 Windows 用户或电脑后需要重新登录。
 
 ## 数据来源
 
-- 角色、武器、材料与版本数据：Nanoka
-- 材料图片备用来源：Lunaris
+- [Nanoka](https://nanoka.cc/)：角色、武器、材料与正式服及前瞻数据。
+- [GachaTracker](https://www.gachatracker.app/games/genshin/)：角色与武器发布时间。
+- [Snap.Metadata](https://github.com/SnapHutaoRemasteringProject/Snap.Metadata)：历史卡池记录，补充发布时间。
+- 米游社养成计算器：材料库存探测（开发版）。
+- [SeelieEx](https://github.com/KeyPJ/seelieEx)：材料请求方式参考。
 
-外部数据结构或服务地址发生变化时，部分列表、详情或图标可能暂时无法加载。
-
-## Releases
-
-正式版本通过 GitHub Releases 发布。每个版本包含：
-
-- 可直接用于“加载已解压的扩展程序”的 ZIP 包。
-- 对应的 SHA-256 校验文件。
-- GitHub 自动生成的版本说明。
-
-下载后请校验压缩包文件名与版本号，再解压到固定目录使用。
-
-## 安装
-
-本项目当前以“加载已解压的扩展程序”形式使用。
-
-1. 从 GitHub Releases 下载最新 ZIP 包，或下载仓库源码。
-2. 解压到一个固定目录。
-3. 在 Chrome 地址栏打开 `chrome://extensions/`。
-4. 开启右上角的“开发者模式”。
-5. 点击“加载已解压的扩展程序”。
-6. 选择包含 `manifest.json` 的目录。
-7. 点击浏览器工具栏中的扩展图标，打开侧边栏。
-
-最低 Chrome 版本：**114**。
-
-## 更新
-
-本地加载的扩展不会由 Chrome 自动更新。升级时：
-
-1. 备份或导出配置。
-2. 从 Releases 下载新版 ZIP，并覆盖原扩展目录。
-3. 在 `chrome://extensions/` 中点击该扩展的“重新加载”。
-
-项目保留固定扩展 ID 与本地存储键，覆盖更新时现有配置通常会继续保留。仍建议在更新前导出配置。
-
-## 权限说明
-
-扩展使用以下权限：
-
-- `sidePanel`：显示 Chrome 侧边栏。
-- `storage`：在本机保存规划配置和缓存。
-- `https://static.nanoka.cc/*`：读取 Nanoka 数据与图片。
-- `https://api.lunaris.moe/*`：在 Nanoka 图片缺失时读取材料图片。
-
-当前版本没有米游社登录、Cookie 读取或账号云同步功能。
-
-## 本地数据
-
-主要配置保存在 `chrome.storage.local` 中。本项目不包含独立服务器，也不会主动把用户填写的背包数量上传到开发者服务器。
-
-## 项目结构
-
-```text
-.
-├── manifest.json       # Manifest V3 配置
-├── background.js       # 后台数据与图片请求
-├── sidepanel.html      # 侧边栏页面
-├── app.js              # 界面、状态与交互逻辑
-├── stepper.js          # 背包数量微调按钮逻辑
-├── core.mjs            # 养成计算核心
-├── hakushin.mjs        # Nanoka 数据解析与合并
-├── styles.css          # 页面主样式
-├── stepper.css         # 数量微调按钮样式
-└── icons/              # 扩展图标
-```
+外部数据接口变更可能影响资料读取和同步。
 
 ## 开发
 
-本项目没有构建步骤。修改文件后，在 `chrome://extensions/` 中点击“重新加载”即可测试。
+桌面应用源码位于 [desktop/GenshinPlanner/](desktop/GenshinPlanner/)，使用 WPF、WebView2 与 JavaScript ES Modules。
 
-建议在提交前执行：
+需要 .NET 10 SDK 和 Node.js。在仓库根目录执行：
 
-```bash
-node --check background.js
-node --check app.js
-node --check stepper.js
-node --check core.mjs
-node --check hakushin.mjs
-python -m json.tool manifest.json
+```powershell
+node --test desktop/GenshinPlanner/tests/*.test.mjs
+dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish
 ```
 
-推送形如 `v1.2.12` 的标签后，GitHub Actions 会校验标签与 `manifest.json` 版本一致，随后自动生成 ZIP、SHA-256 文件并发布 Release。也可以在 Actions 页面手动运行 `Build and publish release`。
+主分支为 `main`。Windows 构建通过 GitHub Actions 生成便携 ZIP 及 SHA-256 校验文件。历史浏览器扩展源码归档于 [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1)。
 
-## 当前状态与后续方向
+## 反馈与版权
 
-当前阶段已经完成基础规划、全局背包、正式服与前瞻数据合并、材料图标备用链路、数量微调按钮和配置导入导出。
+反馈问题时请附上程序版本、Windows 版本、相关角色或武器名称以及错误提示或截图。
 
-正在评估的方向包括：
-
-- 版本检查与更新提示。
-- 账号与跨设备数据同步。
-- 在用户明确授权的前提下，研究米游社养成计算器相关数据接入。
-
-以上功能尚未包含在 v1.2.12 中。
-
-## 反馈
-
-提交问题时，请附上：
-
-- Chrome 版本。
-- 扩展版本。
-- 角色或武器名称。
-- 错误提示或截图。
-- `chrome://extensions/` 中后台服务工作线程控制台的相关报错。
-
-## 版权与使用
-
-当前仓库未提供开源许可证。除适用法律明确允许的情形外，未经版权所有者许可，不得复制、修改、再分发或将本项目用于其他项目。
-
-第三方名称、数据和图片仍受各自权利人的条款约束。
+本项目为非官方工具，与米哈游、HoYoverse 及第三方数据提供者无隶属或合作关系。当前仓库未提供开源许可证；未经版权所有者许可，除适用法律明确允许的情形外，不得复制、修改、再分发或将本项目用于其他项目。第三方名称、数据和图片受各自权利人的条款约束。

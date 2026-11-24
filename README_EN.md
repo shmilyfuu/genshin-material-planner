@@ -2,142 +2,65 @@
 
 [简体中文](README.md)
 
-A Chrome side panel extension for planning character, talent, and weapon upgrade materials in Genshin Impact.
+A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-Current version: **v1.2.12**
+**Release: [v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)** · **Development: v0.4.0**
 
-> This is an unofficial project and is not affiliated with or endorsed by HoYoverse, miHoYo, Nanoka, or Lunaris.
+[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ## Features
 
-- Select characters and weapons directly from the Chrome side panel.
-- Search and filter characters by element and rarity.
-- Search and filter weapons by type and rarity.
-- Set target levels for characters, talents, and weapons.
-- Calculate shortages for Mora, EXP materials, character ascension materials, talent materials, and weapon ascension materials.
-- Use one global inventory; shared character and weapon materials are merged automatically.
-- Automatically save selected entries, target levels, and inventory values.
-- Use compact up/down controls beside every inventory field to increase or decrease the value by 1.
-- Arithmetic expressions such as `38*2` and `100+25` remain supported; a step button evaluates the current expression before adjusting it.
-- Import and export planner configuration.
-- Merge live and latest data; entries found only in the latest dataset are marked as preview content.
-- Load material images in this order: `Nanoka → Lunaris → rarity-colored placeholder`.
-- Keep image-source diagnostics hidden when both sources work; show an error only when a source fails.
-- Fall back to manual mode when remote data cannot be loaded.
+- Character and weapon catalogs with search, rarity, element, and weapon type filters.
+- Multiple independent upgrade goals with level, ascension, talent, pause, and completion settings.
+- Independent instances of identical weapons and character-to-weapon links.
+- Unified catalog ordering by goal and ownership status, preview status, release date, and rarity.
+- Shared material inventory, combined shortages, and individual goal comparisons.
+- Weekly domain schedule for active upgrade goals.
+- Separate local planner accounts, inventory, and goals.
+- GGScanner GOOD v3 imports for character and weapon progression.
+- Manual inventory editing and planner configuration import/export.
 
-## Data Sources
+### Miyoushe inventory synchronization (v0.4.0 development)
 
-- Character, weapon, material, and version data: Nanoka
-- Backup material images: Lunaris
+QR login, saved accounts, token refresh, and mainland China Genshin UID selection. Material requests use the complete official character and weapon calculator catalogs.
 
-Changes to external data structures or service endpoints may temporarily affect lists, details, or images.
+Inventory is inferred from `num - lack_num`; the maximum observation is retained across requests. Values that reach the calculation limit are marked as lower bounds. Existing inventory is retained for materials absent from the response. Automated builds have passed; live account login and inventory synchronization require validation.
 
-## Releases
+## Installation and updates
 
-Stable builds are published through GitHub Releases. Each release contains:
+Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/latest), extract it to a writable folder, and run `GenshinPlanner.exe`.
 
-- A ZIP archive ready to be loaded as an unpacked extension.
-- A matching SHA-256 checksum file.
-- Automatically generated release notes.
+Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. The .NET runtime is included.
 
-Check that the archive name and version match before extracting it to a permanent directory.
+Click a catalog card to view its materials, and use the settings button on the card to configure its goal.
 
-## Installation
+Back up the `data/` folder before updating. Replace application files with the new release while retaining this folder.
 
-The extension is currently distributed as an unpacked Chrome extension.
+Planner data and caches are stored locally. Miyoushe credentials are encrypted using Windows DPAPI for the current Windows user and stored under `data/Miyoushe/`. Planner exports contain planner and inventory data only. Signing in again is required after moving to another Windows user or computer.
 
-1. Download the latest ZIP archive from GitHub Releases, or download the repository source.
-2. Extract it to a permanent directory.
-3. Open `chrome://extensions/` in Chrome.
-4. Enable **Developer mode**.
-5. Click **Load unpacked**.
-6. Select the directory containing `manifest.json`.
-7. Click the extension icon in the browser toolbar to open the side panel.
+## Data sources
 
-Minimum supported Chrome version: **114**.
+- [Nanoka](https://nanoka.cc/): character, weapon, material, and live/preview data.
+- [GachaTracker](https://www.gachatracker.app/games/genshin/): release dates.
+- [Snap.Metadata](https://github.com/SnapHutaoRemasteringProject/Snap.Metadata): historical banner data.
+- Miyoushe enhancement calculator: inventory observations in the development build.
+- [SeelieEx](https://github.com/KeyPJ/seelieEx): reference for material requests.
 
-## Updating
-
-Unpacked extensions are not updated automatically by Chrome. To upgrade:
-
-1. Back up or export the current configuration.
-2. Download the new ZIP from Releases and replace the files in the existing extension directory.
-3. Open `chrome://extensions/` and click **Reload** for the extension.
-
-The project keeps a fixed extension ID and storage key, so existing configuration will normally remain available after an in-place update. Exporting a backup first is still recommended.
-
-## Permissions
-
-The extension requests the following permissions:
-
-- `sidePanel`: display the Chrome side panel.
-- `storage`: save planner configuration and cache locally.
-- `https://static.nanoka.cc/*`: read Nanoka data and images.
-- `https://api.lunaris.moe/*`: load backup material images when Nanoka has no matching image.
-
-Version v1.2.12 does not include HoYoLAB/Miyoushe login, cookie access, or cloud account synchronization.
-
-## Local Data
-
-Planner state is stored in `chrome.storage.local`. This release has no dedicated backend and does not upload manually entered inventory values to a developer-operated server.
-
-## Project Structure
-
-```text
-.
-├── manifest.json       # Manifest V3 configuration
-├── background.js       # Background data and image requests
-├── sidepanel.html      # Side panel page
-├── app.js              # UI, state, and interaction logic
-├── stepper.js          # Inventory stepper controls
-├── core.mjs            # Upgrade calculation core
-├── hakushin.mjs        # Nanoka parsing and live/latest merging
-├── styles.css          # Main UI styles
-├── stepper.css         # Stepper control styles
-└── icons/              # Extension icons
-```
+Changes to external services may affect data loading and synchronization.
 
 ## Development
 
-No build step is required. After editing the files, reload the extension from `chrome://extensions/`.
+The [desktop/GenshinPlanner/](desktop/GenshinPlanner/) application uses WPF, WebView2, and JavaScript ES modules. Install the .NET 10 SDK and Node.js, then run from the repository root:
 
-Suggested validation commands:
-
-```bash
-node --check background.js
-node --check app.js
-node --check stepper.js
-node --check core.mjs
-node --check hakushin.mjs
-python -m json.tool manifest.json
+```powershell
+node --test desktop/GenshinPlanner/tests/*.test.mjs
+dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish
 ```
 
-Pushing a tag such as `v1.2.12` starts GitHub Actions. The workflow verifies that the tag matches the version in `manifest.json`, builds the ZIP and SHA-256 files, and publishes a GitHub Release. The `Build and publish release` workflow can also be started manually from the Actions page.
+The primary development branch is `main`. GitHub Actions produces Windows ZIP archives and SHA-256 checksums. Historical browser extension source is archived at [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1).
 
-## Current Status and Possible Next Steps
+## Feedback and copyright
 
-The current stage includes the core planner, global inventory, live/latest data merging, backup material images, inventory stepper controls, and configuration import/export.
+Include the application version, Windows version, relevant character or weapon, and error details when reporting issues.
 
-Areas under evaluation include:
-
-- Version checks and update notifications.
-- Account-based cross-device synchronization.
-- Research into Miyoushe enhancement-calculator data integration with explicit user authorization.
-
-These features are not included in v1.2.12.
-
-## Reporting Issues
-
-Please include the following information:
-
-- Chrome version.
-- Extension version.
-- Character or weapon name.
-- Error message or screenshot.
-- Relevant errors from the extension service worker console in `chrome://extensions/`.
-
-## Copyright and Use
-
-This repository does not provide an open-source license. Except where applicable law expressly permits otherwise, copying, modification, redistribution, or reuse in another project requires permission from the copyright holder.
-
-Third-party names, data, and images remain subject to their respective owners' terms.
+This is an unofficial project, unaffiliated with HoYoverse, miHoYo, or third-party data providers. This repository does not provide an open-source license. Except where applicable law permits otherwise, copying, modification, redistribution, or reuse requires permission from the copyright holder. Third-party names, data, and images are subject to their respective owners' terms.

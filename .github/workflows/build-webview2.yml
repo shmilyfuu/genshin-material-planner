@@ -3,7 +3,7 @@ name: Build Windows WebView2 planner
 on:
   push:
     branches:
-      - desktop/webview2
+      - main
     paths:
       - 'desktop/**'
       - '.github/workflows/build-webview2.yml'
