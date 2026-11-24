@@ -1,0 +1,61 @@
+name: Publish desktop v0.5.1
+on:
+  push:
+    branches: [release/desktop-v0.5.1]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: shmilyfuu/genshin-material-planner
+    steps:
+      - name: Publish verified Windows build
+        shell: bash
+        run: |
+          set -euo pipefail
+          run=45399454846
+          commit=2628784d1c1caff8b8675c7fcb2cdb8d5839dbb5
+          name=GenshinPlanner-WebView2-v0.5.1-win-x64
+          gh run watch "$run" --exit-status --interval 5
+          test "$(gh run view "$run" --json headSha --jq .headSha)" = "$commit"
+          test "$(gh run view "$run" --json conclusion --jq .conclusion)" = success
+          mkdir -p dist
+          gh run download "$run" --name "$name" --dir dist
+          cd dist
+          test -f "$name.zip"
+          test -f "$name.zip.sha256"
+          actual=$(sha256sum "$name.zip" | cut -d' ' -f1)
+          expected=$(tr -d '[:space:]' < "$name.zip.sha256")
+          test "$actual" = "$expected"
+          python - <<'PY'
+          import zipfile, hashlib
+          with zipfile.ZipFile('GenshinPlanner-WebView2-v0.5.1-win-x64.zip') as z:
+              names={x.replace('\\','/'):x for x in z.namelist()}
+              assert {'GenshinPlanner.exe','data/','resources/wwwroot/index.html','resources/wwwroot/icons/inventory.png','resources/wwwroot/icons/training-guide.png','resources/wwwroot/icons/training-active.png'}<=names.keys()
+              assert not any(x.startswith('data/') and x!='data/' for x in names)
+              for filename,expected in [('training-guide.png','e4dfe7801f4b14955e8527d99c9f0ad731bbd4fac57a7dbbd83b12cdd1465f35'),('training-active.png','ef9255bcd303d0d92fd0f041a7356535362fbc1d18ef4524fa474a4bdaeb2fc3')]:
+                  assert hashlib.sha256(z.read(names['resources/wwwroot/icons/'+filename])).hexdigest()==expected
+              assert z.testzip() is None
+          PY
+          if gh release view desktop-v0.5.1 >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite.'
+            exit 1
+          fi
+          cat > notes.md <<'EOF'
+          ## 界面
+          - 使用游戏原始背包、设置、提升及正在培养图标，保留原始颜色与透明度。
+          - 卡片四角标识间距统一为 2px，前瞻标识使用与武器实例编号相同的文字样式。
+
+          ## 背包库存
+          - 同步背包显示手动记录及数量差异。
+          - 应用到手动背包：确认后写入所有已确认的材料数量（含零），保留库存下限及未知数量对应的手动记录，并切换至手动背包。
+          - 手动背包和同步背包按规划账号独立保存。
+
+          ## 更新
+          v0.5.0 用户可通过设置菜单检查更新。Windows 10/11 x64 便携版，手动升级时保留 data 目录。
+          EOF
+          gh release create desktop-v0.5.1 "$name.zip" "$name.zip.sha256" --target "$commit" --title "原神养成规划 v0.5.1" --notes-file notes.md --latest
