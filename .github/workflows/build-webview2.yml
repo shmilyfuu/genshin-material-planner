@@ -51,7 +51,7 @@ jobs:
           if (-not (Test-Path desktop/publish/resources/wwwroot/icons/training-guide.png)) { throw 'Training guide icon missing' }
           if (-not (Test-Path desktop/publish/resources/wwwroot/icons/training-active.png)) { throw 'Active training icon missing' }
           $version = (Get-Item desktop/publish/GenshinPlanner.exe).VersionInfo
-          if ("$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)" -ne '0.5.5') { throw 'Executable version mismatch' }
+          if ("$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)" -ne '0.5.6') { throw 'Executable version mismatch' }
           # Package XML documentation is only used by development tooling.
           Get-ChildItem desktop/publish -File -Filter 'Microsoft.Web.WebView2.*.xml' | Remove-Item -Force
           $rootFiles = @(Get-ChildItem desktop/publish -File)
@@ -63,7 +63,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path desktop/dist, desktop/publish/data | Out-Null
           Add-Type -AssemblyName System.IO.Compression.ZipFile
-          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.5.5-win-x64.zip'
+          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.5.6-win-x64.zip'
           [System.IO.Compression.ZipFile]::CreateFromDirectory(
             (Resolve-Path desktop/publish).Path,
             $zipPath,
@@ -79,9 +79,9 @@ jobs:
           (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower() | Set-Content ($zipPath + '.sha256')
       - uses: actions/upload-artifact@v4
         with:
-          name: GenshinPlanner-WebView2-v0.5.5-win-x64
+          name: GenshinPlanner-WebView2-v0.5.6-win-x64
           path: |
-            desktop/dist/GenshinPlanner-WebView2-v0.5.5-win-x64.zip
-            desktop/dist/GenshinPlanner-WebView2-v0.5.5-win-x64.zip.sha256
+            desktop/dist/GenshinPlanner-WebView2-v0.5.6-win-x64.zip
+            desktop/dist/GenshinPlanner-WebView2-v0.5.6-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14

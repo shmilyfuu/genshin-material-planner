@@ -111,3 +111,16 @@ test('主界面共用10px布局间距，左侧对齐及窄窗口规则一致',()
  assert.ok(rule('.status-bar').includes('padding:0 var(--layout-gap)'));
  assert.ok(!css.includes('@media(max-width:1400px){.app-header'));
 });
+
+test('角色与武器筛选控件共用29px外框高度',()=>{
+ const css=read('desktop.css');
+ const rule=selector=>{const start=css.indexOf(selector+'{');assert.ok(start>=0,selector);return css.slice(start,css.indexOf('}',start)+1);};
+ assert.ok(rule('.filter-area').includes('--filter-height:29px'));
+ for(const selector of ['.searchbox','.filter-chip']){
+   assert.ok(rule(selector).includes('height:var(--filter-height)'));
+   assert.ok(rule(selector).includes('align-items:center'));
+   assert.ok(rule(selector).includes('padding:0 '));
+ }
+ assert.ok(rule('.filter-chip.icon-only').includes('width:var(--filter-height)'));
+ assert.ok(!rule('.filter-chip.icon-only').includes('height:'));
+});
