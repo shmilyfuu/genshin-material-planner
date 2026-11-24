@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 const read=name=>readFileSync(new URL('../wwwroot/'+name,import.meta.url),'utf8');
 test('顶部仅保留账号切换、同步库存和设置入口',()=>{
  const header=read('index.html').match(/<header class="app-header">[\s\S]*?<\/header>/)[0];
@@ -34,14 +35,24 @@ test('更新前保存规划，版本来自宿主，启动后自动检查更新',
  assert.ok(source.includes("void checkUpdate();"));
 });
 
-test('卡片使用新资源，前瞻星号和实例编号采用统一样式',()=>{
+test('卡片名称居中、前瞻星号独立定位，编号与角标中心对齐',()=>{
  const app=read('desktop-app.mjs'),css=read('desktop.css');
  assert.ok(app.includes("symbol.src='icons/training-active.png'"));
- assert.ok(app.includes("preview.textContent='*';preview.title=row.sourceTag;"));
- assert.ok(css.includes('.avatar-instance,.avatar-preview{'));
- assert.ok(css.includes('--badge-inset:2px'));
+ assert.ok(app.includes("star.textContent='*';star.title=row.sourceTag;"));
+ assert.ok(app.includes('label.append(name)'));assert.ok(app.includes('label.append(star)'));
+ assert.ok(app.includes("title.classList.add('is-preview')"));
+ assert.ok(!app.includes('avatar-preview'));assert.ok(!css.includes('.avatar-preview'));
+ assert.match(css,/\.avatar-name\{[^}]*justify-items:center/);
+ assert.match(css,/\.avatar-name\.is-preview\{padding-inline:calc\(5px \+ var\(--preview-width\)\)\}/);
+ assert.match(css,/\.avatar-name-label\{position:relative;width:max-content;max-width:100%/);
+ assert.match(css,/\.avatar-name-text\{display:block;overflow:hidden;text-overflow:ellipsis\}/);
+ assert.match(css,/\.avatar-name-star\{position:absolute;left:100%;top:0/);
+ assert.match(css,/\.avatar-portrait\{--badge-inset:2px;--badge-size:23px/);
+ assert.match(css,/\.card-settings\{[^}]*top:var\(--badge-inset\);right:var\(--badge-inset\)[^}]*width:var\(--badge-size\);height:var\(--badge-size\)/);
+ assert.match(css,/\.card-badge\{[^}]*width:var\(--badge-size\);height:var\(--badge-size\)/);
+ assert.match(css,/\.card-badge\.training\{bottom:var\(--badge-inset\);left:var\(--badge-inset\)/);
  assert.ok(app.includes('marker.textContent=String(ordinal)'));
- assert.ok(css.match(/\.avatar-instance,\.avatar-preview\{[^}]*width:18px;height:18px;display:grid;place-items:center;background:#28374d80/));
+ assert.match(css,/\.avatar-instance\{--instance-size:18px;--instance-inset:calc\(var\(--badge-inset\) \+ \(var\(--badge-size\) - var\(--instance-size\)\) \/ 2\);position:absolute;top:var\(--instance-inset\);left:var\(--instance-inset\)[^}]*background:#28374d80/);
  assert.ok(css.match(/\.avatar-card\{[^}]*border:0/));
  assert.ok(!css.match(/\.card-settings\{[^}]*filter:/));
  assert.ok(!css.includes('brightness(0)'));
@@ -143,4 +154,9 @@ test('图鉴标签及搜索使用本地游戏图标，星级筛选与类型筛�
  assert.ok(css.includes('width:calc(6em + 18px)'));
  assert.ok(app.includes("makeChip(n+'★',null,"));assert.ok(css.includes('.filter-chip.star-chip,.filter-chip.icon-only{width:var(--filter-height)'));
  assert.ok(!css.match(/\.tabs\{[^}]*border-bottom/));assert.ok(css.includes('.tab.active{color:var(--ink);background:var(--cream)}'));
+});
+
+test('武器标签使用原始 UI_BagTabIcon_Weapon 游戏资源',()=>{
+ const data=readFileSync(new URL('../wwwroot/icons/weapon-tab.png',import.meta.url));
+ assert.equal(createHash('sha1').update('blob '+data.length+'\0').update(data).digest('hex'),'0d0d5e212a33dfdf17afd6523f8e3cfc9d911698');
 });

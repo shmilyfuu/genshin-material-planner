@@ -380,12 +380,20 @@ function rosterCard(row){
     const marker=document.createElement('span');marker.className='avatar-instance';
     marker.textContent=String(ordinal);marker.dataset.digits=String(Math.min(3,marker.textContent.length));marker.title='同名武器 '+ordinal;artwork.append(marker);
   }
-  if(row.sourceTag){
-    const preview=document.createElement('span');preview.className='avatar-preview';
-    preview.textContent='*';preview.title=row.sourceTag;preview.setAttribute('aria-label',row.sourceTag);artwork.append(preview);
-  }
   const title=document.createElement('span');title.className='avatar-name';
-  title.textContent=row.name;title.title=row.name;
+  const label=document.createElement('span');label.className='avatar-name-label';
+  const name=document.createElement('span');name.className='avatar-name-text';name.textContent=row.name;
+  label.append(name);
+  title.title=row.name;
+  if(row.sourceTag){
+    title.classList.add('is-preview');
+    const star=document.createElement('span');star.className='avatar-name-star';
+    star.textContent='*';star.title=row.sourceTag;star.setAttribute('aria-label',row.sourceTag);
+    label.append(star);
+    title.title=row.name+'* · '+row.sourceTag;
+    card.setAttribute('aria-label',row.name+'，'+row.sourceTag+'，单击选择');
+  }
+  title.append(label);
   card.append(artwork,title);
   const onEdit=()=>openEditor(goal,{kind,row,instance:row.instance||null});
   artwork.append(editButton(onEdit));
