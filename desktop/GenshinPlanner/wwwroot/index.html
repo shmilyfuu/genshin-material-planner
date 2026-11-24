@@ -84,7 +84,7 @@
     <div id="mysQr" hidden><img id="mysQrImage" width="220" height="220" alt="米游社登录二维码"><div class="modal-actions"><button id="mysPoll" type="button">检查扫码状态</button></div></div>
     <div class="goal-field"><span>原神 UID</span><select id="mysUid"></select></div>
     <div class="modal-actions"><button id="mysReadUid" type="button">读取 UID</button><button id="mysSync" class="primary-btn" type="button">同步全部材料</button><button id="mysDiagnose" type="button">材料诊断</button></div>
-    <p id="mysStatus" role="status"></p><p>库存由官方养成计算器反推，达到请求上限的材料为估算下限。未返回的材料保留同步背包中的已有库存。</p>
+    <p id="mysStatus" role="status"></p><p>库存按材料系列反推，虚线表示可确认的原始库存下限。未确定的材料留空；同步成功后更新整个同步背包。</p>
     <div class="modal-actions"><button id="mysClose" type="button">关闭</button></div>
   </div>
 </div>

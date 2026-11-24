@@ -594,7 +594,7 @@ function renderInventory(){
     button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));
   }
   $('inventoryModeNote').textContent=synced
-    ?(Object.keys(state.syncedMaterialInventory).length?'米游社库存 · 只读，虚线表示探测下限。':'尚未同步材料，请通过米游社同步。')
+    ?(Object.keys(state.syncedMaterialInventory).length?'米游社库存 · 虚线表示下限，未知库存按 0 估算缺口。':'尚未同步材料，请通过米游社同步。')
     :'手动库存 · 输入框左侧可增加或减少 1。';
   const holder=$('inventoryGroups');holder.replaceChildren();
   const id=selectedGoalId||inventoryGoalId;const goal=goalById(id);
@@ -831,6 +831,12 @@ async function start(){
   try{const record=await bridge('storage.load');if(record)state=normalizeState(record);}catch(e){toast('读取本地数据失败：'+e.message);}
   initializePlanner(state);renderAll();
   installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,
+    loadInventoryProfile:async(kind,entry)=>{
+      const row=kind==='character'?charRow(entry.id):weaponRow(entry.id);
+      if(!row)throw Error('Nanoka 目录未匹配');
+      const response=await bridge('data.fetch',{path:`/gi/${encodeURIComponent(row.version)}/zh/${kind}/${row.id}.json`,force:false,maxAge:86400000});
+      return kind==='character'?parseCharacterDetail(response.data,row):parseWeaponDetail(response.data,row);
+    },
     loadDiagnosticWeapon:async weapon=>{
       const row=weaponRow(weapon.id);
       if(!row)throw Error('Nanoka 武器目录未匹配');

@@ -1,4 +1,5 @@
-import {buildInventoryRequests,readInventoryRows,mergeInventoryRows} from './mys-inventory.mjs';
+import {buildInventoryRequests} from './mys-inventory.mjs';
+import {readInventoryObservation,buildRecoveryCatalog,recoverMaterialFamily,recoverInventory,buildFamilyProbe} from './inventory-recovery.mjs';
 import {buildDiagnosticCases,captureDiagnosticResponse,weaponMatchesFamily,DIAGNOSTIC_FAMILY_IDS,DIAGNOSTIC_KNOWN_NAMES} from './inventory-diagnostics.mjs';
 'use strict';
 
@@ -488,7 +489,7 @@ async function mysAllWeapons(cookie,headers){
   }
   throw Error('武器目录页数超过预期。');
 }
-async function syncInventory(uid,region,progress){
+async function syncInventory(uid,region,progress,loadProfile){
   const roles=await mysRoles();
   if(!roles.some(r=>r.uid===uid&&r.region===region))throw Error('所选 UID 与当前账号不匹配。');
   const accounts=await mysReadAccounts(),id=accounts.activeId,account=accounts.entries[id];
@@ -496,28 +497,60 @@ async function syncInventory(uid,region,progress){
   progress?.('正在读取官方角色与武器目录…');
   const [avatars,weapons]=await Promise.all([mysAllCalculatorAvatars(cookie,headers),mysAllWeapons(cookie,headers)]);
   const plan=buildInventoryRequests(avatars,weapons);
-  const values=new Map();
+  const profiles=new Map(),profileFailures=[],entries=[...avatars.map(row=>({kind:'character',row})),...weapons.map(row=>({kind:'weapon',row}))];
+  let cursor=0,done=0;
+  await Promise.all(Array.from({length:5},async()=>{
+    while(cursor<entries.length){
+      const {kind,row}=entries[cursor++];
+      try{profiles.set(kind+':'+Number(row.id),await loadProfile(kind,row));}
+      catch(e){profileFailures.push({kind,id:Number(row.id),name:String(row.name||''),error:String(e.message||e).slice(0,200)});}
+      finally{done++;progress?.(`识别材料系列 ${done}/${entries.length}`);}
+    }
+  }));
+  const catalog=buildRecoveryCatalog(avatars,weapons,profiles);
+  if(!catalog.families.length)throw Error('未能识别材料系列，请刷新游戏资料后重试。');
+  const observations=[],requestKeys=new Set(),probeErrors=[];
+  let requests=0;
   const request=async items=>{
+    const key=JSON.stringify(items);
+    if(requestKeys.has(key))return;
     const response=await mysCalcPost('/v3/batch_compute',{items,uid,region,lang:'zh-cn'},cookie,headers);
-    return readInventoryRows(response);
+    observations.push(readInventoryObservation(response));requestKeys.add(key);requests++;
   };
   let completed=0;
   for(const batch of plan.batches){
-    progress?.(`计算材料 ${completed+1}/${plan.batches.length} · ${plan.characterCount} 名角色 / ${plan.weaponCount} 类武器`);
-    // Each batch has distinct carrier IDs; split only if the service rejects a large batch.
-    let rows;
-    try{rows=await request(batch);}
+    progress?.(`读取基础需求 ${completed+1}/${plan.batches.length} · ${plan.characterCount} 名角色 / ${plan.weaponCount} 类武器`);
+    try{await request(batch);}
     catch(e){
       if(batch.length<=30||/接口错误 -100|UID 库存/.test(e.message))throw e;
-      rows=[];
-      for(let i=0;i<batch.length;i+=30)rows.push(...await request(batch.slice(i,i+30)));
+      for(let i=0;i<batch.length;i+=30)await request(batch.slice(i,i+30));
     }
-    mergeInventoryRows(values,rows);completed++;
+    completed++;
   }
+  // Use each family independently. Do not merge fulfilled demand across observations.
+  // Prefer high-tier probes; only query lower tiers if the raw counts remain unresolved.
+  for(const [index,group] of catalog.families.entries()){
+    for(let tier=group.ids.length-1;tier>=0;tier--){
+      const recovery=recoverMaterialFamily(group.ids,observations);
+      if(recovery.complete||recovery.contradiction)break;
+      if(recovery.lo[tier]===recovery.hi[tier])continue;
+      const items=buildFamilyProbe(group,tier,avatars);
+      if(!items.length||requestKeys.has(JSON.stringify(items)))continue;
+      progress?.(`恢复材料库存 ${index+1}/${catalog.families.length} · 材料 ${group.ids[tier]}`);
+      await new Promise(resolve=>setTimeout(resolve,500));
+      try{await request(items);}
+      catch(e){
+        if(/接口错误 -100|UID 库存|HTTP 429|频繁|风控/.test(e.message))throw e;
+        probeErrors.push({ids:group.ids,tier,error:String(e.message||e).slice(0,200)});
+      }
+    }
+  }
+  const recovered=recoverInventory(catalog,observations);
   const latest=await mysReadAccounts();
   if(latest.activeId!==id||latest.entries[id]?.stoken!==account.stoken)throw Error('查询期间登录账号发生变化。');
-  if(!values.size)throw Error('米游社未返回有效材料。');
-  return {uid,region,materials:[...values.values()],characterCount:plan.characterCount,weaponCount:plan.weaponCount,batches:completed};
+  if(!recovered.materials.length)throw Error('米游社未返回可确认的材料库存。');
+  return {uid,region,replace:true,materials:recovered.materials,characterCount:plan.characterCount,weaponCount:plan.weaponCount,
+    batches:requests,unresolved:recovered.unresolved,conflicts:recovered.conflicts,profileFailures,probeErrors};
 }
 async function diagnoseInventory(uid,region,progress,loadProfile){
   const roles=await mysRoles();

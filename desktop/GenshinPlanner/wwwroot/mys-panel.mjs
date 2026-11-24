@@ -54,11 +54,11 @@ export function installMiyoushePanel(bridge,options){
     if(options.getPlanningId()!==planningId)throw Error('规划账号已切换，请重新打开米游社。');
     const existing=options.getInventoryUid();
     if(existing&&existing!==role.uid)throw Error('该 UID 与当前规划账号不同，请切换规划账号。');
-    const result=await api.syncInventory(role.uid,role.region,text);
+    const result=await api.syncInventory(role.uid,role.region,text,options.loadInventoryProfile);
     if(options.getPlanningId()!==planningId|| (options.getInventoryUid()&&options.getInventoryUid()!==role.uid))throw Error('查询期间规划账号发生变化。');
     options.apply(result);
     const min=result.materials.filter(m=>m.minimum).length;
-    text(`同步背包已更新 · ${result.characterCount} 名角色 / ${result.weaponCount} 类武器 / ${result.materials.length} 种材料 · ${min} 种达到探测上限。`);
+    text(`同步背包已更新 · ${result.materials.length-min} 种已确定 / ${min} 种下限 / ${result.unresolved.length} 种未确定 · ${result.batches} 次请求。`);
   });
   $('mysDiagnose').onclick=()=>action(async()=>{
     const role=roles.find(r=>r.uid+'|'+r.region===uid.value);
