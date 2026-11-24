@@ -51,11 +51,29 @@ export const WEAPON_ASC_3STAR_DATA = [
   [75000,2,6,6,0,10,12,6,6,10,4],
   [105000,2,6,6,3,10,12,18,6,10,12]
 ];
+// One- and two-star weapons have four ascensions (maximum Lv.70).
+export const WEAPON_ASC_1STAR_DATA = [
+  [0,0,0,0,0,0,0,0,0,0,0],
+  [0,1,0,0,0,1,0,0,1,0,0],
+  [5000,1,1,0,0,5,0,0,3,0,0],
+  [10000,1,3,0,0,5,2,0,3,2,0],
+  [20000,1,3,1,0,5,6,0,3,5,0]
+];
+export const WEAPON_ASC_2STAR_DATA = [
+  [0,0,0,0,0,0,0,0,0,0,0],
+  [5000,1,0,0,0,1,0,0,1,0,0],
+  [10000,1,1,0,0,6,0,0,5,0,0],
+  [20000,1,4,0,0,6,3,0,5,3,0],
+  [35000,1,4,1,0,6,8,0,5,7,0]
+];
+export const weaponMaxAscension = rarity => [1,2].includes(Number(rarity))?4:6;
 export function weaponAscensionTable(rarity){
   const tier=Number(rarity);
   if(tier===5)return WEAPON_ASC_DATA;
   if(tier===4)return WEAPON_ASC_4STAR_DATA;
   if(tier===3)return WEAPON_ASC_3STAR_DATA;
+  if(tier===2)return WEAPON_ASC_2STAR_DATA;
+  if(tier===1)return WEAPON_ASC_1STAR_DATA;
   throw new Error(`暂不支持 ${tier} 星武器的突破需求`);
 }
 

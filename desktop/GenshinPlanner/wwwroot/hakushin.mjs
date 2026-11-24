@@ -226,15 +226,16 @@ export function parseWeaponDetail(raw, fallback = {}) {
   const rarity=normalizeRarity(data.rarity ?? data.rank ?? fallback.rarity ?? 0);
   const specs={5:[[5,14,14,6],[23,27,41],[15,23,27]],
     4:[[3,9,9,4],[15,18,27],[10,15,18]],
-    3:[[2,6,6,3],[10,12,18],[6,10,12]]};
+    3:[[2,6,6,3],[10,12,18],[6,10,12]],
+    2:[[1,4,1],[6,8],[5,7]],1:[[1,3,1],[5,6],[3,5]]};
   const totals=specs[rarity]||[[],[],[]];
   const weapGems=totals[0].length?matchWeaponMaterialSeries(asc,totals[0]):[];
   const matA=totals[1].length?matchWeaponMaterialSeries(asc,totals[1]):[];
   const matB=totals[2].length?matchWeaponMaterialSeries(asc,totals[2]):[];
   const warnings = [];
-  if (nonNull(weapGems).length < 4) warnings.push('武器突破材料识别不完整');
-  if (nonNull(matA).length < 3) warnings.push('武器素材 A 识别不完整');
-  if (nonNull(matB).length < 3) warnings.push('武器素材 B 识别不完整');
+  if (nonNull(weapGems).length < (rarity<=2?3:4)) warnings.push('武器突破材料识别不完整');
+  if (nonNull(matA).length < (rarity<=2?2:3)) warnings.push('武器素材 A 识别不完整');
+  if (nonNull(matB).length < (rarity<=2?2:3)) warnings.push('武器素材 B 识别不完整');
 
   return {
     kind: 'weapon',

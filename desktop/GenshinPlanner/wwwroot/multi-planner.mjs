@@ -1,4 +1,5 @@
 import {calcTieredDeficit, safeEval} from './core.mjs';
+import {weaponOrdinal} from './planner-model.mjs';
 import {buildNanokaDemand} from './hybrid-calculator.mjs';
 
 const idOf = (material) => {
@@ -6,10 +7,11 @@ const idOf = (material) => {
   return Number.isSafeInteger(value) && value > 0 ? String(value) : '';
 };
 
-export function migrateLegacyInventory(inventory, character, weapon, rules = {}) {
+export function migrateLegacyInventory(inventory, character, weapon, rules = {}, missing = null) {
   const values = {};
   const assign = (material, input) => {
     const id = idOf(material);
+    if (!id && typeof input === 'string' && input.trim()) missing?.push(input);
     if (id && typeof input === 'string' && input.trim()) {
       if (!Object.hasOwn(values, id)) values[id] = input.slice(0, 120);
     }
@@ -59,12 +61,13 @@ export function calculateMultiPlan(entries, inventory = {}) {
         || plan?.source?.selectedWeaponName || '未载入的养成对象');
       continue;
     }
-    const built = buildNanokaDemand({
+    let built;
+    try { built = buildNanokaDemand({
       config: plan.config,
       characterProfile: entry.characterProfile,
       weaponProfile: entry.weaponProfile,
       parts: {character: Boolean(charId), weapon: Boolean(weaponId)}
-    });
+    }); } catch(error) { unavailable.push((plan.source.selectedCharacterName||plan.source.selectedWeaponName||'培养目标')+' · '+error.message); continue; }
     for (const group of built.groups) {
       const link = [];
       for (const row of group.rows) {
@@ -213,7 +216,7 @@ export function planMaterialUsage(entries) {
   return result;
 }
 
-export function materialContributions(entries){
+export function materialContributions(entries,state=null){
   const result=new Map();
   const counts=new Map(),ordinals=new Map();
   for(const {plan} of entries){
@@ -227,15 +230,17 @@ export function materialContributions(entries){
     if(weaponId){
       const ordinal=(ordinals.get(weaponId)||0)+1;
       ordinals.set(weaponId,ordinal);
-      if(counts.get(weaponId)>1)name+=` #${ordinal}`;
+      const actual=state?weaponOrdinal(state,goal.weaponInstanceId):ordinal;
+      const total=state?state.weaponInstances.filter(w=>w.weaponId===weaponId).length:counts.get(weaponId);
+      if(total>1&&actual>0)name+=` #${actual}`;
     }
     if(goal.enabled===false||goal.completed===true)continue;
     const character=Boolean(goal.source?.selectedCharacterId);
     const weapon=Boolean(goal.source?.selectedWeaponId);
     if(character&&!entry.characterProfile||weapon&&!entry.weaponProfile)continue;
-    const built=buildNanokaDemand({config:goal.config,
+    let built;try{built=buildNanokaDemand({config:goal.config,
       characterProfile:entry.characterProfile,weaponProfile:entry.weaponProfile,
-      parts:{character,weapon}});
+      parts:{character,weapon}});}catch{continue;}
     for(const row of built.groups.flatMap(g=>g.rows)){
       if(!row.count)continue;
       const id=String(row.id),items=result.get(id)||[];
@@ -243,4 +248,12 @@ export function materialContributions(entries){
     }
   }
   return result;
+}
+
+// Presentation derives from the existing deficit allocation; it never recalculates it.
+export function singleGoalRows(group){
+  const needsFarming=group.rows.some(row=>row.lack>0);
+  return group.rows.filter(row=>row.count>0||row.lack>0).map(row=>({
+    ...row,status:row.lack>0?'deficit':group.family&&needsFarming&&group.rows.some(lower=>lower.rank<row.rank&&lower.lack>0)&&row.stock<row.count?'craftPending':'satisfied'
+  }));
 }

@@ -30,7 +30,7 @@ test('游戏图标为本地 PNG 文件',()=>{
 test('更新前保存规划，版本来自宿主，启动后自动检查更新',()=>{
  const source=read('desktop-app.mjs');
  assert.ok(source.includes("bridge('app.version')"));
- assert.ok(source.includes("await bridge('storage.save',{state:snapshot()});"));
+ assert.ok(source.includes("await flushSave();"));
  assert.ok(source.includes("bridge('update.install',{version:updateCandidate.latest})"));
  assert.ok(source.includes("void checkUpdate();"));
 });

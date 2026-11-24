@@ -17,8 +17,8 @@ test('桌面窗口使用可调整三栏、顶部培养区、日历和常驻缺�
   }
   assert.ok(html.includes('class="deficit-rail"'));
   assert.equal((html.match(/class="column-resizer"/g)||[]).length,2);
-  assert.ok(css.includes('minmax(78px,1fr)'));
-  assert.ok(css.includes('64px'));
+  assert.ok(css.includes('minmax(82px,1fr)'));
+  assert.ok(css.includes('--strip-height:29px'));
   assert.ok(css.includes('16px;height:16px'));
   assert.ok(js.includes("bridge('ui.layout.load')"));
   assert.ok(js.includes("bridge('ui.layout.save'"));

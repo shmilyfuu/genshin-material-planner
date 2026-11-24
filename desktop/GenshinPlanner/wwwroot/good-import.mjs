@@ -53,49 +53,43 @@ export function importGOOD(state,raw,{characters=[],weapons=[],confirmAmbiguous=
       location:String(w.location||''),lock:!!w.lock,scanned:true});
   }
   const existing=state.weaponInstances;
-  const matched=new Set();
   const fingerprint=w=>[w.weaponId,w.level,w.ascension,w.refinement,w.location].join('|');
-  for(const w of incoming){
-    let candidates=existing.filter(x=>!matched.has(x.id)&&x.weaponId===w.weaponId&&fingerprint(x)===fingerprint(w));
-    if(candidates.length!==1&&w.location){
-      const uniqueLocation=existing.filter(x=>!matched.has(x.id)&&x.weaponId===w.weaponId&&x.location===w.location);
-      if(uniqueLocation.length===1)candidates=uniqueLocation;
+  const note=w=>ambiguous.push(`${w.key} Lv.${w.level} R${w.refinement}`);
+  const add=w=>{const item={id:newId('weapon'),...w};existing.push(item);newWeapons.push(item.id);};
+  const update=(old,w)=>{
+    Object.assign(old,w);
+    const target=weaponGoal(state,old.id);
+    if(target)target.config.weapAsc[0]=Math.min(target.config.weapAsc[1],Math.max(0,Math.min(6,Math.trunc(w.ascension))));
+    updatedWeapons.push(old.id);
+  };
+  for(const weaponId of new Set(incoming.map(w=>w.weaponId))){
+    const old=existing.filter(w=>w.weaponId===weaponId);
+    const fresh=incoming.filter(w=>w.weaponId===weaponId);
+    const unused=new Set(old),pending=new Set(fresh);
+    // Reserve all exact identities before considering changes of level or equipment.
+    for(const key of new Set(fresh.map(fingerprint))){
+      const a=old.filter(w=>unused.has(w)&&fingerprint(w)===key);
+      const b=fresh.filter(w=>pending.has(w)&&fingerprint(w)===key);
+      if(!a.length)continue;
+      if(a.length===1&&b.length===1){update(a[0],b[0]);}
+      else{
+        b.forEach(note);
+        if(confirmAmbiguous)for(let i=0;i<Math.min(a.length,b.length);i++)update(a[i],b[i]);
+        for(let i=a.length;i<b.length;i++)add(b[i]);
+      }
+      a.forEach(w=>unused.delete(w));b.forEach(w=>pending.delete(w));
     }
-    if(candidates.length===1){
-      const found=candidates[0];Object.assign(found,w);matched.add(found.id);
-      const target=weaponGoal(state,found.id);
-      if(target)target.config.weapAsc[0]=Math.min(target.config.weapAsc[1],Math.max(0,Math.min(6,w.ascension)));
-      updatedWeapons.push(found.id);continue;
+    for(const location of new Set([...pending].map(w=>w.location).filter(Boolean))){
+      const a=[...unused].filter(w=>w.location===location),b=[...pending].filter(w=>w.location===location);
+      if(a.length===1&&b.length===1){update(a[0],b[0]);unused.delete(a[0]);pending.delete(b[0]);}
     }
-    if(candidates.length>1){
-      ambiguous.push(`${w.key} Lv.${w.level} R${w.refinement}`);
-      if(!confirmAmbiguous)continue;
-      const found=candidates[0];matched.add(found.id);Object.assign(found,w);updatedWeapons.push(found.id);continue;
-    }
-    // An older same-name instance with changed level is ambiguous if several exist.
-    const sameName=existing.filter(x=>!matched.has(x.id)&&x.weaponId===w.weaponId);
-    if(sameName.length>1){ambiguous.push(`${w.key} Lv.${w.level} R${w.refinement}`);continue;}
-    if(sameName.length===1){
-      const old=sameName[0];Object.assign(old,w);matched.add(old.id);
-      const target=weaponGoal(state,old.id);
-      if(target)target.config.weapAsc[0]=Math.min(target.config.weapAsc[1],Math.max(0,Math.min(6,w.ascension)));
-      updatedWeapons.push(old.id);continue;
-    }
-    const item={id:newId('weapon'),...w};existing.push(item);matched.add(item.id);newWeapons.push(item.id);
-  }
-  // If a later scan contains more indistinguishable copies, preserve the
-  // existing IDs and create only the additional physical instances.
-  const byType=new Map();
-  for(const item of incoming){
-    const group=byType.get(item.weaponId)||[];group.push(item);byType.set(item.weaponId,group);
-  }
-  for(const [weaponId,scanned] of byType){
-    const present=existing.filter(item=>item.weaponId===weaponId);
-    const shortage=Math.max(0,scanned.length-present.length);
-    for(let i=0;i<shortage;i++){
-      const entry=scanned[scanned.length-shortage+i];
-      const created={...entry,id:newId('weapon')};
-      existing.push(created);newWeapons.push(created.id);
+    if(unused.size===1&&pending.size===1){update([...unused][0],[...pending][0]);pending.clear();}
+    if(!unused.size){for(const w of pending)add(w);}
+    else if(pending.size){
+      for(const w of pending)note(w);
+      // The count is known, but the identities of changed copies are not.
+      const shortage=Math.max(0,fresh.length-existing.filter(w=>w.weaponId===weaponId).length);
+      for(const w of [...pending].slice(0,shortage))add(w);
     }
   }
   // Adopt a scanned equipment relationship only when a character already has a

@@ -1,11 +1,11 @@
-import {CHAR_LEVEL_LABELS, cloneDefaultState, normalizeState, safeEval} from './core.mjs';
+import {CHAR_LEVEL_LABELS, weaponMaxAscension, cloneDefaultState, normalizeState, safeEval} from './core.mjs';
 import {
   normalizeCharacterList, normalizeWeaponList, mergeSourceLists,
   parseCharacterDetail, parseWeaponDetail, readManifestVersions,
   detectMergeRules, itemIconUrl
 } from './hakushin.mjs';
-import {calculateMultiPlan, collectInventoryCatalog, planMaterialUsage, migrateLegacyInventory, materialContributions} from './multi-planner.mjs';
-import {initializePlanner,makeGoal,makeWeaponInstance,characterGoal,weaponGoal,weaponInstance,goalKind,goalObjectId,activeGoals,visibleRoster,setLink,removeWeaponInstance,newId} from './planner-model.mjs';
+import {calculateMultiPlan, collectInventoryCatalog, planMaterialUsage, migrateLegacyInventory, materialContributions, singleGoalRows} from './multi-planner.mjs';
+import {initializePlanner,makeGoal,makeWeaponInstance,characterGoal,weaponGoal,weaponInstance,goalKind,goalObjectId,activeGoals,visibleRoster,setLink,removeWeaponInstance,weaponOrdinal,newId} from './planner-model.mjs';
 import {importGOOD,validateGOOD} from './good-import.mjs';
 import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
@@ -65,7 +65,7 @@ const $=id=>document.getElementById(id);
 const host=window.chrome?.webview;
 let sequence=0;const pending=new Map();
 if(host){host.addEventListener('message',ev=>{
-  const d=ev.data;if(d?.event==='update.progress'){renderUpdateProgress(d.progress);return;}if(!d||!pending.has(d.id))return;
+  const d=ev.data;if(d?.event==='update.progress'){renderUpdateProgress(d.progress);return;}if(d?.event==='app.closing'){void prepareClose();return;}if(!d||!pending.has(d.id))return;
   const task=pending.get(d.id);pending.delete(d.id);
   if(d.ok)task.resolve(d.data);else task.reject(new Error(d.error||'操作失败'));
 });}
@@ -98,7 +98,7 @@ let listVersion={live:'',latest:''};
 let profileLoadToken=0;
 let filter=createRosterFilter();
 let selectedGoalId=null,inventoryGoalId=null,selectedRosterKey=null,goalEditor=null;
-let saveTimer=null,writeChain=Promise.resolve(),toastTimeout=null;
+let saveTimer=null,writeChain=Promise.resolve(),toastTimeout=null,storageReady=false,closing=false;
 let currentModalResolve=null;
 
 const COLUMN_MIN=[460,250,290];
@@ -129,7 +129,7 @@ function displayColumns(){
 function saveColumns(){
   clearTimeout(layoutSaveTimer);
   const layout={columns:[...columnWidths]};
-  layoutSaveChain=layoutSaveChain.then(()=>bridge('ui.layout.save',{layout})).catch(e=>setStatus('保存列宽失败：'+e.message,'error'));
+  const operation=layoutSaveChain.catch(()=>{}).then(()=>bridge('ui.layout.save',{layout}));layoutSaveChain=operation;void operation.catch(e=>setStatus('保存列宽失败：'+e.message,'error'));return operation;
 }
 function deferSaveColumns(){
   clearTimeout(layoutSaveTimer);
@@ -204,8 +204,9 @@ function snapshot(){
   if(active){state.source=structuredClone(active.source);state.config=structuredClone(active.config);}
   saveActivePlannerAccount(state);return structuredClone(state);
 }
-function flushSave(){clearTimeout(saveTimer);const data=snapshot();writeChain=writeChain.then(()=>bridge('storage.save',{state:data})).catch(e=>setStatus('保存失败：'+e.message,'error'));return writeChain;}
-function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(flushSave,300);}
+function flushSave(){clearTimeout(saveTimer);if(!storageReady)return Promise.reject(Error('本地规划尚未成功读取。'));const data=snapshot();const operation=writeChain.catch(()=>{}).then(()=>bridge('storage.save',{state:data}));writeChain=operation;return operation;}
+function scheduleSave(){if(!storageReady||closing)return;clearTimeout(saveTimer);saveTimer=setTimeout(()=>void flushSave().catch(e=>setStatus('保存失败：'+e.message,'error')),300);}
+async function prepareClose(){if(closing)return;closing=true;document.querySelector('.app').inert=true;try{if(storageReady)await flushSave();await saveColumns();await bridge('app.closeReady',{ok:true});}catch(e){await bridge('app.closeReady',{ok:false,error:e.message});closing=false;document.querySelector('.app').inert=!storageReady;}}
 
 const goalById=id=>state.plans.find(g=>g.id===id)||null;
 const selectedGoal=()=>goalById(selectedGoalId);
@@ -220,8 +221,8 @@ const objName=goal=>{
   if(goalKind(goal)!=='weapon')return name;
   const all=state.weaponInstances.filter(w=>w.weaponId===goalObjectId(goal));
   if(all.length<=1)return name;
-  const index=all.findIndex(w=>w.id===goal.weaponInstanceId);
-  return index>=0?`${name} #${index+1}`:name;
+  const ordinal=weaponOrdinal(state,goal.weaponInstanceId);
+  return ordinal>0?`${name} #${ordinal}`:name;
 };
 const charRow=id=>characterList.find(x=>x.id===String(id));
 const weaponRow=id=>weaponList.find(x=>x.id===String(id));
@@ -376,7 +377,7 @@ function rosterCard(row){
     done.title='养成结束';artwork.append(done);
   }
   if(row.instance){
-    const ordinal=state.weaponInstances.filter(w=>w.weaponId===row.id).findIndex(w=>w.id===row.instance.id)+1;
+    const ordinal=weaponOrdinal(state,row.instance.id);
     const marker=document.createElement('span');marker.className='avatar-instance';
     marker.textContent=String(ordinal);marker.dataset.digits=String(Math.min(3,marker.textContent.length));marker.title='同名武器 '+ordinal;artwork.append(marker);
   }
@@ -431,11 +432,11 @@ function editorSelect(label,choices,value,callback){
   row.append(name,select);return row;
 }
 function levelRows(kind,goal,body){
-  const defs=kind==='character'?[['charAsc','角色突破',6],['talentA','普通攻击',9],['talentE','元素战技',9],['talentQ','元素爆发',9]]:[['weapAsc','武器突破',6]];
+  const defs=kind==='character'?[['charAsc','角色突破',6],['talentA','普通攻击',9],['talentE','元素战技',9],['talentQ','元素爆发',9]]:[['weapAsc','武器突破',weaponMaxAscension(weaponRow(goalObjectId(goal))?.rarity)]];
   for(const [key,label,max] of defs){
     const row=document.createElement('div');row.className='goal-level-field';
     const caption=document.createElement('span');caption.textContent=label;
-    const pair=goal.config[key];
+    const pair=goal.config[key];pair[0]=Math.min(max,pair[0]);pair[1]=Math.min(max,pair[1]);
     const options=Array.from({length:max+1},(_,i)=>[String(i),max===9?`${i+1} 级`:CHAR_LEVEL_LABELS[i]]);
     const makeSelect=(value,side)=>{
       const select=document.createElement('select');
@@ -493,7 +494,7 @@ function updateLinkedWeaponField(goal,body){
   const items=[{id:'',label:'暂不关联武器'}];
   for(const instance of state.weaponInstances){
     const row=weaponRow(instance.weaponId);if(!row||!available(row))continue;
-    const ordinal=state.weaponInstances.filter(w=>w.weaponId===instance.weaponId).findIndex(w=>w.id===instance.id)+1;
+    const ordinal=weaponOrdinal(state,instance.id);
     items.push({id:instance.id,row,ordinal,label:row.name+' #'+ordinal+' · Lv.'+instance.level+' R'+instance.refinement});
   }
   items.push({id:'__new__',label:'新建并关联武器实例'});
@@ -572,7 +573,7 @@ async function deleteEditor(){
 async function removeEditorWeapon(){
   const editor=goalEditor,instance=editor?.instance;if(!instance)return;
   const linked=state.plans.filter(g=>goalKind(g)==='character'&&g.linkedWeaponInstanceId===instance.id).length;
-  const ordinal=state.weaponInstances.filter(w=>w.weaponId===instance.weaponId).findIndex(w=>w.id===instance.id)+1;
+  const ordinal=weaponOrdinal(state,instance.id);
   const accepted=await modal({title:'移除武器实例',description:'确定移除 '+editor.targetRow.name+' #'+ordinal+'？该实例的培养目标将一同移除。'+(linked?'\n另有 '+linked+' 个角色目标将解除关联。':''),requiresText:false,confirm:'移除'});
   if(accepted===null)return;
   try{const result=removeWeaponInstance(state,instance.id);const removed=new Set(result.removedGoalIds);
@@ -684,14 +685,14 @@ function renderResults(){
   $('resultSummary').textContent=partial?'单项目标与全部需求对照':'共用背包统一扣除';
   const holder=$('resultContent');holder.replaceChildren();
   const allById=new Map(allResult.groups.flatMap(g=>g.rows).map(r=>[String(r.id),r]));
-  const sourceMap=materialContributions(all);
+  const sourceMap=materialContributions(all,state);
   const catalog=collectInventoryCatalog(all);
   const categoryById=new Map();for(const [key] of categories)for(const group of catalog[key])for(const row of group.rows){
     if(!categoryById.has(row.id))categoryById.set(row.id,key);
   }
   let seen=0;
   for(const [key,title] of categories){
-    const rows=target.groups.flatMap(g=>g.rows).filter(r=>(partial?r.count>0:r.lack>0)&&categoryById.get(String(r.id))===key);
+    const rows=target.groups.flatMap(g=>partial?singleGoalRows(g):g.rows.filter(r=>r.lack>0)).filter(r=>categoryById.get(String(r.id))===key);
     if(!rows.length)continue;
     const section=document.createElement('section');section.className='deficit-group';
     const heading=document.createElement('h3');heading.textContent=title;section.append(heading);
@@ -702,7 +703,7 @@ function renderResults(){
       const img=document.createElement('img');img.alt='';img.loading='lazy';img.src=itemIconUrl(material.id);img.onerror=()=>img.remove();icon.append(img);
       const title=document.createElement('span');title.className='deficit-name';title.textContent=material.name;
       const value=document.createElement('span');value.className='deficit-value';
-      const primary=document.createElement('strong');primary.textContent=material.lack>0?'缺 × '+displayNum(material.lack):'已满足';value.append(primary);
+      const primary=document.createElement('strong');primary.textContent=material.lack>0?'缺 × '+displayNum(material.lack):material.status==='craftPending'?'补齐后可合成':'已满足';value.append(primary);
       if(partial){const common=document.createElement('small');
         const global=allById.get(String(material.id));common.textContent='全部缺 '+displayNum(global?.lack||0);value.append(common);}
       summary.append(icon,title,value);detail.append(summary);
@@ -791,12 +792,14 @@ async function reloadAllProfiles(force=false){
   const plans=[...state.plans];const results=await Promise.all(plans.map(plan=>loadGoalProfile(plan,force)));
   if(token!==profileLoadToken||account!==state.activeAccountId)return;
   profiles=new Map(plans.map((p,i)=>[p.id,results[i]]));
+  for(const plan of state.plans){if(goalKind(plan)!=='weapon')continue;const row=weaponRow(goalObjectId(plan));if(!row)continue;const max=weaponMaxAscension(row.rarity);plan.config.weapAsc=plan.config.weapAsc.map(n=>Math.min(max,n));}
   if(!state.materialInventoryMigrated&&plans.length){
     const first=plans[0],entry=profiles.get(first.id);
     const linked=first.linkedWeaponInstanceId?plans.find(g=>g.weaponInstanceId===first.linkedWeaponInstanceId):null;
     const weapon=linked?profiles.get(linked.id)?.weaponProfile:entry.weaponProfile;
-    const legacy=migrateLegacyInventory(state.inv,entry.characterProfile,weapon,first.source.mergeRules);
-    state.materialInventory={...legacy,...state.materialInventory};state.materialInventoryMigrated=true;
+    const missing=[];const legacy=migrateLegacyInventory(state.inv,entry.characterProfile,weapon,first.source.mergeRules,missing);
+    if(!missing.length){state.materialInventory={...legacy,...state.materialInventory};state.materialInventoryMigrated=true;}
+    else toast('旧库存尚有材料待识别，将在资料完整后继续迁移。');
   }
   renderAll();save();
 }
@@ -906,7 +909,7 @@ async function installUpdate(){
   updateInstalling=true;$('updateLater').disabled=true;$('updateInstall').disabled=true;
   renderUpdateProgress({phase:'prepare'});
   try{
-    await flushSave();await bridge('storage.save',{state:snapshot()});
+    await flushSave();
     await bridge('update.install',{version:updateCandidate.latest});
     renderUpdateProgress({phase:'handoff'});
   }catch(e){$('updateProgress').hidden=true;$('updateStatus').textContent='更新失败：'+e.message;taskStatus('update','更新失败：'+e.message,'error');$('updateLater').disabled=false;$('updateInstall').disabled=false;updateInstalling=false;}
@@ -952,7 +955,8 @@ async function start(){
   for(const tab of document.querySelectorAll('[data-tab]'))tab.onclick=()=>{
     filter=createRosterFilter(tab.dataset.tab);renderFilters();renderRoster();};
   await initializeColumns();
-  try{const record=await bridge('storage.load');if(record)state=normalizeState(record);}catch(e){toast('读取本地数据失败：'+e.message);}
+  document.querySelector('.app').inert=true;
+  try{const record=await bridge('storage.load');if(record!==null){if(!record||typeof record!=='object'||Array.isArray(record))throw Error('规划文件格式错误');state=normalizeState(record);}storageReady=true;document.querySelector('.app').inert=false;}catch(e){setStatus('读取本地数据失败：'+e.message+'。原文件已保留，请关闭程序检查 data/planner.json。','error');return;}
   initializePlanner(state);renderAll();
   mysPanel=installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,getBinding:()=>state.mysBinding,
     listPlanning:()=>state.plannerAccounts.map(a=>({id:a.id,name:a.name,uid:a.id===state.activeAccountId?state.inventoryUid:a.data?.inventoryUid||''})),

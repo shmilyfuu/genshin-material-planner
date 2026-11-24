@@ -1,4 +1,4 @@
-import {cloneDefaultState} from './core.mjs';
+import {cloneDefaultState,weaponMaxAscension} from './core.mjs';
 
 export const goalKind = goal => goal?.kind || (goal?.source?.selectedCharacterId ? 'character' : 'weapon');
 export const goalObjectId = goal => String(goalKind(goal)==='character'
@@ -7,6 +7,10 @@ export const activeGoals = state => state.plans.filter(g=>g.enabled !== false &&
 export const characterGoal = (state,id) => state.plans.find(g=>goalKind(g)==='character' && goalObjectId(g)===String(id));
 export const weaponGoal = (state,instanceId) => state.plans.find(g=>goalKind(g)==='weapon' && g.weaponInstanceId===instanceId);
 export const weaponInstance = (state,id) => state.weaponInstances.find(w=>w.id===id);
+export function weaponOrdinal(state,instanceId){
+  const instance=weaponInstance(state,instanceId);
+  return instance?state.weaponInstances.filter(w=>w.weaponId===instance.weaponId).findIndex(w=>w.id===instanceId)+1:0;
+}
 export const newId = prefix => prefix+'-'+Math.random().toString(36).slice(2,9)+Date.now().toString(36);
 
 export function makeGoal(kind,row,{id=newId('goal'),instanceId='',current=null}={}){
@@ -27,7 +31,8 @@ export function makeGoal(kind,row,{id=newId('goal'),instanceId='',current=null}=
   }else{
     Object.assign(source,{selectedWeaponId:String(row.id),selectedWeaponName:row.name,
       selectedWeaponTag:row.sourceTag||'',selectedWeaponVersion:row.version||''});
-    config.weapAsc=[Math.max(0,Math.min(6,Number(current?.ascension)||0)),6];
+    const max=weaponMaxAscension(row.rarity);
+    config.weapAsc=[Math.max(0,Math.min(max,Math.trunc(Number(current?.ascension)||0))),max];
   }
   return {id,kind,weaponInstanceId:kind==='weapon'?instanceId:'',linkedWeaponInstanceId:'',
     source,config,enabled:true,completed:false};
