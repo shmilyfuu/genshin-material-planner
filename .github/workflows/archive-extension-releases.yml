@@ -1,0 +1,25 @@
+name: Archive browser extension releases
+on:
+  push:
+    branches: [release/desktop-v0.3.7]
+    paths: ['.github/workflows/archive-extension-releases.yml']
+permissions:
+  contents: write
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Set desktop release as latest
+        run: gh release edit desktop-v0.3.7 --latest
+      - name: Archive historical extension releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tag in v1.5.1 v1.2.12 v1.2.11; do
+            gh release edit "$tag" --draft=true
+            test "$(gh release view "$tag" --json isDraft --jq '.isDraft')" = true
+          done
+          gh release list --json tagName,isDraft,isLatest
