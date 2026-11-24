@@ -27,3 +27,17 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 #mysModal{z-index:55}.mys-modal{width:min(480px,95vw)}.mys-modal #mysQr:not([hidden]){display:grid;justify-items:center;margin:12px 0}.mys-modal #mysQr img{background:#fff}.inventory-minimum{border-style:dashed!important}
 
 .inventory-mode-switch{display:flex;gap:4px;margin-top:10px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:18px;flex:none}.inventory-mode-switch button{flex:1;min-width:0;border:0;background:transparent;color:var(--text);font-size:11px;border-radius:15px;padding:5px 4px;white-space:nowrap}.inventory-mode-switch button.active{background:var(--cream);color:var(--ink);font-weight:700}.material-number input[readonly]{cursor:default}.material-number:has(.inventory-minimum){border-style:dashed}
+
+.header-icon-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;min-height:32px;font-weight:650}
+.header-icon-btn img{width:20px;height:20px;object-fit:contain;filter:brightness(0) saturate(100%);opacity:.72}
+.settings-wrap{position:relative;flex:none}
+.settings-menu[hidden]{display:none}
+.settings-menu{position:absolute;z-index:80;top:calc(100% + 9px);right:0;width:216px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:5px 6px;box-shadow:0 10px 30px #10182470}
+.settings-group{padding:5px 0}
+.settings-group+.settings-group{border-top:1px solid var(--line)}
+.settings-group>span{display:block;padding:4px 10px;font-size:10px;color:var(--muted)}
+.settings-group button{display:block;width:100%;padding:8px 10px;border:0;background:transparent;color:var(--text);text-align:left;border-radius:4px;font-size:11px;cursor:pointer}
+.settings-group button:hover:not(:disabled),.settings-group button:focus-visible{background:var(--surface);color:var(--cream)}
+.settings-group button:disabled{opacity:.45;cursor:default}
+#updateModal{z-index:70}.update-modal{width:min(460px,95vw)}
+.update-notes{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;background:var(--surface);padding:12px;border-radius:6px;font-size:11px;line-height:1.6;color:var(--text)}

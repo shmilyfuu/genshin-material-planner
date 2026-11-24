@@ -7,19 +7,27 @@
 <body>
 <div class="app">
   <header class="app-header">
-    <div class="app-identity"><span class="app-mark">◆</span><div><strong>原神养成规划</strong><span>多账号 · 培养目标 · 手动背包</span></div></div>
-    <div class="account-picker"><select id="accountSelect" aria-label="切换规划账号"></select></div>
-    <button class="soft-btn" id="addAccountButton" type="button">添加账号</button>
-    <button class="soft-btn" id="renameAccountButton" type="button">重命名</button>
-    <button class="soft-btn" id="deleteAccountButton" type="button">删除账号</button>
+    <div class="app-identity"><span class="app-mark">◆</span><div><strong>原神养成规划</strong><span id="appVersion"></span></div></div>
     <div class="header-spacer"></div><span class="data-status" id="dataStatus" role="status">正在读取本地数据…</span>
-    <button class="soft-btn" id="syncInventoryButton" type="button">同步库存</button>
-    <div class="header-actions">
-      <button class="soft-btn" id="refreshButton" type="button">刷新资料</button>
-      <button class="soft-btn" id="importGoodButton" type="button">导入 GGScanner</button>
-      <button class="soft-btn" id="importButton" type="button">导入规划</button>
-      <button class="soft-btn" id="exportButton" type="button">导出规划</button>
-      <button class="soft-btn" id="mysOpen" type="button">米游社</button>
+    <div class="account-picker"><select id="accountSelect" aria-label="切换规划账号"></select></div>
+    <button class="soft-btn header-icon-btn" id="syncInventoryButton" type="button"><img src="icons/inventory.png" alt="">同步库存</button>
+    <div class="settings-wrap" id="settingsWrap">
+      <button class="soft-btn header-icon-btn" id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsMenu"><img src="icons/settings.png" alt="">设置</button>
+      <div id="settingsMenu" class="settings-menu" hidden>
+        <div class="settings-group"><span>账号管理</span>
+          <button id="addAccountButton" type="button">添加规划账号</button>
+          <button id="renameAccountButton" type="button">重命名当前账号</button>
+          <button id="deleteAccountButton" type="button">删除当前账号</button>
+          <button id="mysOpen" type="button">米游社账号与绑定</button>
+        </div>
+        <div class="settings-group"><span>资料与数据</span>
+          <button id="refreshButton" type="button">刷新游戏资料</button>
+          <button id="importGoodButton" type="button">导入 GGScanner</button>
+          <button id="importButton" type="button">导入规划</button>
+          <button id="exportButton" type="button">导出规划</button>
+        </div>
+        <div class="settings-group"><span>程序</span><button id="checkUpdateButton" type="button">检查更新</button></div>
+      </div>
     </div>
   </header>
   <section class="calendar-strip" aria-label="每周刷取日历">
@@ -27,7 +35,7 @@
     <div class="calendar-days" id="calendarDays"></div>
   </section>
   <section class="active-goals-strip" aria-label="正在培养">
-    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 设置按钮编辑 · 暂停后不计入缺口</span></div>
+    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 提升指南按钮编辑 · 暂停后不计入缺口</span></div>
     <div class="active-goal-list" id="activeGoals"></div>
   </section>
   <div class="workbench" id="workbench">
@@ -36,7 +44,7 @@
         <div class="tabs" role="tablist" aria-label="培养对象">
           <button type="button" class="tab active" data-tab="character" aria-selected="true">角色</button>
           <button type="button" class="tab" data-tab="weapon" aria-selected="false">武器</button>
-          <span class="roster-help">单击选择或取消 · 设置按钮编辑</span>
+          <span class="roster-help">单击选择或取消 · 提升指南按钮编辑</span>
         </div>
         <div class="filter-area">
           <div class="filter-top">
@@ -89,6 +97,14 @@
     <div class="modal-actions"><button id="mysUnbind" type="button">解除当前绑定</button><button id="mysDiagnose" type="button">材料诊断</button><button id="mysBind" class="primary-btn" type="button">确认绑定</button></div>
     <p id="mysStatus" role="status"></p><p>库存按材料系列反推，虚线表示可确认的原始库存下限。未确定的材料留空；同步成功后更新整个同步背包。</p>
     <div class="modal-actions"><button id="mysClose" type="button">关闭</button></div>
+  </div>
+</div>
+<div class="modal-backdrop" id="updateModal" hidden>
+  <div class="modal update-modal" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
+    <h2 id="updateTitle">发现新版本</h2><p id="updateVersions"></p>
+    <div id="updateNotes" class="update-notes"></div>
+    <p id="updateStatus" role="status">更新完成后程序将自动重启，本地规划与账号数据将保留。</p>
+    <div class="modal-actions"><button id="updateLater" type="button">稍后更新</button><button id="updateInstall" class="primary-btn" type="button">立即更新</button></div>
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

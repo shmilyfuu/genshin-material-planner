@@ -134,5 +134,5 @@ export function installMiyoushePanel(bridge,options){
     await bridge('mys.diagnostics.save',{report});
     text(`诊断已保存至 data/inventory-diagnostics.json · 有效响应 ${report.successfulCases}/${report.cases.length}${report.error?' · '+report.error:''}`);
   });
-  controls();return {update:controls};
+  controls();return {update:controls,isBusy:()=>busy};
 }

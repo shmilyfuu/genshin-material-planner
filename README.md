@@ -4,7 +4,7 @@
 
 面向原神的 Windows 桌面养成规划工具，支持多角色、多武器培养计划、共享材料库存与每周刷取日历。
 
-**正式版：[v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**　|　**开发版：v0.4.6**
+**[下载正式版](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**
 
 [下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
@@ -20,11 +20,11 @@
 - 导入 GGScanner GOOD v3 数据，匹配角色及武器的当前练度。
 - 支持材料数量手动输入、微调及规划配置导入导出。
 
-### 米游社材料同步（v0.4.6 开发版）
+### 米游社材料同步
 
 支持扫码自动确认、自动读取国服 UID，并绑定已有规划账号或新建规划账号。顶部「同步库存」按当前规划账号的绑定执行同步。通过米游社官方养成计算器的角色和武器目录进行全量材料探测，覆盖官方已收录的未拥有角色与武器。
 
-按材料系列结合需求、缺口和剩余材料反推原始库存，对未确定的品质追加请求。可证明的库存下限单独标记，未知材料留空。每个规划账号独立保存手动背包与同步背包，切换模式后按所选库存计算材料缺口和日历。同步背包为只读，手动背包支持编辑。开发版已通过自动化构建，实际账号登录及库存同步仍需验证。
+按材料系列结合需求、缺口和剩余材料反推原始库存，对未确定的品质追加请求。可证明的库存下限单独标记，未知材料留空。每个规划账号独立保存手动背包与同步背包，切换模式后按所选库存计算材料缺口和日历。同步背包为只读，手动背包支持编辑。部分材料库存仍可能只能获得下限或无法确定。
 
 ## 下载与使用
 
@@ -34,9 +34,11 @@
 
 系统要求：Windows 10/11 x64，Microsoft Edge WebView2 Runtime。发布包包含 .NET 运行时。
 
-单击角色或武器卡片可查看材料与缺口，点击卡片右上角设置按钮可配置培养目标。再次单击选中卡片可返回全部目标视图。
+单击角色或武器卡片可查看材料与缺口，点击卡片右上角提升指南按钮可配置培养目标。再次单击选中卡片可返回全部目标视图。
 
 ## 更新与本地数据
+
+程序启动时自动检查 GitHub Releases 的新正式版本，也可通过「设置 → 检查更新」手动检查。确认后下载、校验并安装更新，保留 `data/` 目录，更新后自动重启。
 
 升级前备份 `data/`，将新版文件覆盖到原程序目录，并保留原有 `data/`。
 
@@ -59,7 +61,7 @@ data/
 - [Nanoka](https://nanoka.cc/)：角色、武器、材料与正式服及前瞻数据。
 - [GachaTracker](https://www.gachatracker.app/games/genshin/)：角色与武器发布时间。
 - [Snap.Metadata](https://github.com/SnapHutaoRemasteringProject/Snap.Metadata)：历史卡池记录，补充发布时间。
-- 米游社养成计算器：材料库存探测（开发版）。
+- 米游社养成计算器：材料库存探测。
 - [SeelieEx](https://github.com/KeyPJ/seelieEx)：材料请求方式参考。
 
 外部数据接口变更可能影响资料读取和同步。

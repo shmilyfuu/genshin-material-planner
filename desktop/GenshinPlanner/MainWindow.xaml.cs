@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     };
 
     private readonly string _dataDir = Path.Combine(AppContext.BaseDirectory, "data");
+    private readonly UpdateHost _updates = new();
     private readonly MiyousheHost _mys = new(Path.Combine(AppContext.BaseDirectory, "data"));
     private string StateFile => Path.Combine(_dataDir, "planner.json");
     private string LayoutFile => Path.Combine(_dataDir, "desktop-layout.json");
@@ -76,6 +77,10 @@ public partial class MainWindow : Window
             var data = message["params"] as JsonObject;
             object? result = type switch
             {
+                "app.version" => UpdateHost.CurrentVersion.ToString(),
+                "app.ready" => SignalReady(),
+                "update.check" => await _updates.CheckAsync(),
+                "update.install" => await _updates.PrepareAsync(data?["version"]?.GetValue<string>() ?? ""),
                 "ui.layout.load" => ReadLayout(),
                 "ui.layout.save" => SaveColumns(data),
                 "storage.load" => await LoadStateAsync(),
@@ -91,11 +96,18 @@ public partial class MainWindow : Window
                 _ => throw new InvalidOperationException("未知操作。")
             };
             Reply(new { id = requestId, ok = true, data = result });
+            if (type == "update.install" && result is true) Dispatcher.BeginInvoke(new Action(Close));
         }
         catch (Exception error)
         {
             Reply(new { id = requestId, ok = false, error = error.Message });
         }
+    }
+
+    private static bool SignalReady()
+    {
+        if (App.UpdateReadyStage is string stage) UpdateHost.SignalReady(AppContext.BaseDirectory, stage);
+        return true;
     }
 
     private void Reply(object response)

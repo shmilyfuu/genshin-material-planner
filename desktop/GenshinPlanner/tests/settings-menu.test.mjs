@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=name=>readFileSync(new URL('../wwwroot/'+name,import.meta.url),'utf8');
+test('顶部仅保留账号切换、同步库存和设置入口',()=>{
+ const header=read('index.html').match(/<header class="app-header">[\s\S]*?<\/header>/)[0];
+ const visible=header.split('id="settingsMenu"')[0];
+ assert.ok(visible.includes('id="accountSelect"'));
+ assert.ok(visible.includes('id="syncInventoryButton"'));
+ assert.ok(visible.includes('id="settingsButton"'));
+ assert.ok(visible.includes('icons/inventory.png'));
+ assert.ok(visible.includes('icons/settings.png'));
+ assert.ok(visible.includes('id="appVersion"'));
+ for(const id of ['addAccountButton','renameAccountButton','deleteAccountButton','mysOpen','refreshButton','importGoodButton','importButton','exportButton','checkUpdateButton']){
+   assert.ok(header.includes('id="'+id+'"'));
+   assert.ok(!visible.includes('id="'+id+'"'));
+ }
+ assert.ok(read('desktop-app.mjs').includes("icon.src='icons/training-guide.png'"));
+});
+test('游戏图标为本地 PNG 文件',()=>{
+ for(const [filename,w,h] of [['inventory.png',72,72],['training-guide.png',64,64]]){
+   const data=readFileSync(new URL('../wwwroot/icons/'+filename,import.meta.url));
+   assert.equal(data.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+   assert.equal(data.readUInt32BE(16),w);assert.equal(data.readUInt32BE(20),h);
+ }
+});
+test('更新前保存规划，版本来自宿主，启动后自动检查更新',()=>{
+ const source=read('desktop-app.mjs');
+ assert.ok(source.includes("bridge('app.version')"));
+ assert.ok(source.includes("await bridge('storage.save',{state:snapshot()});"));
+ assert.ok(source.includes("bridge('update.install',{version:updateCandidate.latest})"));
+ assert.ok(source.includes("void checkUpdate();"));
+});

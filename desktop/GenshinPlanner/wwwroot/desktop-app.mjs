@@ -91,6 +91,7 @@ async function bridge(type,params={}){
 
 let state=normalizeState(cloneDefaultState());
 let mysPanel=null;
+let updateCandidate=null,updateChecking=false,updateInstalling=false;
 let characterList=[],weaponList=[];
 let profiles=new Map();
 let listVersion={live:'',latest:''};
@@ -228,8 +229,8 @@ function thumb(icon,name,css=''){
 }
 function editButton(onEdit,css='card-settings'){
   const button=document.createElement('button');button.type='button';button.className=css;
-  button.title='设置培养目标';button.setAttribute('aria-label',button.title);
-  const icon=document.createElement('img');icon.src='icons/settings.png';icon.alt='';icon.onerror=()=>{button.innerHTML=svg('settings');};button.append(icon);button.onclick=ev=>{ev.stopPropagation();onEdit();};return button;
+  button.title='配置培养目标';button.setAttribute('aria-label',button.title);
+  const icon=document.createElement('img');icon.src='icons/training-guide.png';icon.alt='';icon.onerror=()=>{button.innerHTML=svg('settings');};button.append(icon);button.onclick=ev=>{ev.stopPropagation();onEdit();};return button;
 }
 function bindCard(node,onSelect,onEdit){
   node.addEventListener('click',ev=>{if(!ev.target.closest('button,input,select'))onSelect();});
@@ -808,7 +809,50 @@ async function importScanner(){
     renderAll();save();toast(result.warnings[0]||'GOOD 角色与武器数据已导入');
   }catch(e){toast('GOOD 导入失败：'+e.message);}
 }
+function closeSettings(){const menu=$('settingsMenu');menu.hidden=true;$('settingsButton').setAttribute('aria-expanded','false');}
+function installSettingsMenu(){
+  $('settingsButton').onclick=()=>{const menu=$('settingsMenu');menu.hidden=!menu.hidden;$('settingsButton').setAttribute('aria-expanded',String(!menu.hidden));};
+  $('settingsMenu').addEventListener('click',e=>{if(e.target.closest('button:not(:disabled)'))closeSettings();});
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#settingsWrap'))closeSettings();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('settingsMenu').hidden){closeSettings();$('settingsButton').focus();}});
+}
+async function checkUpdate(manual=false){
+  if(!host||updateChecking||updateInstalling)return;
+  updateChecking=true;$('checkUpdateButton').disabled=true;
+  try{
+    if(manual)setStatus('正在检查更新…');
+    const result=await bridge('update.check');
+    $('appVersion').textContent='v'+result.current;
+    if(!result.available){if(manual){setStatus('当前已是最新版本','success');toast('当前已是最新版本');}return;}
+    updateCandidate=result;
+    if(mysPanel?.isBusy()||document.querySelector('.modal-backdrop:not([hidden])')){
+      if(manual)toast('发现新版本 v'+result.latest+'，请关闭当前窗口后检查更新');
+      return;
+    }
+    closeSettings();$('updateVersions').textContent='v'+result.current+' → v'+result.latest;
+    $('updateNotes').textContent=result.notes||'';
+    $('updateNotes').hidden=!result.notes;
+    $('updateStatus').textContent='更新完成后程序将自动重启，本地规划与账号数据将保留。';
+    $('updateLater').disabled=false;$('updateInstall').disabled=false;$('updateModal').hidden=false;
+  }catch(e){if(manual){setStatus('检查更新失败：'+e.message,'error');toast('检查更新失败：'+e.message);}}
+  finally{updateChecking=false;$('checkUpdateButton').disabled=false;}
+}
+async function installUpdate(){
+  if(updateInstalling||!updateCandidate||mysPanel?.isBusy())return;
+  updateInstalling=true;$('updateLater').disabled=true;$('updateInstall').disabled=true;
+  $('updateStatus').textContent='正在下载并校验更新包…';
+  try{
+    await flushSave();await bridge('storage.save',{state:snapshot()});
+    await bridge('update.install',{version:updateCandidate.latest});
+    $('updateStatus').textContent='更新已准备完成，正在重启程序…';
+  }catch(e){$('updateStatus').textContent='更新失败：'+e.message;$('updateLater').disabled=false;$('updateInstall').disabled=false;updateInstalling=false;}
+}
 async function start(){
+  installSettingsMenu();
+  $('checkUpdateButton').onclick=()=>void checkUpdate(true);
+  $('updateLater').onclick=()=>{if(!updateInstalling)$('updateModal').hidden=true;};
+  $('updateInstall').onclick=()=>void installUpdate();
+  if(host){try{$('appVersion').textContent='v'+await bridge('app.version');}catch(e){toast('版本读取失败：'+e.message);}}
   $('modalCancel').onclick=()=>closeModal(false);$('modalConfirm').onclick=()=>closeModal(true);
   $('modalInput').onkeydown=e=>{if(e.key==='Enter')closeModal(true);};
   $('goalCancel').onclick=closeEditor;$('goalSave').onclick=()=>void saveEditor();$('goalDelete').onclick=()=>void deleteEditor();$('goalRemoveCopy').onclick=()=>void removeEditorWeapon();
@@ -867,6 +911,8 @@ async function start(){
     },
     apply:async result=>{applySyncedInventory(state,result);state.mysSyncedAt=Date.now();renderInventory();renderResults();renderCalendar();await flushSave();}});
   mysPanel.update();
+  if(host)await bridge('app.ready');
   await loadLists();
+  void checkUpdate();
 }
 void start();
