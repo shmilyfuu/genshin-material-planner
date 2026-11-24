@@ -23,3 +23,5 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 [data-rank="3"]:is(.material-img,.calendar-material,.weapon-picker-icon){background-image:url("icons/rarity/rarity-3.png")}
 [data-rank="4"]:is(.material-img,.calendar-material,.weapon-picker-icon){background-image:url("icons/rarity/rarity-4.webp")}
 [data-rank="5"]:is(.material-img,.calendar-material,.weapon-picker-icon){background-image:url("icons/rarity/rarity-5.webp")}
+
+#mysModal{z-index:55}.mys-modal{width:min(480px,95vw)}.mys-modal #mysQr:not([hidden]){display:grid;justify-items:center;margin:12px 0}.mys-modal #mysQr img{background:#fff}.inventory-minimum{border-style:dashed!important}

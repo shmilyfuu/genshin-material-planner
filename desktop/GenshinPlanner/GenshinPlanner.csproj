@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>GenshinPlanner</AssemblyName>
     <RootNamespace>GenshinPlanner</RootNamespace>
-    <Version>0.3.7</Version>
+    <Version>0.4.0</Version>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
@@ -17,6 +17,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets\AppIcon.ico" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3856.49" />
     <Content Include="wwwroot\**\*">
       <TargetPath>resources\wwwroot\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>

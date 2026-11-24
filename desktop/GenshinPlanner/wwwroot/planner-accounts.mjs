@@ -1,5 +1,5 @@
 const ACCOUNT_FIELDS = [
-  'plans', 'activePlanId', 'source', 'config', 'materialInventory',
+  'plans', 'activePlanId', 'source', 'config', 'materialInventory', 'inventoryMinimum',
   'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
   'verifiedInventory', 'manualInventoryImportUid', 'ownedCharacters',
   'weaponInstances', 'plannerSchema'

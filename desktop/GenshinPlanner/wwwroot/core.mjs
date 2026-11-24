@@ -66,6 +66,7 @@ export const DEFAULT_STATE = Object.freeze({
   ownedCharacters: {},
   weaponInstances: [],
   materialInventory: {},
+  inventoryMinimum: {},
   materialInventoryMigrated: false,
   source: {
     selectedCharacterId: '',
@@ -284,9 +285,11 @@ export function normalizeState(input) {
       if (/^\d{1,12}$/.test(id)) normalized.materialInventory[id] = normalizeString(value);
     }
   }
+  normalized.inventoryMinimum = {};
+  for (const [id,flag] of Object.entries(source.inventoryMinimum || {}).slice(0,1500)) if (/^\d{1,12}$/.test(id) && flag === true && Object.hasOwn(normalized.materialInventory,id)) normalized.inventoryMinimum[id] = true;
   normalized.materialInventoryMigrated = source.materialInventoryMigrated === true;
   const snapshotKeys = [
-    'plans', 'activePlanId', 'source', 'config', 'materialInventory',
+    'plans', 'activePlanId', 'source', 'config', 'materialInventory', 'inventoryMinimum',
     'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
     'verifiedInventory', 'manualInventoryImportUid', 'ownedCharacters',
     'weaponInstances', 'plannerSchema'

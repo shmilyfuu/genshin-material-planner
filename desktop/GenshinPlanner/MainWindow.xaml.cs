@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     };
 
     private readonly string _dataDir = Path.Combine(AppContext.BaseDirectory, "data");
+    private readonly MiyousheHost _mys = new(Path.Combine(AppContext.BaseDirectory, "data"));
     private string StateFile => Path.Combine(_dataDir, "planner.json");
     private string LayoutFile => Path.Combine(_dataDir, "desktop-layout.json");
     private readonly object _layoutLock = new();
@@ -80,6 +81,9 @@ public partial class MainWindow : Window
                 "storage.load" => await LoadStateAsync(),
                 "storage.save" => await SaveStateAsync(data),
                 "data.fetch" => await FetchNanokaAsync(data),
+                "mys.storage.load" => await _mys.LoadAsync(data),
+                "mys.storage.save" => await _mys.SaveAsync(data),
+                "mys.request" => await _mys.RequestAsync(data),
                 "release.fetch" => await FetchReleaseSourceAsync(data),
                 "storage.export" => ExportState(data),
                 "storage.import" => await ImportStateAsync(),

@@ -9,6 +9,7 @@ import {initializePlanner,makeGoal,makeWeaponInstance,characterGoal,weaponGoal,w
 import {importGOOD,validateGOOD} from './good-import.mjs';
 import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
+import {installMiyoushePanel} from './mys-panel.mjs';
 import {indexBannerReleases,mergeBannerReleases,parseReleaseTable,attachReleaseDates,compareRosterRelease} from './release-order.mjs';
 import {
   saveActivePlannerAccount, selectPlannerAccount, createPlannerAccount,
@@ -556,7 +557,7 @@ async function removeEditorWeapon(){
   }catch(error){toast(error.message);}
 }
 function closeEditor(){$('goalModal').hidden=true;goalEditor=null;}
-function updateMaterialCount(id,value){if(String(value).trim())state.materialInventory[id]=String(value);
+function updateMaterialCount(id,value){delete (state.inventoryMinimum||{})[id];if(String(value).trim())state.materialInventory[id]=String(value);
   else delete state.materialInventory[id];renderResults();renderCalendar();save();}
 function materialRow(item,shared){
   const row=document.createElement('div');row.className='material-row';
@@ -569,10 +570,11 @@ function materialRow(item,shared){
   const arrows=document.createElement('div');arrows.className='material-arrows';
   const input=document.createElement('input');input.type='text';input.inputMode='numeric';input.value=state.materialInventory[item.id]??'';input.placeholder='0';
   input.setAttribute('aria-label',item.name+'背包数量');
-  const step=delta=>{input.value=String(Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,safeEval(input.value)+delta)));updateMaterialCount(item.id,input.value);};
+  if(state.inventoryMinimum?.[item.id]){input.title='米游社探测下限：实际库存可能更多';input.classList.add('inventory-minimum');}
+  const step=delta=>{input.value=String(Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,safeEval(input.value)+delta)));input.classList.remove('inventory-minimum');input.removeAttribute('title');updateMaterialCount(item.id,input.value);};
   for(const [delta,text] of [[1,'▲'],[-1,'▼']]){const button=document.createElement('button');button.type='button';button.textContent=text;
     button.title=delta>0?'增加 1':'减少 1';button.onclick=()=>step(delta);arrows.append(button);}
-  input.oninput=()=>updateMaterialCount(item.id,input.value);
+  input.oninput=()=>{input.classList.remove('inventory-minimum');input.removeAttribute('title');updateMaterialCount(item.id,input.value);};
   controls.append(arrows,input);row.append(image,copy,controls);return row;
 }
 const categories=[['basicInventory','基础与专属材料'],['cultInventory','培养素材'],
@@ -808,6 +810,9 @@ async function start(){
     filter=createRosterFilter(tab.dataset.tab);renderFilters();renderRoster();};
   await initializeColumns();
   try{const record=await bridge('storage.load');if(record)state=normalizeState(record);}catch(e){toast('读取本地数据失败：'+e.message);}
-  initializePlanner(state);renderAll();await loadLists();
+  initializePlanner(state);renderAll();
+  installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,
+    apply:result=>{state.inventoryUid=result.uid;state.inventoryMinimum||={};for(const row of result.materials){state.materialInventory[row.id]=String(row.num);if(row.minimum)state.inventoryMinimum[row.id]=true;else delete state.inventoryMinimum[row.id];}renderInventory();renderResults();renderCalendar();save();}});
+  await loadLists();
 }
 void start();
