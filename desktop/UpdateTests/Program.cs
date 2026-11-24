@@ -93,6 +93,54 @@ try
         catch (InvalidDataException) { rejected = true; }
         Require(rejected, "Invalid archive was accepted: " + extra);
     }
-    Console.WriteLine("Update tests passed.");
+    {
+        var root = MakeRoot("progress");
+        var observations = new List<UpdateHost.Progress>();
+        using var data = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("progress test"));
+        var hash = UpdateHost.HashWithProgressAsync(data, CancellationToken.None, observations.Add).GetAwaiter().GetResult();
+        Require(hash.SequenceEqual(System.Security.Cryptography.SHA256.HashData(data.ToArray())), "Hash changed");
+        Require(observations.First().phase == "verify" && observations.First().completed == 0, "Verify initial progress missing");
+        Require(observations.Last().completed == data.Length && observations.Last().total == data.Length, "Verify progress incomplete");
+        observations.Clear();
+        UpdateHost.ExtractPackage(good, Path.Combine(root, "extracted"), observations.Add);
+        Require(observations.First().phase == "extract" && observations.First().completed == 0, "Extract initial progress missing");
+        Require(observations.Last().completed == observations.Last().total && observations.Last().total > 0, "Extract progress incomplete");
+        Require(observations.Zip(observations.Skip(1)).All(pair => pair.First.completed <= pair.Second.completed), "Extract progress regressed");
+    }
+    if (OperatingSystem.IsWindows())
+    {
+        var root = MakeRoot("instance");
+        var primary = new InstanceCoordinator(root);
+        Require(primary.TryAcquire(), "Primary instance not acquired");
+        using var activated = new ManualResetEventSlim();
+        primary.Listen(activated.Set);
+        Task.Run(() =>
+        {
+            using var duplicate = new InstanceCoordinator(root);
+            Require(!duplicate.TryAcquire(), "Duplicate acquired same instance lock");
+            duplicate.RequestActivation();
+            using var separate = new InstanceCoordinator(root + "-other");
+            Require(separate.TryAcquire(), "Independent portable directory was blocked");
+        }).GetAwaiter().GetResult();
+        Require(activated.Wait(TimeSpan.FromSeconds(5)), "Activation signal missing");
+        using var gate = InstanceCoordinator.OpenUpdateGate(root);
+        Require(InstanceCoordinator.Wait(gate, 0), "Update gate not acquired");
+        try
+        {
+            Task.Run(() =>
+            {
+                using var otherGate = InstanceCoordinator.OpenUpdateGate(root);
+                Require(!InstanceCoordinator.Wait(otherGate, 0), "Concurrent normal startup bypassed update gate");
+            }).GetAwaiter().GetResult();
+        }
+        finally { gate.ReleaseMutex(); }
+        primary.Dispose();
+        Task.Run(() =>
+        {
+            using var replacement = new InstanceCoordinator(root);
+            Require(replacement.TryAcquire(), "Replacement instance not acquired after release");
+        }).GetAwaiter().GetResult();
+    }
+    Console.WriteLine("Update and instance tests passed.");
 }
 finally { Directory.Delete(temp, true); }

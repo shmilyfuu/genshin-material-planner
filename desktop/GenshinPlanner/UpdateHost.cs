@@ -23,6 +23,7 @@ internal sealed class UpdateHost
     private bool _preparing;
 
     private sealed record Release(Version Version, string ZipUrl, string HashUrl, long Size, string Notes);
+    internal sealed record Progress(string phase, long completed = 0, long total = 0, double bytesPerSecond = 0);
 
     static UpdateHost()
     {
@@ -86,7 +87,7 @@ internal sealed class UpdateHost
             size, notes[..Math.Min(notes.Length, 12000)]);
     }
 
-    private static async Task DownloadAsync(string url, string path, long limit, CancellationToken token)
+    private static async Task DownloadAsync(string url, string path, long limit, CancellationToken token, Action<Progress>? progress = null)
     {
         using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
@@ -97,17 +98,26 @@ internal sealed class UpdateHost
         await using var source = await response.Content.ReadAsStreamAsync(token);
         await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true);
         byte[] buffer = new byte[65536];
-        long total = 0;
+        long total = 0, previous = 0;
+        var watch = Stopwatch.StartNew();
+        double previousTime = 0;
+        progress?.Invoke(new Progress("download", 0, limit));
         int count;
         while ((count = await source.ReadAsync(buffer, token)) > 0)
         {
             total += count;
             if (total > limit) throw new InvalidDataException("更新文件大小超出范围。");
             await output.WriteAsync(buffer.AsMemory(0, count), token);
+            double now = watch.Elapsed.TotalSeconds;
+            if (now - previousTime >= .2 || total == limit)
+            {
+                progress?.Invoke(new Progress("download", total, limit, (total - previous) / Math.Max(.001, now - previousTime)));
+                previous = total; previousTime = now;
+            }
         }
     }
 
-    public async Task<bool> PrepareAsync(string requestedVersion)
+    public async Task<bool> PrepareAsync(string requestedVersion, Action<Progress>? progress = null)
     {
         if (_preparing) throw new InvalidOperationException("更新正在准备。");
         var release = _candidate;
@@ -130,17 +140,17 @@ internal sealed class UpdateHost
             var expected = (await File.ReadAllTextAsync(checksum, timeout.Token)).Trim();
             if (!Regex.IsMatch(expected, @"^[0-9a-fA-F]{64}$"))
                 throw new InvalidDataException("SHA256 校验文件格式无效。");
-            await DownloadAsync(release.ZipUrl, package, Math.Min(release.Size, MaxPackageSize), timeout.Token);
+            await DownloadAsync(release.ZipUrl, package, Math.Min(release.Size, MaxPackageSize), timeout.Token, progress);
             if (new FileInfo(package).Length != release.Size)
                 throw new InvalidDataException("更新包下载不完整。");
             await using (var stream = File.OpenRead(package))
             {
-                var actual = Convert.ToHexString(await SHA256.HashDataAsync(stream, timeout.Token));
+                var actual = Convert.ToHexString(await HashWithProgressAsync(stream, timeout.Token, progress));
                 if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("更新包 SHA256 校验失败。");
             }
             var payload = Path.Combine(stage, "payload");
-            await Task.Run(() => ExtractPackage(package, payload), timeout.Token);
+            await Task.Run(() => ExtractPackage(package, payload, progress), timeout.Token);
             var published = FileVersionInfo.GetVersionInfo(Path.Combine(payload, ExeName));
             if (published.FileMajorPart != release.Version.Major || published.FileMinorPart != release.Version.Minor
                 || published.FileBuildPart != release.Version.Build)
@@ -152,7 +162,24 @@ internal sealed class UpdateHost
             var info = new ProcessStartInfo(helper) { UseShellExecute = false, WorkingDirectory = stage };
             info.ArgumentList.Add("--apply-update");
             info.ArgumentList.Add(Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            progress?.Invoke(new Progress("handoff"));
             using var process = Process.Start(info) ?? throw new InvalidOperationException("无法启动更新进程。");
+            var ready = Path.Combine(stage, "helper-ready");
+            try
+            {
+                var watch = Stopwatch.StartNew();
+                while (!File.Exists(ready))
+                {
+                    if (process.HasExited || watch.Elapsed > TimeSpan.FromSeconds(30))
+                        throw new InvalidOperationException("更新进程未完成准备。");
+                    await Task.Delay(100, timeout.Token);
+                }
+            }
+            catch
+            {
+                if (!process.HasExited) { process.Kill(); await process.WaitForExitAsync(); }
+                throw;
+            }
             handedOff = true;
             return true;
         }
@@ -163,12 +190,33 @@ internal sealed class UpdateHost
         }
     }
 
-    internal static void ExtractPackage(string package, string destination)
+    internal static async Task<byte[]> HashWithProgressAsync(Stream stream, CancellationToken token, Action<Progress>? progress = null)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[65536]; long completed = 0;
+        var total = stream.Length; var watch = Stopwatch.StartNew();
+        progress?.Invoke(new Progress("verify", 0, total));
+        int count;
+        while ((count = await stream.ReadAsync(buffer.AsMemory(), token)) > 0)
+        {
+            hash.AppendData(buffer, 0, count); completed += count;
+            if (watch.ElapsedMilliseconds >= 150 || completed == total)
+            { progress?.Invoke(new Progress("verify", completed, total)); watch.Restart(); }
+        }
+        return hash.GetHashAndReset();
+    }
+
+    internal static void ExtractPackage(string package, string destination, Action<Progress>? progress = null)
     {
         Directory.CreateDirectory(destination);
         using var archive = ZipFile.OpenRead(package);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        long size = 0;
+        long size = 0, extracted = 0;
+        long total = archive.Entries.Sum(entry => entry.Length);
+        if (total > MaxExtractSize || archive.Entries.Count > 20000)
+            throw new InvalidDataException("更新包解压大小超出范围。");
+        progress?.Invoke(new Progress("extract", 0, total));
+        var buffer = new byte[65536]; var watch = Stopwatch.StartNew();
         foreach (var entry in archive.Entries)
         {
             var name = entry.FullName.Replace('\\', '/');
@@ -194,13 +242,24 @@ internal sealed class UpdateHost
             else
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                entry.ExtractToFile(target, false);
+                using var input = entry.Open();
+                using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                int count;
+                while ((count = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    extracted += count;
+                    if (extracted > total || extracted > MaxExtractSize) throw new InvalidDataException("更新包解压大小超出范围。");
+                    output.Write(buffer, 0, count);
+                    if (watch.ElapsedMilliseconds >= 150 || extracted == total)
+                    { progress?.Invoke(new Progress("extract", extracted, total)); watch.Restart(); }
+                }
             }
         }
         if (!File.Exists(Path.Combine(destination, ExeName))
             || !File.Exists(Path.Combine(destination, "resources", "wwwroot", "index.html"))
             || !File.Exists(Path.Combine(destination, "resources", "wwwroot", "desktop-app.mjs")))
             throw new InvalidDataException("更新包缺少程序或界面资源。");
+        if (extracted != total) throw new InvalidDataException("更新包解压长度不符。");
     }
 
     private static bool SamePath(string a, string b) =>
@@ -266,14 +325,20 @@ internal sealed class UpdateHost
         File.WriteAllText(Path.Combine(stage, "complete"), "complete");
     }
 
-    internal static void ApplyFromHelper(int parentId)
+    internal static void ApplyFromHelper(int parentId, Action<string>? progress = null)
     {
         var stage = Path.TrimEndingDirectorySeparator(Path.GetFullPath(AppContext.BaseDirectory));
         var root = Path.GetDirectoryName(stage) ?? throw new InvalidDataException("更新目录无效。");
         ValidateStage(root, Path.GetFileName(stage));
         if (!SamePath(Environment.ProcessPath ?? "", Path.Combine(stage, "helper.exe")))
             throw new InvalidOperationException("更新进程路径无效。");
+        using var gate = InstanceCoordinator.OpenUpdateGate(root);
+        if (!InstanceCoordinator.Wait(gate, 30000)) throw new InvalidOperationException("其他更新正在运行。");
+        try
+        {
         var exe = Path.Combine(root, ExeName);
+        File.WriteAllText(Path.Combine(stage, "helper-ready"), "ready");
+        progress?.Invoke("正在等待主程序退出…");
         Process? parent = null;
         try { parent = Process.GetProcessById(parentId); } catch (ArgumentException) { }
         using (parent)
@@ -287,8 +352,10 @@ internal sealed class UpdateHost
         }
         try
         {
+            progress?.Invoke("正在安装更新文件…");
             InstallFiles(root, stage, () =>
             {
+                progress?.Invoke("正在启动并验证新版本…");
                 var info = new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = root };
                 info.ArgumentList.Add("--update-ready");
                 info.ArgumentList.Add(Path.GetFileName(stage));
@@ -314,6 +381,7 @@ internal sealed class UpdateHost
         }
         catch
         {
+            progress?.Invoke("正在恢复原程序…");
             // Relaunch the restored version only when the backup was fully restored.
             if (File.Exists(exe) && Directory.Exists(Path.Combine(root, "resources"))
                 && !File.Exists(Path.Combine(stage, "backup", ExeName))
@@ -321,6 +389,8 @@ internal sealed class UpdateHost
                 Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = root });
             throw;
         }
+        }
+        finally { gate.ReleaseMutex(); }
     }
 
     internal static void CleanupCompleted(string root)

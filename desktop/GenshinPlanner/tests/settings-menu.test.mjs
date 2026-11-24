@@ -42,3 +42,16 @@ test('卡片使用新资源，前瞻星号和实例编号采用统一样式',()=
  assert.ok(read('index.html').includes('id="applyInventoryButton"'));
  assert.ok(app.includes('applyInventoryToManual(state)'));
 });
+
+test('账号信息紧跟下拉框，状态栏位于工作区底部，更新进度使用宿主消息',()=>{
+ const html=read('index.html'),app=read('desktop-app.mjs');
+ const header=html.match(/<header class="app-header">[\s\S]*?<\/header>/)[0];
+ assert.ok(header.indexOf('id="accountSelect"')<header.indexOf('id="boundNickname"'));
+ assert.ok(header.indexOf('id="boundUid"')<header.indexOf('class="header-spacer"'));
+ assert.ok(!header.includes('id="dataStatus"'));
+ assert.ok(html.match(/<footer class="status-bar"[\s\S]*?id="dataStatus"/));
+ assert.ok(html.includes('<progress id="updateBar"'));
+ assert.ok(app.includes("d?.event==='update.progress'"));
+ assert.ok(app.includes("binding?'UID '+binding.uid:'未绑定米游社'"));
+ assert.ok(app.includes("Math.floor(completed/total*100)"));
+});

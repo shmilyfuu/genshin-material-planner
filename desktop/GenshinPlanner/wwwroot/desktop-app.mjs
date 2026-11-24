@@ -65,7 +65,7 @@ const $=id=>document.getElementById(id);
 const host=window.chrome?.webview;
 let sequence=0;const pending=new Map();
 if(host){host.addEventListener('message',ev=>{
-  const d=ev.data;if(!d||!pending.has(d.id))return;
+  const d=ev.data;if(d?.event==='update.progress'){renderUpdateProgress(d.progress);return;}if(!d||!pending.has(d.id))return;
   const task=pending.get(d.id);pending.delete(d.id);
   if(d.ok)task.resolve(d.data);else task.reject(new Error(d.error||'操作失败'));
 });}
@@ -184,8 +184,21 @@ async function initializeColumns(){
 }
 
 
-function setStatus(text,tone=''){const node=$('dataStatus');node.textContent=text;node.dataset.tone=tone;}
-function toast(message){clearTimeout(toastTimeout);const t=$('toast');t.textContent=message;t.classList.add('show');toastTimeout=setTimeout(()=>t.classList.remove('show'),3500);}
+const statusTasks=new Map();
+let lastStatus={text:'正在读取本地数据…',tone:'busy'};
+function renderStatus(){
+  const active=[...statusTasks.values()].sort((a,b)=>b.priority-a.priority)[0]||lastStatus;
+  const node=$('dataStatus');node.textContent=active.text;node.title=active.text;node.dataset.tone=active.tone;
+  $('statusIndicator').dataset.tone=active.tone;
+}
+function setStatus(text,tone=''){lastStatus={text,tone};renderStatus();}
+function taskStatus(key,text,tone='busy'){
+  const priorities={update:30,sync:20,lists:10};
+  if(tone==='busy')statusTasks.set(key,{text,tone,priority:priorities[key]||0});
+  else{statusTasks.delete(key);lastStatus={text,tone};}
+  renderStatus();
+}
+function toast(message){clearTimeout(toastTimeout);const t=$('statusNotice');t.textContent=message;t.title=message;toastTimeout=setTimeout(()=>{t.textContent='';t.title='';},6500);}
 function snapshot(){
   const active=state.plans.find(g=>g.id===state.activePlanId)||state.plans[0];
   if(active){state.source=structuredClone(active.source);state.config=structuredClone(active.config);}
@@ -216,6 +229,10 @@ function save(){saveActivePlannerAccount(state);scheduleSave();}
 function renderAccounts(){const select=$('accountSelect');select.replaceChildren();
   for(const a of state.plannerAccounts)select.add(new Option(a.name,a.id));
   select.value=state.activeAccountId;$('deleteAccountButton').disabled=state.plannerAccounts.length<=1;
+  const binding=state.mysBinding,nickname=$('boundNickname'),uid=$('boundUid');
+  nickname.textContent=binding?.nickname||'';nickname.hidden=!binding?.nickname;
+  uid.textContent=binding?'UID '+binding.uid:'未绑定米游社';
+  $('accountBinding').title=binding?[binding.nickname,'UID '+binding.uid,binding.regionName].filter(Boolean).join(' · '):'未绑定米游社';
   mysPanel?.update();
 }
 function thumb(icon,name,css=''){
@@ -739,7 +756,7 @@ async function loadReleaseMetadata(force){
   return {bannerIndex:mergeBannerReleases(value(bundled),value(banners)),characterDates:value(characters),weaponDates:value(weapons)};
 }
 async function loadLists(force=false){
-  setStatus('正在读取 Nanoka 角色和武器资料…');
+  taskStatus('lists','正在读取 Nanoka 角色和武器资料…');
   try{
     const manifest=await bridge('data.fetch',{path:'/manifest.json',force,maxAge:21600000});
     const versions=readManifestVersions(manifest.data);
@@ -752,8 +769,8 @@ async function loadLists(force=false){
     characterList=attachReleaseDates(characterList,'character',release.characterDates,release.bannerIndex);
     weaponList=attachReleaseDates(weaponList,'weapon',release.weaponDates,release.bannerIndex);
     await reloadAllProfiles(force);
-    setStatus(`已载入 ${characterList.length} 名角色、${weaponList.length} 类武器`,'success');
-  }catch(e){setStatus('资料读取失败：'+e.message,'error');toast('检查网络后刷新资料');}
+    taskStatus('lists',`已载入 ${characterList.length} 名角色、${weaponList.length} 类武器`,'success');
+  }catch(e){taskStatus('lists','资料读取失败：'+e.message,'error');toast('检查网络后刷新资料');}
   renderAll();
 }
 async function loadGoalProfile(plan,force){
@@ -847,11 +864,11 @@ async function checkUpdate(manual=false){
   if(!host||updateChecking||updateInstalling)return;
   updateChecking=true;$('checkUpdateButton').disabled=true;
   try{
-    if(manual)setStatus('正在检查更新…');
+    taskStatus('update','正在检查更新…');
     const result=await bridge('update.check');
     $('appVersion').textContent='v'+result.current;
-    if(!result.available){if(manual){setStatus('当前已是最新版本','success');toast('当前已是最新版本');}return;}
-    updateCandidate=result;
+    if(!result.available){taskStatus('update','当前已是最新版本 · v'+result.current,'success');return;}
+    updateCandidate=result;taskStatus('update','发现新版本 v'+result.latest,'success');
     if(mysPanel?.isBusy()||document.querySelector('.modal-backdrop:not([hidden])')){
       if(manual)toast('发现新版本 v'+result.latest+'，请关闭当前窗口后检查更新');
       return;
@@ -859,20 +876,38 @@ async function checkUpdate(manual=false){
     closeSettings();$('updateVersions').textContent='v'+result.current+' → v'+result.latest;
     $('updateNotes').textContent=result.notes||'';
     $('updateNotes').hidden=!result.notes;
+    $('updateProgress').hidden=true;$('updateTitle').textContent='发现新版本';
     $('updateStatus').textContent='更新完成后程序将自动重启，本地规划与账号数据将保留。';
     $('updateLater').disabled=false;$('updateInstall').disabled=false;$('updateModal').hidden=false;
-  }catch(e){if(manual){setStatus('检查更新失败：'+e.message,'error');toast('检查更新失败：'+e.message);}}
+  }catch(e){taskStatus('update','检查更新失败：'+e.message,'error');}
   finally{updateChecking=false;$('checkUpdateButton').disabled=false;}
+}
+function renderUpdateProgress(progress){
+  if(!updateInstalling||!progress)return;
+  const {phase,completed=0,total=0,bytesPerSecond=0}=progress;
+  const labels={prepare:'正在准备更新',download:'正在下载更新包',verify:'正在校验更新包',extract:'正在解压更新文件',handoff:'正在启动安装进程'};
+  const label=labels[phase]||'正在更新';
+  $('updateProgress').hidden=false;$('updateTitle').textContent='正在更新';
+  $('updatePhase').textContent=label;
+  const bar=$('updateBar'),known=Number.isFinite(total)&&total>0&&Number.isFinite(completed)&&completed>=0;
+  const percent=known?Math.min(100,Math.max(0,Math.floor(completed/total*100))):null;
+  if(known)bar.value=percent;else bar.removeAttribute('value');
+  $('updatePercent').textContent=known?percent+'%':'';
+  const mb=n=>(n/1048576).toFixed(1)+' MB';
+  $('updateBytes').textContent=known?mb(completed)+' / '+mb(total):'';
+  $('updateSpeed').textContent=phase==='download'&&bytesPerSecond>0?mb(bytesPerSecond)+'/s':'';
+  $('updateStatus').textContent='更新完成后程序将自动重启，本地规划与账号数据将保留。';
+  taskStatus('update',label+(known?' · '+percent+'%':''));
 }
 async function installUpdate(){
   if(updateInstalling||!updateCandidate||mysPanel?.isBusy())return;
   updateInstalling=true;$('updateLater').disabled=true;$('updateInstall').disabled=true;
-  $('updateStatus').textContent='正在下载并校验更新包…';
+  renderUpdateProgress({phase:'prepare'});
   try{
     await flushSave();await bridge('storage.save',{state:snapshot()});
     await bridge('update.install',{version:updateCandidate.latest});
-    $('updateStatus').textContent='更新已准备完成，正在重启程序…';
-  }catch(e){$('updateStatus').textContent='更新失败：'+e.message;$('updateLater').disabled=false;$('updateInstall').disabled=false;updateInstalling=false;}
+    renderUpdateProgress({phase:'handoff'});
+  }catch(e){$('updateProgress').hidden=true;$('updateStatus').textContent='更新失败：'+e.message;taskStatus('update','更新失败：'+e.message,'error');$('updateLater').disabled=false;$('updateInstall').disabled=false;updateInstalling=false;}
 }
 async function start(){
   installSettingsMenu();
@@ -907,7 +942,7 @@ async function start(){
   initializePlanner(state);renderAll();
   mysPanel=installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,getBinding:()=>state.mysBinding,
     listPlanning:()=>state.plannerAccounts.map(a=>({id:a.id,name:a.name,uid:a.id===state.activeAccountId?state.inventoryUid:a.data?.inventoryUid||''})),
-    setStatus,toast,
+    setStatus:(text,tone)=>taskStatus('sync',text,tone||'busy'),toast,
     bind:async(target,raw,label)=>{
       const binding=normalizeMysBinding(raw);if(!binding)throw Error('绑定信息无效。');
       const owner=plannerBindingOwner(state,binding.uid,target);

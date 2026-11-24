@@ -80,7 +80,7 @@ public partial class MainWindow : Window
                 "app.version" => UpdateHost.CurrentVersion.ToString(),
                 "app.ready" => SignalReady(),
                 "update.check" => await _updates.CheckAsync(),
-                "update.install" => await _updates.PrepareAsync(data?["version"]?.GetValue<string>() ?? ""),
+                "update.install" => await _updates.PrepareAsync(data?["version"]?.GetValue<string>() ?? "", ReportUpdateProgress),
                 "ui.layout.load" => ReadLayout(),
                 "ui.layout.save" => SaveColumns(data),
                 "storage.load" => await LoadStateAsync(),
@@ -108,6 +108,15 @@ public partial class MainWindow : Window
     {
         if (App.UpdateReadyStage is string stage) UpdateHost.SignalReady(AppContext.BaseDirectory, stage);
         return true;
+    }
+
+    private void ReportUpdateProgress(UpdateHost.Progress progress)
+    {
+        if (Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (Browser.CoreWebView2 is not null) Reply(new { @event = "update.progress", progress });
+        }));
     }
 
     private void Reply(object response)
