@@ -30,3 +30,8 @@ Game artwork remains the property of its respective rights holders.
 
 The settings icon is sourced from the extracted game sprite:
 https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_IconSmall_Setting.png
+
+Additional original sprites used for the desktop roster:
+https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_BtnIcon_AvatarList.png
+https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_BagTabIcon_Weapon.png
+https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_Icon_Search.png

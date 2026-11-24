@@ -4,11 +4,15 @@
 
 A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-**[Download latest release](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**
+**[Download v0.5.9](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9)**
 
-[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
+[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ## Features
+
+- Weapon ascension for all five rarities; one- and two-star weapons cap at Lv.70.
+- Preview objects are marked with an asterisk after the centered name.
+- Individual deficits include lower-tier materials required for crafting.
 
 - Character and weapon catalogs with search, rarity, element, and weapon type filters.
 - Multiple independent upgrade goals with level, ascension, talent, pause, and completion settings.
@@ -28,7 +32,7 @@ Raw inventory is recovered per crafting family using demand, shortages and direc
 
 ## Installation and updates
 
-Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/latest), extract it to a writable folder, and run `GenshinPlanner.exe`.
+Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9), extract it to a writable folder, and run `GenshinPlanner.exe`.
 
 Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. The .NET runtime is included.
 

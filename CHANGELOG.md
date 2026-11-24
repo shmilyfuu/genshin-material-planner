@@ -1,5 +1,13 @@
 # Changelog
 
+## Desktop 0.5.9
+
+- Added one- and two-star weapon ascension and corrected individual crafting deficit presentation.
+- Improved GOOD weapon instance matching and consistent instance numbering.
+- Protected local planning data, saved changes on close, and retried incomplete legacy inventory migration.
+- Refined roster filters, game icons, preview names and card badges.
+- Desktop-specific update discovery and fail-fast build validation.
+
 ## 1.2.12
 
 - Added compact up and down controls to every inventory quantity field.

@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private string StateFile => Path.Combine(_dataDir, "planner.json");
     private string LayoutFile => Path.Combine(_dataDir, "desktop-layout.json");
     private readonly object _layoutLock = new();
+    private readonly SemaphoreSlim _stateGate = new(1, 1);
+    private bool _stateLoaded, _uiReady, _closePending, _allowClose;
     private string CacheDir => Path.Combine(_dataDir, "NanokaCache");
 
     public MainWindow()
@@ -79,6 +81,7 @@ public partial class MainWindow : Window
             {
                 "app.version" => UpdateHost.CurrentVersion.ToString(),
                 "app.ready" => SignalReady(),
+                "app.closeReady" => CompleteClose(data),
                 "update.check" => await _updates.CheckAsync(),
                 "update.install" => await _updates.PrepareAsync(data?["version"]?.GetValue<string>() ?? "", ReportUpdateProgress),
                 "ui.layout.load" => ReadLayout(),
@@ -96,7 +99,7 @@ public partial class MainWindow : Window
                 _ => throw new InvalidOperationException("未知操作。")
             };
             Reply(new { id = requestId, ok = true, data = result });
-            if (type == "update.install" && result is true) Dispatcher.BeginInvoke(new Action(Close));
+            if (type == "update.install" && result is true) { _allowClose = true; Dispatcher.BeginInvoke(new Action(Close)); }
         }
         catch (Exception error)
         {
@@ -104,8 +107,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool SignalReady()
+    private bool SignalReady()
     {
+        _uiReady = true;
         if (App.UpdateReadyStage is string stage) UpdateHost.SignalReady(AppContext.BaseDirectory, stage);
         return true;
     }
@@ -199,8 +203,29 @@ public partial class MainWindow : Window
         catch (Exception) { /* Use the initial 1600 x 900 window. */ }
     }
 
+    private bool CompleteClose(JsonObject? data)
+    {
+        if (!_closePending) return false;
+        _closePending = false;
+        var ok = data?["ok"]?.GetValue<bool>() == true;
+        if (!ok && MessageBox.Show(this, "保存失败：" + data?["error"]?.ToString() + "\n仍要退出吗？", "退出程序", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return false;
+        _allowClose = true;
+        Dispatcher.BeginInvoke(new Action(Close));
+        return true;
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (_uiReady && !_allowClose && Browser.CoreWebView2 is not null)
+        {
+            e.Cancel = true;
+            if (!_closePending)
+            {
+                _closePending = true;
+                Reply(new { @event = "app.closing" });
+            }
+            return;
+        }
         try
         {
             var bounds = WindowState == WindowState.Normal
@@ -223,9 +248,19 @@ public partial class MainWindow : Window
 
     private async Task<JsonNode?> LoadStateAsync()
     {
-        if (!File.Exists(StateFile)) return null;
-        var text = await File.ReadAllTextAsync(StateFile);
-        return JsonNode.Parse(text);
+        await _stateGate.WaitAsync();
+        try
+        {
+            _stateLoaded = false;
+            if (!File.Exists(StateFile)) { _stateLoaded = true; return null; }
+            var text = await File.ReadAllTextAsync(StateFile);
+            var state = JsonNode.Parse(text) as JsonObject ?? throw new InvalidDataException("规划文件格式错误。");
+            if (state.Count == 0 || (!state.ContainsKey("plans") && !state.ContainsKey("config") && !state.ContainsKey("plannerAccounts")))
+                throw new InvalidDataException("规划文件缺少必要数据。");
+            _stateLoaded = true;
+            return state;
+        }
+        finally { _stateGate.Release(); }
     }
 
     private async Task<bool> SaveStateAsync(JsonObject? data)
@@ -233,11 +268,18 @@ public partial class MainWindow : Window
         var json = data?["state"]?.ToJsonString() ?? throw new InvalidOperationException("缺少数据。");
         if (Encoding.UTF8.GetByteCount(json) > 8 * 1024 * 1024)
             throw new InvalidOperationException("规划数据超过存储限制。");
-        Directory.CreateDirectory(_dataDir);
-        var temp = StateFile + ".tmp";
-        await File.WriteAllTextAsync(temp, json);
-        File.Move(temp, StateFile, true);
-        return true;
+        await _stateGate.WaitAsync();
+        try
+        {
+            if (!_stateLoaded) throw new InvalidOperationException("原规划尚未成功读取，已禁止覆盖。");
+            Directory.CreateDirectory(_dataDir);
+            var temp = StateFile + ".tmp";
+            await File.WriteAllTextAsync(temp, json);
+            if (File.Exists(StateFile)) File.Replace(temp, StateFile, StateFile + ".bak");
+            else File.Move(temp, StateFile);
+            return true;
+        }
+        finally { _stateGate.Release(); }
     }
 
     private async Task<JsonNode> FetchNanokaAsync(JsonObject? data)

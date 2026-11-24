@@ -4,11 +4,15 @@
 
 面向原神的 Windows 桌面养成规划工具，支持多角色、多武器培养计划、共享材料库存与每周刷取日历。
 
-**[下载正式版](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**
+**[下载正式版 v0.5.9](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9)**
 
-[下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
+[下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ## 功能
+
+- 支持一至五星武器突破，低星武器最高培养至 Lv.70。
+- 前瞻角色与武器以名称后星号标识；培养卡片使用游戏原始图标。
+- 单项缺口显示包含材料合成所需的实际低阶缺口。
 
 - 角色、武器图鉴，支持名称搜索、星级、元素和武器类型筛选。
 - 独立配置角色等级、突破、天赋和武器等级，支持多项培养计划、暂停及完成状态。
@@ -28,7 +32,7 @@
 
 ## 下载与使用
 
-1. 前往 [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) 下载 Windows x64 ZIP。
+1. 前往 [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9) 下载 Windows x64 ZIP。
 2. 将压缩包解压到有写入权限的固定目录。
 3. 运行 `GenshinPlanner.exe`。
 

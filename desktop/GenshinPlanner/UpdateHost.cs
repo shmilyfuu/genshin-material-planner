@@ -43,11 +43,23 @@ internal sealed class UpdateHost
     public async Task<object> CheckAsync()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        using var response = await Http.GetAsync("https://api.github.com/repos/" + Repository + "/releases/latest", timeout.Token);
-        response.EnsureSuccessStatusCode();
-        var release = JsonNode.Parse(await response.Content.ReadAsStringAsync(timeout.Token)) as JsonObject
-            ?? throw new InvalidDataException("更新信息格式无效。");
-        _candidate = ParseRelease(release, CurrentVersion);
+        _candidate = null;
+        var candidates = new List<JsonObject>();
+        for (int page = 1; ; page++)
+        {
+            using var response = await Http.GetAsync("https://api.github.com/repos/" + Repository + "/releases?per_page=100&page=" + page, timeout.Token);
+            response.EnsureSuccessStatusCode();
+            var releases = JsonNode.Parse(await response.Content.ReadAsStringAsync(timeout.Token)) as JsonArray
+                ?? throw new InvalidDataException("更新信息格式无效。");
+            candidates.AddRange(releases.OfType<JsonObject>());
+            if (releases.Count < 100) break;
+        }
+        var release = candidates.Where(r => r["draft"]?.GetValue<bool>() == false && r["prerelease"]?.GetValue<bool>() == false)
+            .Select(r => (Node: r, Match: TagPattern.Match(r["tag_name"]?.GetValue<string>() ?? "")))
+            .Where(r => r.Match.Success && Version.TryParse(r.Match.Groups[1].Value, out _))
+            .OrderByDescending(r => Version.Parse(r.Match.Groups[1].Value))
+            .Select(r => r.Node).FirstOrDefault();
+        if (release is not null) _candidate = ParseRelease(release, CurrentVersion);
         return new
         {
             current = CurrentVersion.ToString(),
