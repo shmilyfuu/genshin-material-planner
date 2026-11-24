@@ -1,22 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildDiagnosticCases,captureDiagnosticResponse,weaponMatchesFamily,DIAGNOSTIC_FAMILY_IDS} from '../wwwroot/inventory-diagnostics.mjs';
-const avatars=Array.from({length:12},(_,i)=>({id:10000020+i,weapon_cat_id:1}));
-const silver={id:11599,name:'银昼',weapon_cat_id:1,max_level:90},other={id:11499,name:'戍望谣歌',weapon_cat_id:1,max_level:90};
-test('诊断包含 A B C 和四档单把与高需求测试，武器实例独立载体',()=>{
- const cases=buildDiagnosticCases(avatars,[silver,other],[silver,other]);
+const avatars=Array.from({length:24},(_,i)=>({id:10000020+i,weapon_cat_id:i<12?10:12}));
+const snow={id:14437,name:'凝雪沉心',weapon_cat_id:10,max_level:90,familyDemand:[3,9,9,4]};
+const star={id:14525,name:'秘星典谕',weapon_cat_id:10,max_level:90,familyDemand:[5,14,14,6]};
+const bow={id:15437,name:'柔风游弦',weapon_cat_id:12,max_level:90,familyDemand:[3,9,9,4]};
+test('银昼未收录时，直接选择已验证的凝雪沉心，按真实四星需求构造诊断',()=>{
+ const cases=buildDiagnosticCases(avatars,[snow,star,bow],[snow,star,bow]);
  assert.equal(cases.length,11);
+ assert.equal(cases[0].targetWeapon.id,14437);
+ assert.deepEqual(cases[0].expectedDemand,[3,9,9,4]);
+ assert.deepEqual(cases[1].expectedDemand,[6,18,18,8]);
  assert.equal(cases[0].items.length,1);
  assert.equal(cases[1].items.length,2);
- assert.equal(cases[2].items.length,2);
- assert.deepEqual(cases.filter(c=>c.id.endsWith('-high')).map(c=>c.items.length),[10,4,3,2]);
+ assert.equal(cases[2].items.length,3);
  assert.deepEqual(cases.filter(c=>c.id.endsWith('-high')).map(c=>[c.items[0].weapon.level_current,c.items[0].weapon.level_target]),[[1,21],[21,51],[51,71],[71,90]]);
+ assert.ok(cases.filter(c=>c.id.endsWith('-high')).every(c=>c.targetReached&&c.expectedDemand>=c.targetDemand));
  for(const c of cases){assert.equal(new Set(c.items.map(x=>x.avatar_id)).size,c.items.length);assert.ok(c.items.every(x=>x.avatar_level_current===1&&x.avatar_level_target===1));}
 });
-test('载体不足时记录遗漏，避免声称达到测试需求',()=>{
- const cases=buildDiagnosticCases(avatars.slice(0,2),[silver],[silver]);
+test('同系列候选可跨武器类型达到高需求，载体不足明确记录',()=>{
+ const cases=buildDiagnosticCases(avatars,[snow,bow],[snow,bow]);
  const high=cases.find(x=>x.id==='D-green-high');
- assert.equal(high.requestedCopies,10);assert.equal(high.items.length,2);assert.equal(high.omitted.length,8);
+ assert.equal(high.items.length,17);assert.equal(high.expectedDemand,51);assert.equal(high.targetReached,true);
+ assert.ok(high.items.some(x=>x.weapon.id===bow.id));
+ const small=buildDiagnosticCases(avatars.slice(0,2),[snow],[snow]).find(x=>x.id==='D-green-high');
+ assert.equal(small.items.length,2);assert.equal(small.expectedDemand,6);assert.equal(small.targetReached,false);
+});
+test('凝雪沉心未收录时可使用其他已验证武器，不依赖前瞻武器',()=>{
+ const cases=buildDiagnosticCases(avatars,[star],[star]);
+ assert.equal(cases[0].targetWeapon.id,star.id);assert.deepEqual(cases[0].expectedDemand,[5,14,14,6]);
+ assert.throws(()=>buildDiagnosticCases(avatars,[star],[]),/官方目录/);
 });
 test('材料家族以完整四档 ID 匹配',()=>{
  assert.equal(weaponMatchesFamily({materials:{weapGems:DIAGNOSTIC_FAMILY_IDS.map(id=>({id}))}}),true);

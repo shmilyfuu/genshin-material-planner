@@ -524,8 +524,8 @@ async function diagnoseInventory(uid,region,progress,loadProfile){
   if(!roles.some(r=>r.uid===uid&&r.region===region))throw Error('所选 UID 与当前账号不匹配。');
   const accounts=await mysReadAccounts(),id=accounts.activeId,account=accounts.entries[id];
   const cookie=mysAccountCookie(account),device=await mysFingerprint(await mysDevice()),headers=mysCalcHeaders(device);
-  const report={schema:1,version:'0.4.3',startedAt:new Date().toISOString(),familyIds:[...DIAGNOSTIC_FAMILY_IDS],
-    reference:{actualStockLowToHigh:[47,36,11,0],silverWeaponDemandLowToHigh:[5,14,14,6],note:'此前测试时的库存，请与本次游戏实际背包核对。'},
+  const report={schema:1,version:'0.4.4',startedAt:new Date().toISOString(),familyIds:[...DIAGNOSTIC_FAMILY_IDS],
+    reference:{actualStockLowToHigh:[47,36,11,0],note:'此前测试时的库存，请与本次游戏实际背包核对。'},
     directory:{},cases:[]};
   const errorText=e=>String(e?.message||e).slice(0,500);
   try{
@@ -543,7 +543,7 @@ async function diagnoseInventory(uid,region,progress,loadProfile){
         try{
           const profile=await loadProfile(weapon);
           if(!profile?.materials?.weapGems?.every(Boolean)||profile.materials.weapGems.length!==4)throw Error('突破系列未识别');
-          if(weaponMatchesFamily(profile))family.push(weapon);
+          if(weaponMatchesFamily(profile))family.push({...weapon,familyDemand:profile.materials.weapGems.map(row=>Number(row.total))});
         }catch(e){unresolved.push({id:Number(weapon.id),name:String(weapon.name||''),error:errorText(e)});}
         finally{done++;progress?.(`诊断：核对武器突破系列 ${done}/${candidates.length}`);}
       }
@@ -551,10 +551,11 @@ async function diagnoseInventory(uid,region,progress,loadProfile){
     report.directory.scannedWeapons=candidates.length;
     report.directory.excludedLowLevel=weapons.length-candidates.length;
     family.sort((a,b)=>Number(a.id)-Number(b.id));
-    report.directory.familyWeapons=family.map(w=>({id:Number(w.id),name:String(w.name||''),weaponCatId:Number(w.weapon_cat_id),maxLevel:Number(w.max_level)||90}));
+    report.directory.familyWeapons=family.map(w=>({id:Number(w.id),name:String(w.name||''),weaponCatId:Number(w.weapon_cat_id),maxLevel:Number(w.max_level)||90,demandLowToHigh:w.familyDemand}));
     report.directory.unresolved=unresolved;
     report.directory.coverageComplete=unresolved.length===0;
     const cases=buildDiagnosticCases(avatars,weapons,family);
+    report.targetWeapon=cases[0].targetWeapon;
     const request=async items=>{
       const response=await mysCalcPost('/v3/batch_compute',{items,uid,region,lang:'zh-cn'},cookie,headers);
       return captureDiagnosticResponse(response);

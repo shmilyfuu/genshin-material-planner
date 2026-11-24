@@ -4,7 +4,7 @@
 
 面向原神的 Windows 桌面养成规划工具，支持多角色、多武器培养计划、共享材料库存与每周刷取日历。
 
-**正式版：[v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**　|　**开发版：v0.4.3**
+**正式版：[v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**　|　**开发版：v0.4.4**
 
 [下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
@@ -20,7 +20,7 @@
 - 导入 GGScanner GOOD v3 数据，匹配角色及武器的当前练度。
 - 支持材料数量手动输入、微调及规划配置导入导出。
 
-### 米游社材料同步（v0.4.3 开发版）
+### 米游社材料同步（v0.4.4 开发版）
 
 支持扫码登录、账号切换、凭证刷新及国服原神 UID 选择。通过米游社官方养成计算器的角色和武器目录进行全量材料探测，覆盖官方已收录的未拥有角色与武器。
 
