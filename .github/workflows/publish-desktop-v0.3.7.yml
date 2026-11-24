@@ -1,0 +1,30 @@
+name: Publish archived desktop v0.3.7
+on:
+  push:
+    branches: [release/desktop-v0.3.7]
+    paths: ['.github/workflows/publish-desktop-v0.3.7.yml']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download verified Windows build
+        run: |
+          set -euo pipefail
+          gh run download 45335611494 -n GenshinPlanner-WebView2-v0.3.7-win-x64 -D dist
+          cd dist
+          expected=$(tr -d '\r\n ' < GenshinPlanner-WebView2-v0.3.7-win-x64.zip.sha256)
+          actual=$(sha256sum GenshinPlanner-WebView2-v0.3.7-win-x64.zip | cut -d ' ' -f 1)
+          test "$expected" = "$actual"
+      - name: Publish Windows desktop release
+        run: |
+          set -euo pipefail
+          gh release create desktop-v0.3.7 dist/*.zip dist/*.sha256 \
+            --target a5b47003a68bcd36337b2c4b83e1eed0e4fcf4a0 \
+            --title "原神养成规划 WebView2 v0.3.7" --latest=false \
+            --notes $'Windows x64 便携版。\n\n- 统一角色与武器排序，按首次推出日期排列。\n- 保留发布时间缓存。\n- 使用派蒙程序图标。\n\n升级时保留 data 目录。'
