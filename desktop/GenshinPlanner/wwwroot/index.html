@@ -11,9 +11,9 @@
     <div class="account-picker"><select id="accountSelect" aria-label="切换规划账号"></select></div>
     <div class="account-binding" id="accountBinding"><strong id="boundNickname"></strong><span id="boundUid">未绑定米游社</span></div>
     <div class="header-spacer"></div>
-    <button class="soft-btn header-icon-btn" id="syncInventoryButton" type="button"><img src="icons/inventory.png" alt="">同步库存</button>
+    <button class="soft-btn header-icon-btn" id="syncInventoryButton" type="button"><span class="header-icon inventory-icon" aria-hidden="true"></span>同步库存</button>
     <div class="settings-wrap" id="settingsWrap">
-      <button class="soft-btn header-icon-btn" id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsMenu"><img src="icons/settings.png" alt="">设置</button>
+      <button class="soft-btn header-icon-btn" id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsMenu"><span class="header-icon settings-icon" aria-hidden="true"></span>设置</button>
       <div id="settingsMenu" class="settings-menu" hidden>
         <div class="settings-group"><span>账号管理</span>
           <button id="addAccountButton" type="button">添加规划账号</button>
@@ -32,12 +32,12 @@
     </div>
   </header>
   <section class="calendar-strip" aria-label="每周刷取日历">
-    <div class="strip-heading"><strong>每周刷取日历</strong><span id="calendarNote">按当前培养目标显示秘境材料</span></div>
-    <div class="calendar-days" id="calendarDays"></div>
+    <div class="strip-heading" id="calendarHeading" title="按当前培养目标显示秘境材料"><strong>刷取日历</strong></div>
+    <div class="calendar-days" id="calendarDays" tabindex="0" aria-label="每周材料开放日"></div>
   </section>
   <section class="active-goals-strip" aria-label="正在培养">
-    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 提升按钮编辑 · 暂停后不计入缺口</span></div>
-    <div class="active-goal-list" id="activeGoals"></div>
+    <div class="strip-heading" id="activeGoalsHeading"><strong>正在培养</strong></div>
+    <div class="active-goal-list" id="activeGoals" tabindex="0" aria-label="正在培养的角色与武器"></div>
   </section>
   <div class="workbench" id="workbench">
     <main class="editor">

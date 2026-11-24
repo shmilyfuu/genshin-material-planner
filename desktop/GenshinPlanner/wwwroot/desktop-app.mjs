@@ -274,24 +274,17 @@ function selectGoal(id){
 function renderGoals(){
   const root=$('activeGoals');root.replaceChildren();
   const pending=state.plans.filter(g=>!g.completed&&goalObjectId(g));
-  $('activeGoalCount').textContent=`${pending.filter(g=>g.enabled!==false).length} 项培养中`;
+  $('activeGoalsHeading').title=`${pending.filter(g=>g.enabled!==false).length} 项培养中 · 单击选择 · 提升按钮编辑 · 暂停后不计入缺口`;
   if(!pending.length){root.innerHTML='<span class="empty-strip">点击角色或武器卡片的提升按钮，添加培养目标。</span>';return;}
   for(const goal of pending){
     const kind=goalKind(goal),row=kind==='character'?charRow(goalObjectId(goal)):weaponRow(goalObjectId(goal));
     const card=document.createElement('div');card.className='goal-card'+(selectedGoalId===goal.id?' selected':'')+(goal.enabled===false?' paused':'');
     card.tabIndex=0;card.dataset.goalId=goal.id;card.setAttribute('role','button');card.setAttribute('aria-label',objName(goal)+'，单击选择');
     const artwork=thumb(row?.icon,objName(goal),'goal-art');
-    if(goal.enabled===false){
-      const badge=document.createElement('span');badge.className='goal-paused';badge.textContent='暂停';
-      artwork.append(badge);
-    }
-    card.append(artwork);
-    const description=document.createElement('span');description.className='goal-description';
-    const title=document.createElement('strong');title.textContent=objName(goal);
-    const info=document.createElement('small');
     const obj=weaponInstance(state,goal.weaponInstanceId);
-    info.textContent=kind==='weapon'?(obj?`Lv.${obj.level} · R${obj.refinement}${obj.location?' · '+obj.location:''}`:'武器培养目标'):'角色培养目标';
-    description.append(title,info);card.append(description);
+    const detail=kind==='weapon'&&obj?`Lv.${obj.level} · R${obj.refinement}${obj.location?' · '+obj.location:''}`:'';
+    card.title=[objName(goal),detail,goal.enabled===false?'已暂停':''].filter(Boolean).join(' · ');
+    card.append(artwork);
     const toggle=document.createElement('button');toggle.type='button';toggle.className='goal-toggle';
     toggle.innerHTML=svg(goal.enabled===false?'play':'pause');
     toggle.title=goal.enabled===false?'恢复计算':'暂停计算';toggle.setAttribute('aria-label',toggle.title);
@@ -740,9 +733,8 @@ function renderCalendar(){
     if(!tray.childElementCount){const empty=document.createElement('span');empty.className='calendar-empty';empty.textContent='—';tray.append(empty);}
     cell.append(label,tray);box.append(cell);
   });
-  const note=$('calendarNote');
-  note.textContent=plan.unknown.length?`${plan.unknown.length} 种材料的开放日待核对`:'按当前培养目标显示秘境材料';
-  note.title=plan.unknown.map(item=>item.name||item.id).join('、');
+  const heading=$('calendarHeading');
+  heading.title=plan.unknown.length?`${plan.unknown.length} 种材料的开放日待核对：${plan.unknown.map(item=>item.name||item.id).join('、')}`:'按当前培养目标显示秘境材料';
 }
 function renderAll(){renderAccounts();renderGoals();renderFilters();renderRoster();renderInventory();renderResults();renderCalendar();}
 async function loadReleaseMetadata(force){
@@ -909,7 +901,19 @@ async function installUpdate(){
     renderUpdateProgress({phase:'handoff'});
   }catch(e){$('updateProgress').hidden=true;$('updateStatus').textContent='更新失败：'+e.message;taskStatus('update','更新失败：'+e.message,'error');$('updateLater').disabled=false;$('updateInstall').disabled=false;updateInstalling=false;}
 }
+function installCompactStripScroll(){
+  for(const id of ['calendarDays','activeGoals']){
+    const strip=$(id);
+    strip.addEventListener('wheel',event=>{
+      if(event.ctrlKey||event.shiftKey||event.deltaX||strip.scrollWidth<=strip.clientWidth||!event.deltaY)return;
+      const step=event.deltaMode===1?29:event.deltaMode===2?strip.clientWidth:1;
+      const next=Math.max(0,Math.min(strip.scrollWidth-strip.clientWidth,strip.scrollLeft+event.deltaY*step));
+      if(next!==strip.scrollLeft){event.preventDefault();strip.scrollLeft=next;}
+    },{passive:false});
+  }
+}
 async function start(){
+  installCompactStripScroll();
   installSettingsMenu();
   $('checkUpdateButton').onclick=()=>void checkUpdate(true);
   $('updateLater').onclick=()=>{if(!updateInstalling)$('updateModal').hidden=true;};

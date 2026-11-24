@@ -8,8 +8,10 @@ test('顶部仅保留账号切换、同步库存和设置入口',()=>{
  assert.ok(visible.includes('id="accountSelect"'));
  assert.ok(visible.includes('id="syncInventoryButton"'));
  assert.ok(visible.includes('id="settingsButton"'));
- assert.ok(visible.includes('icons/inventory.png'));
- assert.ok(visible.includes('icons/settings.png'));
+ assert.ok(visible.includes('header-icon inventory-icon'));
+ assert.ok(visible.includes('header-icon settings-icon'));
+ assert.ok(read('desktop.css').includes('url("icons/inventory.png")'));
+ assert.ok(read('desktop.css').includes('url("icons/settings.png")'));
  assert.ok(visible.includes('id="appVersion"'));
  for(const id of ['addAccountButton','renameAccountButton','deleteAccountButton','mysOpen','refreshButton','importGoodButton','importButton','exportButton','checkUpdateButton']){
    assert.ok(header.includes('id="'+id+'"'));
@@ -54,4 +56,29 @@ test('账号信息紧跟下拉框，状态栏位于工作区底部，更新进�
  assert.ok(app.includes("d?.event==='update.progress'"));
  assert.ok(app.includes("binding?'UID '+binding.uid:'未绑定米游社'"));
  assert.ok(app.includes("Math.floor(completed/total*100)"));
+});
+
+test('紧凑日历和培养条共享29px高度与6px间距，日期自适应宽度',()=>{
+ const html=read('index.html'),css=read('desktop.css'),app=read('desktop-app.mjs');
+ const calendar=html.match(/<section class="calendar-strip"[\s\S]*?<\/section>/)[0];
+ const goals=html.match(/<section class="active-goals-strip"[\s\S]*?<\/section>/)[0];
+ assert.ok(calendar.includes('<strong>刷取日历</strong>'));
+ assert.ok(goals.includes('<strong>正在培养</strong>'));
+ assert.ok(!html.includes('strip-hint'));
+ assert.ok(css.includes('--strip-height:29px;--strip-gap:6px'));
+ assert.ok(css.match(/\.calendar-day\{[^}]*flex:0 0 auto[^}]*padding:0 0 0 var\(--strip-gap\)/));
+ assert.ok(css.match(/\.calendar-materials\{[^}]*gap:0/));
+ assert.ok(css.match(/\.goal-card\{[^}]*gap:var\(--strip-gap\)[^}]*padding:0 var\(--strip-gap\) 0 0/));
+ assert.ok(css.match(/\.goal-art\{[^}]*width:var\(--strip-height\);height:var\(--strip-height\)/));
+ assert.ok(css.match(/\.goal-toggle\{width:24px;height:24px/));
+ const render=app.slice(app.indexOf('function renderGoals(){'),app.indexOf('function typeIcon('));
+ assert.ok(!render.includes('goal-description'));assert.ok(!render.includes('goal-paused'));
+ assert.ok(render.includes('card.append(artwork)'));assert.ok(render.includes('card.append(toggle)'));assert.ok(render.includes('card.append(editButton('));assert.ok(render.includes('card.title='));
+ assert.ok(app.includes("strip.addEventListener('wheel'"));
+});
+test('顶部图标使用原始透明度与按钮文字颜色，无投影',()=>{
+ const css=read('desktop.css');
+ const rule=css.match(/\.header-icon-btn \.header-icon\{[^}]*\}/)[0];
+ assert.ok(rule.includes('background:currentColor'));assert.ok(rule.includes('mask:var(--header-icon)'));
+ assert.ok(!rule.includes('filter:'));assert.ok(!css.includes('.header-icon-btn img{'));
 });
