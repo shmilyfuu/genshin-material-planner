@@ -831,6 +831,12 @@ async function start(){
   try{const record=await bridge('storage.load');if(record)state=normalizeState(record);}catch(e){toast('读取本地数据失败：'+e.message);}
   initializePlanner(state);renderAll();
   installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,
+    loadDiagnosticWeapon:async weapon=>{
+      const row=weaponRow(weapon.id);
+      if(!row)throw Error('Nanoka 武器目录未匹配');
+      const response=await bridge('data.fetch',{path:`/gi/${encodeURIComponent(row.version)}/zh/weapon/${row.id}.json`,force:false,maxAge:86400000});
+      return parseWeaponDetail(response.data,row);
+    },
     apply:result=>{applySyncedInventory(state,result);renderInventory();renderResults();renderCalendar();save();}});
   await loadLists();
 }

@@ -5,9 +5,10 @@ export function installMiyoushePanel(bridge,options){
   let roles=[],ticket='',busy=false,accounts={entries:[]},planningId='';
   const text=value=>{status.textContent=value;};
   function controls(){
-    for(const id of ['mysAdd','mysRefresh','mysRemove','mysReadUid','mysPoll','mysSync','mysAccount','mysUid','mysClose'])$(id).disabled=busy;
+    for(const id of ['mysAdd','mysRefresh','mysRemove','mysReadUid','mysPoll','mysSync','mysDiagnose','mysAccount','mysUid','mysClose'])$(id).disabled=busy;
     for(const id of ['mysRefresh','mysRemove','mysReadUid'])$(id).disabled=busy||!account.value;
     $('mysSync').disabled=busy||!uid.value;
+    $('mysDiagnose').disabled=busy||!uid.value;
     $('mysPoll').disabled=busy||!ticket;
   }
   function clearRoles(){roles=[];uid.replaceChildren(new Option('请选择 UID',''));controls();}
@@ -58,6 +59,15 @@ export function installMiyoushePanel(bridge,options){
     options.apply(result);
     const min=result.materials.filter(m=>m.minimum).length;
     text(`同步背包已更新 · ${result.characterCount} 名角色 / ${result.weaponCount} 类武器 / ${result.materials.length} 种材料 · ${min} 种达到探测上限。`);
+  });
+  $('mysDiagnose').onclick=()=>action(async()=>{
+    const role=roles.find(r=>r.uid+'|'+r.region===uid.value);
+    if(!role)throw Error('请选择 UID。');
+    if(options.getPlanningId()!==planningId)throw Error('规划账号已切换，请重新打开米游社。');
+    if(options.getInventoryUid()&&options.getInventoryUid()!==role.uid)throw Error('该 UID 与当前规划账号不同。');
+    const report=await api.diagnoseInventory(role.uid,role.region,text,options.loadDiagnosticWeapon);
+    await bridge('mys.diagnostics.save',{report});
+    text(`诊断已保存至 data/inventory-diagnostics.json · 有效响应 ${report.successfulCases}/${report.cases.length}${report.error?' · '+report.error:''}`);
   });
   controls();
 }

@@ -84,6 +84,7 @@ public partial class MainWindow : Window
                 "mys.storage.load" => await _mys.LoadAsync(data),
                 "mys.storage.save" => await _mys.SaveAsync(data),
                 "mys.request" => await _mys.RequestAsync(data),
+                "mys.diagnostics.save" => await SaveInventoryDiagnosticsAsync(data),
                 "release.fetch" => await FetchReleaseSourceAsync(data),
                 "storage.export" => ExportState(data),
                 "storage.import" => await ImportStateAsync(),
@@ -292,6 +293,20 @@ public partial class MainWindow : Window
             if (!Valid(cached)) throw;
             return new JsonObject { ["content"] = cached };
         }
+    }
+
+    private async Task<bool> SaveInventoryDiagnosticsAsync(JsonObject? data)
+    {
+        if (data?["report"] is not JsonObject report || report["cases"] is not JsonArray)
+            throw new InvalidDataException("材料诊断格式错误。");
+        var json = report.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        if (Encoding.UTF8.GetByteCount(json) > 16 * 1024 * 1024)
+            throw new InvalidDataException("材料诊断文件过大。");
+        Directory.CreateDirectory(_dataDir);
+        var file = Path.Combine(_dataDir, "inventory-diagnostics.json");
+        await File.WriteAllTextAsync(file + ".tmp", json);
+        File.Move(file + ".tmp", file, true);
+        return true;
     }
 
     private bool ExportState(JsonObject? data)

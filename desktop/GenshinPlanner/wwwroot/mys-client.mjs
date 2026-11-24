@@ -1,4 +1,5 @@
 import {buildInventoryRequests,readInventoryRows,mergeInventoryRows} from './mys-inventory.mjs';
+import {buildDiagnosticCases,captureDiagnosticResponse,weaponMatchesFamily,DIAGNOSTIC_FAMILY_IDS,DIAGNOSTIC_KNOWN_NAMES} from './inventory-diagnostics.mjs';
 'use strict';
 
 function add32(a, b) {
@@ -518,8 +519,67 @@ async function syncInventory(uid,region,progress){
   if(!values.size)throw Error('米游社未返回有效材料。');
   return {uid,region,materials:[...values.values()],characterCount:plan.characterCount,weaponCount:plan.weaponCount,batches:completed};
 }
+async function diagnoseInventory(uid,region,progress,loadProfile){
+  const roles=await mysRoles();
+  if(!roles.some(r=>r.uid===uid&&r.region===region))throw Error('所选 UID 与当前账号不匹配。');
+  const accounts=await mysReadAccounts(),id=accounts.activeId,account=accounts.entries[id];
+  const cookie=mysAccountCookie(account),device=await mysFingerprint(await mysDevice()),headers=mysCalcHeaders(device);
+  const report={schema:1,version:'0.4.3',startedAt:new Date().toISOString(),familyIds:[...DIAGNOSTIC_FAMILY_IDS],
+    reference:{actualStockLowToHigh:[47,36,11,0],silverWeaponDemandLowToHigh:[5,14,14,6],note:'此前测试时的库存，请与本次游戏实际背包核对。'},
+    directory:{},cases:[]};
+  const errorText=e=>String(e?.message||e).slice(0,500);
+  try{
+    progress?.('诊断：读取官方角色与武器目录…');
+    const [avatars,weapons]=await Promise.all([mysAllCalculatorAvatars(cookie,headers),mysAllWeapons(cookie,headers)]);
+    report.directory.characterCount=avatars.length;report.directory.weaponCount=weapons.length;
+    // Check all official weapons against the current Nanoka detail data, using the existing local cache.
+    const family=[],unresolved=[];let cursor=0,done=0;
+    const candidates=weapons.filter(w=>Number(w.max_level||90)>40);
+    const priority=new Set(DIAGNOSTIC_KNOWN_NAMES);
+    candidates.sort((a,b)=>Number(priority.has(b.name))-Number(priority.has(a.name)));
+    await Promise.all(Array.from({length:5},async()=>{
+      while(cursor<candidates.length){
+        const weapon=candidates[cursor++];
+        try{
+          const profile=await loadProfile(weapon);
+          if(!profile?.materials?.weapGems?.every(Boolean)||profile.materials.weapGems.length!==4)throw Error('突破系列未识别');
+          if(weaponMatchesFamily(profile))family.push(weapon);
+        }catch(e){unresolved.push({id:Number(weapon.id),name:String(weapon.name||''),error:errorText(e)});}
+        finally{done++;progress?.(`诊断：核对武器突破系列 ${done}/${candidates.length}`);}
+      }
+    }));
+    report.directory.scannedWeapons=candidates.length;
+    report.directory.excludedLowLevel=weapons.length-candidates.length;
+    family.sort((a,b)=>Number(a.id)-Number(b.id));
+    report.directory.familyWeapons=family.map(w=>({id:Number(w.id),name:String(w.name||''),weaponCatId:Number(w.weapon_cat_id),maxLevel:Number(w.max_level)||90}));
+    report.directory.unresolved=unresolved;
+    report.directory.coverageComplete=unresolved.length===0;
+    const cases=buildDiagnosticCases(avatars,weapons,family);
+    const request=async items=>{
+      const response=await mysCalcPost('/v3/batch_compute',{items,uid,region,lang:'zh-cn'},cookie,headers);
+      return captureDiagnosticResponse(response);
+    };
+    for(const [index,test] of cases.entries()){
+      progress?.(`诊断 ${index+1}/${cases.length}：${test.label}`);
+      const entry={...test,request:{items:test.items,lang:'zh-cn'},requestedAt:new Date().toISOString()};
+      delete entry.items;
+      report.cases.push(entry);
+      if(!test.items.length){entry.error='缺少可用角色载体';continue;}
+      try{entry.response=await request(test.items);}
+      catch(e){entry.error=errorText(e);}
+      entry.finishedAt=new Date().toISOString();
+      // Separate read-only diagnostic requests to reduce request bursts.
+      if(index<cases.length-1)await new Promise(resolve=>setTimeout(resolve,1000));
+    }
+    const latest=await mysReadAccounts();
+    if(latest.activeId!==id||latest.entries[id]?.stoken!==account.stoken)throw Error('诊断期间登录账号发生变化。');
+  }catch(e){report.error=errorText(e);}
+  report.finishedAt=new Date().toISOString();
+  report.successfulCases=report.cases.filter(c=>c.response?.has_user_info===true&&Array.isArray(c.response?.overall_consume)).length;
+  return report;
+}
 export function createMiyousheClient(bridge){
   native=bridge;
   return {accounts:async()=>mysPublicAccounts(await mysReadAccounts()),startQr:mysStartQr,pollQr:mysPollQr,
-    refresh:mysRefresh,switchAccount:mysSwitch,remove:mysRemove,roles:mysRoles,syncInventory};
+    refresh:mysRefresh,switchAccount:mysSwitch,remove:mysRemove,roles:mysRoles,syncInventory,diagnoseInventory};
 }
