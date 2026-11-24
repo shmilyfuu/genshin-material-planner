@@ -58,17 +58,18 @@ test('账号信息紧跟下拉框，状态栏位于工作区底部，更新进�
  assert.ok(app.includes("Math.floor(completed/total*100)"));
 });
 
-test('紧凑日历和培养条共享29px内容高度、4px间距及37px区域高度',()=>{
+test('紧凑日历和培养条共享29px内容高度、10px区域间距及49px区域高度',()=>{
  const html=read('index.html'),css=read('desktop.css'),app=read('desktop-app.mjs');
  const calendar=html.match(/<section class="calendar-strip"[\s\S]*?<\/section>/)[0];
  const goals=html.match(/<section class="active-goals-strip"[\s\S]*?<\/section>/)[0];
  assert.ok(calendar.includes('<strong>刷取日历</strong>'));
  assert.ok(goals.includes('<strong>正在培养</strong>'));
  assert.ok(!html.includes('strip-hint'));
- assert.ok(css.includes('--strip-height:29px;--strip-gap:4px;--strip-padding:4px'));
+ assert.ok(css.includes('--layout-gap:10px'));
+ assert.ok(css.includes('--strip-height:29px;--strip-gap:4px;--strip-padding:var(--layout-gap)'));
  assert.ok(css.includes('--strip-total:calc(var(--strip-height) + 2 * var(--strip-padding))'));
- assert.ok(css.includes('padding:var(--strip-padding) 0'));
- assert.ok(css.match(/\.calendar-day\{[^}]*flex:0 0 auto[^}]*padding:0 var\(--strip-gap\)/));
+ assert.ok(css.includes('padding:var(--strip-padding) var(--layout-gap)'));
+ assert.ok(css.match(/\.calendar-day\{[^}]*--day-gap:calc\(2 \* var\(--strip-gap\)\)[^}]*flex:0 0 auto[^}]*gap:var\(--day-gap\);padding:0 0 0 var\(--day-gap\)/));
  assert.ok(css.match(/\.calendar-materials\{[^}]*gap:0/));
  assert.ok(css.match(/\.goal-card\{[^}]*gap:var\(--strip-gap\)[^}]*padding:0 var\(--strip-gap\) 0 0/));
  assert.ok(css.match(/\.goal-art\{[^}]*width:var\(--strip-height\);height:var\(--strip-height\)/));
@@ -94,4 +95,19 @@ test('培养卡片星级背景、透明按钮及选中描边覆盖图片',()=>{
  assert.ok(css.match(/\.goal-card::after\{[^}]*z-index:3[^}]*pointer-events:none/));
  assert.ok(css.includes('.goal-card.selected::after,.goal-card:focus-visible::after{box-shadow:inset 0 0 0 2px #fff}'));
  assert.ok(!css.includes('.goal-card.selected{background:var(--surface-hover);outline'));
+});
+
+test('主界面共用10px布局间距，左侧对齐及窄窗口规则一致',()=>{
+ const css=read('desktop.css');
+ const rule=selector=>{const start=css.indexOf(selector+'{');assert.ok(start>=0,selector);return css.slice(start,css.indexOf('}',start)+1);};
+ assert.ok(rule('.app-header').includes('padding:0 var(--layout-gap)'));
+ assert.ok(rule('.strip-heading').includes('padding:0;'));
+ assert.ok(rule('.calendar-strip,.active-goals-strip').includes('padding:var(--strip-padding) var(--layout-gap)'));
+ assert.ok(rule('.calendar-days,.active-goal-list').includes('gap:var(--layout-gap)'));
+ for(const selector of ['.editor','.filter-area','.roster-scroll'])assert.ok(rule(selector).includes('padding:var(--layout-gap)'));
+ for(const selector of ['.inventory-rail','.deficit-rail'])assert.ok(rule(selector).includes('padding:var(--layout-gap) var(--layout-gap) 0'));
+ assert.ok(rule('.roster-grid').includes('gap:var(--layout-gap)'));
+ for(const selector of ['.material-group','.deficit-group'])assert.ok(rule(selector).includes('margin-bottom:var(--layout-gap)'));
+ assert.ok(rule('.status-bar').includes('padding:0 var(--layout-gap)'));
+ assert.ok(!css.includes('@media(max-width:1400px){.app-header'));
 });
