@@ -43,13 +43,13 @@
     <main class="editor">
       <section class="chooser-panel">
         <div class="tabs" role="tablist" aria-label="培养对象">
-          <button type="button" class="tab active" data-tab="character" aria-selected="true">角色</button>
-          <button type="button" class="tab" data-tab="weapon" aria-selected="false">武器</button>
+          <button type="button" class="tab active" role="tab" data-tab="character" aria-selected="true" aria-label="角色" title="角色"><span class="tab-icon character-tab-icon" aria-hidden="true"></span></button>
+          <button type="button" class="tab" role="tab" data-tab="weapon" aria-selected="false" aria-label="武器" title="武器"><span class="tab-icon weapon-tab-icon" aria-hidden="true"></span></button>
           <span class="roster-help">单击选择或取消 · 提升按钮编辑</span>
         </div>
         <div class="filter-area">
           <div class="filter-top">
-            <label class="searchbox"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="搜索名称" autocomplete="off"></label>
+            <label class="searchbox"><span class="search-icon" aria-hidden="true"></span><input id="searchInput" type="search" placeholder="搜索名称" aria-label="搜索名称" autocomplete="off"></label>
             <div class="filter-row" id="starFilters" aria-label="星级筛选"></div>
           </div>
           <div class="filter-row" id="elementFilters" aria-label="元素筛选"></div>

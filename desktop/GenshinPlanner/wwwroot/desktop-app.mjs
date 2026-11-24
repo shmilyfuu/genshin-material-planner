@@ -324,7 +324,8 @@ function renderFilters(){
   const stars=$('starFilters');stars.replaceChildren();
   stars.append(makeChip('全部',null,filter.star.length===0,()=>reset('star')));
   for(const n of (isChar?[5,4]:[5,4,3,2,1])){
-    stars.append(makeChip(n+'★','star',filter.star.includes(n),()=>redraw('star',n)));
+    const chip=makeChip(n+'★',null,filter.star.includes(n),()=>redraw('star',n));
+    chip.classList.add('star-chip');stars.append(chip);
   }
   const elems=$('elementFilters');elems.replaceChildren();elems.hidden=!isChar;
   if(isChar){
@@ -377,7 +378,7 @@ function rosterCard(row){
   if(row.instance){
     const ordinal=state.weaponInstances.filter(w=>w.weaponId===row.id).findIndex(w=>w.id===row.instance.id)+1;
     const marker=document.createElement('span');marker.className='avatar-instance';
-    marker.textContent='#'+String(ordinal);artwork.append(marker);
+    marker.textContent=String(ordinal);marker.dataset.digits=String(Math.min(3,marker.textContent.length));marker.title='同名武器 '+ordinal;artwork.append(marker);
   }
   if(row.sourceTag){
     const preview=document.createElement('span');preview.className='avatar-preview';

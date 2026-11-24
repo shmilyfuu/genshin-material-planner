@@ -40,6 +40,10 @@ test('卡片使用新资源，前瞻星号和实例编号采用统一样式',()=
  assert.ok(app.includes("preview.textContent='*';preview.title=row.sourceTag;"));
  assert.ok(css.includes('.avatar-instance,.avatar-preview{'));
  assert.ok(css.includes('--badge-inset:2px'));
+ assert.ok(app.includes('marker.textContent=String(ordinal)'));
+ assert.ok(css.match(/\.avatar-instance,\.avatar-preview\{[^}]*width:18px;height:18px;display:grid;place-items:center;background:#28374d80/));
+ assert.ok(css.match(/\.avatar-card\{[^}]*border:0/));
+ assert.ok(!css.match(/\.card-settings\{[^}]*filter:/));
  assert.ok(!css.includes('brightness(0)'));
  assert.ok(read('index.html').includes('id="applyInventoryButton"'));
  assert.ok(app.includes('applyInventoryToManual(state)'));
@@ -104,7 +108,9 @@ test('主界面共用10px布局间距，左侧对齐及窄窗口规则一致',()
  assert.ok(rule('.strip-heading').includes('padding:0;'));
  assert.ok(rule('.calendar-strip,.active-goals-strip').includes('padding:var(--strip-padding) var(--layout-gap)'));
  assert.ok(rule('.calendar-days,.active-goal-list').includes('gap:var(--layout-gap)'));
- for(const selector of ['.editor','.filter-area','.roster-scroll'])assert.ok(rule(selector).includes('padding:var(--layout-gap)'));
+ assert.ok(rule('.editor').includes('padding:0'));
+ for(const selector of ['.filter-area','.roster-scroll'])assert.ok(rule(selector).includes('padding:var(--layout-gap)'));
+ assert.ok(!rule('.chooser-panel').includes('border-radius:'));assert.ok(!rule('.chooser-panel').includes('border:'));
  for(const selector of ['.inventory-rail','.deficit-rail'])assert.ok(rule(selector).includes('padding:var(--layout-gap) var(--layout-gap) 0'));
  assert.ok(rule('.roster-grid').includes('gap:var(--layout-gap)'));
  for(const selector of ['.material-group','.deficit-group'])assert.ok(rule(selector).includes('margin-bottom:var(--layout-gap)'));
@@ -123,4 +129,18 @@ test('角色与武器筛选控件共用29px外框高度',()=>{
  }
  assert.ok(rule('.filter-chip.icon-only').includes('width:var(--filter-height)'));
  assert.ok(!rule('.filter-chip.icon-only').includes('height:'));
+});
+
+test('图鉴标签及搜索使用本地游戏图标，星级筛选与类型筛选等宽',()=>{
+ const html=read('index.html'),css=read('desktop.css'),app=read('desktop-app.mjs');
+ for(const [name,asset] of [['character','character-tab.png'],['weapon','weapon-tab.png']]){
+   assert.ok(html.includes('class="tab-icon '+name+'-tab-icon"'));
+   assert.ok(css.includes('url("icons/'+asset+'")'));
+   assert.equal(readFileSync(new URL('../wwwroot/icons/'+asset,import.meta.url)).subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ }
+ assert.ok(html.includes('class="search-icon"'));assert.ok(css.includes('url("icons/search.png")'));
+ assert.equal(readFileSync(new URL('../wwwroot/icons/search.png',import.meta.url)).subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ assert.ok(css.includes('width:calc(6em + 18px)'));
+ assert.ok(app.includes("makeChip(n+'★',null,"));assert.ok(css.includes('.filter-chip.star-chip,.filter-chip.icon-only{width:var(--filter-height)'));
+ assert.ok(!css.match(/\.tabs\{[^}]*border-bottom/));assert.ok(css.includes('.tab.active{color:var(--ink);background:var(--cream)}'));
 });

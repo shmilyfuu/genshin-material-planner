@@ -53,7 +53,7 @@ test('卡片独立设置入口、选中状态及弹窗层级',()=>{
   assert.ok(css.includes('border-radius:4px 4px 17px 0'));
   assert.ok(css.includes('.weapon-picker-grid'));
   assert.ok(!css.includes('.calendar-material.needed'));
-  for(const path of ['icons/development.webp','icons/rarity/rarity-1.png','icons/rarity/rarity-2.png','icons/rarity/rarity-3.png','icons/rarity/rarity-4.webp','icons/rarity/rarity-5.webp'])assert.ok(existsSync(new URL(path,base)));
+  for(const path of ['icons/rarity/rarity-1.png','icons/rarity/rarity-2.png','icons/rarity/rarity-3.png','icons/rarity/rarity-4.webp','icons/rarity/rarity-5.webp'])assert.ok(existsSync(new URL(path,base)));
 });
 test('等级选择器直接使用四列布局并同步当前和目标等级',()=>{
  const base=new URL('../wwwroot/',import.meta.url);
