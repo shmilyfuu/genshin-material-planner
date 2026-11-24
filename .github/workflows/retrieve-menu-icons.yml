@@ -1,0 +1,31 @@
+name: Retrieve desktop menu icons
+on:
+  push:
+    branches: [assets/desktop-menu-icons]
+permissions:
+  contents: read
+jobs:
+  retrieve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve game menu PNG files
+        run: |
+          python - <<'PY'
+          import hashlib, urllib.request, base64, struct, time
+          for name in ['Icon_Inventory.png','Icon_Training_Guide.png']:
+              h=hashlib.md5(name.encode()).hexdigest()
+              urls=[f'https://static.wikia.nocookie.net/gensin-impact/images/{h[0]}/{h[:2]}/{name}/revision/latest?format=original',f'https://genshin-impact.fandom.com/wiki/Special:FilePath/{name}',f'https://static.wikia.nocookie.net/gensin-impact/images/{h[0]}/{h[:2]}/{name}/revision/latest']
+              for url in urls:
+                  try:
+                      with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0','Accept':'image/png,image/*;q=0.8'}),timeout=25) as r:
+                          data=r.read(500000)
+                      if data[:8]!=b'\x89PNG\r\n\x1a\n': raise ValueError('not a PNG')
+                      w,h2=struct.unpack('>II',data[16:24])
+                      if not 16<=w<=1024 or not 16<=h2<=1024: raise ValueError('invalid dimensions')
+                      print(name,w,h2,hashlib.sha256(data).hexdigest(),flush=True)
+                      print('ICON_DATA_'+name+'='+base64.b64encode(data).decode(),flush=True)
+                      break
+                  except Exception as e:
+                      print(type(e).__name__,str(e),flush=True)
+              else: raise RuntimeError('Unable to retrieve '+name)
+          PY
