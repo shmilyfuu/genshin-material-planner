@@ -27,3 +27,6 @@ https://github.com/Primajin/genshin-farming-helper
 https://github.com/Kiyang101/Genshin-Randomizer-v2
 
 Game artwork remains the property of its respective rights holders.
+
+The settings icon is sourced from the extracted game sprite:
+https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_IconSmall_Setting.png

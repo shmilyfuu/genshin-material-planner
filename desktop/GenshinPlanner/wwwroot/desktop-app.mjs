@@ -223,7 +223,7 @@ function thumb(icon,name,css=''){
 function editButton(onEdit,css='card-settings'){
   const button=document.createElement('button');button.type='button';button.className=css;
   button.title='设置培养目标';button.setAttribute('aria-label',button.title);
-  button.innerHTML=svg('settings');button.onclick=ev=>{ev.stopPropagation();onEdit();};return button;
+  const icon=document.createElement('img');icon.src='icons/settings.png';icon.alt='';icon.onerror=()=>{button.innerHTML=svg('settings');};button.append(icon);button.onclick=ev=>{ev.stopPropagation();onEdit();};return button;
 }
 function bindCard(node,onSelect,onEdit){
   node.addEventListener('click',ev=>{if(!ev.target.closest('button,input,select'))onSelect();});
