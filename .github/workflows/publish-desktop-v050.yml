@@ -1,0 +1,64 @@
+name: Publish desktop v0.5.0
+on:
+  push:
+    branches: [release/desktop-v0.5.0]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: shmilyfuu/genshin-material-planner
+    steps:
+      - name: Publish verified Windows build
+        shell: bash
+        run: |
+          set -euo pipefail
+          run=45386754776
+          commit=3b9f2ece8514935cbeb0b79fe06cb1864a6ddb6c
+          name=GenshinPlanner-WebView2-v0.5.0-win-x64
+          gh run watch "$run" --exit-status --interval 5
+          test "$(gh run view "$run" --json headSha --jq .headSha)" = "$commit"
+          test "$(gh run view "$run" --json conclusion --jq .conclusion)" = success
+          mkdir -p dist
+          gh run download "$run" --name "$name" --dir dist
+          cd dist
+          test -f "$name.zip"
+          test -f "$name.zip.sha256"
+          actual=$(sha256sum "$name.zip" | cut -d' ' -f1)
+          expected=$(tr -d '[:space:]' < "$name.zip.sha256")
+          test "$actual" = "$expected"
+          python - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('GenshinPlanner-WebView2-v0.5.0-win-x64.zip') as z:
+              names={x.replace('\\','/') for x in z.namelist()}
+              assert {'GenshinPlanner.exe','data/','resources/wwwroot/index.html','resources/wwwroot/icons/inventory.png','resources/wwwroot/icons/training-guide.png'}<=names
+              assert not any(x.startswith('data/') and x!='data/' for x in names)
+              assert z.testzip() is None
+          PY
+          if gh release view desktop-v0.5.0 >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite.'
+            exit 1
+          fi
+          cat > notes.md <<'EOF'
+          ## 账号与材料同步
+          - 米游社扫码自动确认、自动读取 UID，支持绑定已有或新建规划账号。
+          - 顶部一键同步当前 UID，手动背包与同步背包独立保存。
+          - 按材料系列反推原始库存，未知材料留空，已确认的库存下限以虚线标记。
+
+          ## 界面
+          - 顶部设置菜单按账号、资料与数据、程序分组。
+          - 使用游戏背包、提升指南及设置图标，标题下方显示程序版本。
+
+          ## 程序更新
+          - 启动时自动检查正式版本，也可通过设置菜单手动检查。
+          - 确认后下载并校验更新包，保留 data 目录，完成更新后自动重启。
+
+          ## 下载
+          Windows 10/11 x64 便携版，需要 Microsoft Edge WebView2 Runtime。
+          解压 ZIP 后运行 GenshinPlanner.exe。覆盖升级前请备份 data 目录。
+          EOF
+          gh release create desktop-v0.5.0 "$name.zip" "$name.zip.sha256" --target "$commit" --title "原神养成规划 v0.5.0" --notes-file notes.md --latest
