@@ -38,42 +38,31 @@ test('重复点击同一条件取消筛选，点击全部恢复该组全部结�
   assert.deepEqual(selectRows(filter).map(x=>x.id),['2']);
 });
 
-test('卡片角标和武器加减按钮使用一致的定位规则',()=>{
+test('卡片独立设置入口、选中状态及弹窗层级',()=>{
   const base=new URL('../wwwroot/',import.meta.url);
   const js=readFileSync(new URL('desktop-app.mjs',base),'utf8');
   const css=readFileSync(new URL('desktop.css',base),'utf8');
-  assert.ok(js.includes("training.className='card-badge training'"));
-  assert.ok(js.includes('card.append(artwork,title)'));
-  assert.ok(!js.includes("className='avatar-meta'"));
-  assert.ok(css.includes('--badge-inset:4px;--badge-size:23px'));
-  assert.ok(css.includes('.avatar-instance{position:absolute;top:4px;left:4px'));
-  assert.ok(css.includes('.avatar-weapon-action svg{display:block;width:14px;height:14px'));
-  assert.ok(css.includes('.avatar-add-copy{top:4px}'));
-  assert.ok(css.includes('.avatar-remove-copy{bottom:4px}'));
-  assert.ok(js.includes("createAction('增加一把'+row.name,'plus','avatar-add-copy'"));
-  assert.ok(js.includes("createAction('移除'+row.name+' #'+ordinal,'minus','avatar-remove-copy'"));
-  assert.ok(js.includes('if(row.instance&&sameName.length>1)'));
-  assert.ok(js.includes("await modal({title:'移除武器实例'"));
-  assert.ok(js.includes("removeWeaponInstance(state,row.instance.id)"));
-  const card=js.slice(js.indexOf('function rosterCard('),js.indexOf('function renderRoster('));
-  assert.ok(card.includes("if(kind==='character')"));
-  assert.ok(!card.includes("}else{\n    badge(weaponDefs"));
-  for(const path of ['icons/development.webp','icons/rarity/rarity-1.png',
-    'icons/rarity/rarity-2.png','icons/rarity/rarity-3.png',
-    'icons/rarity/rarity-4.webp','icons/rarity/rarity-5.webp']){
-    assert.ok(existsSync(new URL(path,base)),path);
-  }
+  assert.ok(js.includes('artwork.append(editButton(onEdit))'));
+  assert.ok(js.includes('refreshSelection();'));
+  assert.ok(!js.includes("addEventListener('dblclick'"));
+  assert.ok(js.includes('fallback.hidden=Boolean(icon)'));
+  assert.ok(js.includes("removeWeaponInstance(state,instance.id)"));
+  assert.ok(js.includes("icon.className='calendar-material';icon.dataset.rank"));
+  assert.ok(css.includes('#modal{z-index:60}'));
+  assert.ok(css.includes('.avatar-card.selected::after'));
+  assert.ok(css.includes('border-radius:4px 4px 17px 0'));
+  assert.ok(css.includes('.weapon-picker-grid'));
+  assert.ok(!css.includes('.calendar-material.needed'));
+  for(const path of ['icons/development.webp','icons/rarity/rarity-1.png','icons/rarity/rarity-2.png','icons/rarity/rarity-3.png','icons/rarity/rarity-4.webp','icons/rarity/rarity-5.webp'])assert.ok(existsSync(new URL(path,base)));
 });
-
-test('等级选择器直接参与四列网格，修改当前或目标等级时双向同步',()=>{
-  const base=new URL('../wwwroot/',import.meta.url);
-  const js=readFileSync(new URL('desktop-app.mjs',base),'utf8');
-  const css=readFileSync(new URL('desktop.css',base),'utf8');
-  const body=js.slice(js.indexOf('function levelRows('),js.indexOf('function updateLinkedWeaponField('));
-  assert.match(body,/const current=makeSelect\\(pair\\[0\\],'current'\\),target=makeSelect\\(pair\\[1\\],'target'\\)/);
-  assert.match(body,/row\\.append\\(caption,current,arrow,target\\)/);
-  assert.doesNotMatch(body,/editorSelect\\(/);
-  assert.match(body,/target\\.value=String\\(pair\\[1\\]\\)/);
-  assert.match(body,/current\\.value=String\\(pair\\[0\\]\\)/);
-  assert.match(css,/\\.goal-level-field\\{display:grid;grid-template-columns:96px minmax\\(0,1fr\\) 20px minmax\\(0,1fr\\)/);
+test('等级选择器直接使用四列布局并同步当前和目标等级',()=>{
+ const base=new URL('../wwwroot/',import.meta.url);
+ const js=readFileSync(new URL('desktop-app.mjs',base),'utf8');
+ const css=readFileSync(new URL('desktop.css',base),'utf8');
+ const body=js.slice(js.indexOf('function levelRows('),js.indexOf('function weaponPicker('));
+ assert.ok(body.includes('row.append(caption,current,arrow,target)'));
+ assert.ok(body.includes('target.value=String(pair[1])'));
+ assert.ok(body.includes('current.value=String(pair[0])'));
+ assert.ok(css.includes('grid-template-columns:96px minmax(0,1fr) 20px minmax(0,1fr)'));
+ assert.ok(css.includes('grid-template-columns:96px minmax(0,1fr)'));
 });

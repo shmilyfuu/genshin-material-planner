@@ -22,11 +22,11 @@
     </div>
   </header>
   <section class="calendar-strip" aria-label="每周刷取日历">
-    <div class="strip-heading"><strong>每周刷取日历</strong><span id="calendarNote">按材料缺口更新</span></div>
+    <div class="strip-heading"><strong>每周刷取日历</strong><span id="calendarNote">按当前培养目标显示秘境材料</span></div>
     <div class="calendar-days" id="calendarDays"></div>
   </section>
   <section class="active-goals-strip" aria-label="正在培养">
-    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 双击编辑 · 暂停后不计入缺口</span></div>
+    <div class="strip-heading"><strong>正在培养</strong><span id="activeGoalCount">0 项</span><span class="strip-hint">单击选择 · 设置按钮编辑 · 暂停后不计入缺口</span></div>
     <div class="active-goal-list" id="activeGoals"></div>
   </section>
   <div class="workbench" id="workbench">
@@ -35,7 +35,7 @@
         <div class="tabs" role="tablist" aria-label="培养对象">
           <button type="button" class="tab active" data-tab="character" aria-selected="true">角色</button>
           <button type="button" class="tab" data-tab="weapon" aria-selected="false">武器</button>
-          <span class="roster-help">单击选择或取消 · 双击设置目标</span>
+          <span class="roster-help">单击选择或取消 · 设置按钮编辑</span>
         </div>
         <div class="filter-area">
           <div class="filter-top">
@@ -72,7 +72,7 @@
 <div class="modal-backdrop" id="goalModal" hidden>
   <div class="modal goal-modal" role="dialog" aria-modal="true" aria-labelledby="goalModalTitle">
     <h2 id="goalModalTitle">培养目标</h2><div id="goalModalBody"></div>
-    <div class="modal-actions"><button id="goalAddCopy" type="button" hidden>添加同名武器</button><button id="goalDelete" class="danger-btn" type="button">删除目标</button><span class="modal-spacer"></span><button id="goalCancel" type="button">取消</button><button id="goalSave" class="primary-btn" type="button">保存</button></div>
+    <div class="modal-actions"><button id="goalAddCopy" type="button" hidden>添加同名武器</button><button id="goalRemoveCopy" class="danger-btn" type="button" hidden>移除武器</button><button id="goalDelete" class="danger-btn" type="button">删除目标</button><span class="modal-spacer"></span><button id="goalCancel" type="button">取消</button><button id="goalSave" class="primary-btn" type="button">保存</button></div>
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

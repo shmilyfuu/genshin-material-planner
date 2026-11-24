@@ -51,7 +51,7 @@ export function calendarForEntries(entries,deficits){
       seen.add(key);
       const icon=family[family.length-1];
       const lack=family.reduce((total,item)=>total+(demand.get(String(item.id))?.lack||0),0);
-      const row={id:String(icon.id),name:String(icon.name||''),kind,lack,highlight:lack>0};
+      const row={id:String(icon.id),name:String(icon.name||''),kind,rank:Number(icon.rank)||Number(demand.get(String(icon.id))?.rank)||(kind==='talent'?4:5),lack,highlight:lack>0};
       const day=family.map(item=>weeklyMaterialDay(item.name,kind)).find(Boolean);
       if(!day){unknown.push(row);continue;}
       for(const index of [day-1,day+2,6])days[index].push(row);
