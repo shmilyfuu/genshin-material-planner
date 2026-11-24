@@ -129,10 +129,11 @@ public partial class MainWindow : Window
 
     private bool SaveColumns(JsonObject? data)
     {
-        if (data?["layout"]?["columns"] is not JsonArray values || values.Count != 4)
+        const int columnCount = 3;
+        if (data?["layout"]?["columns"] is not JsonArray values || values.Count != columnCount)
             throw new InvalidDataException("列宽配置格式错误。");
-        var columns = new double[4];
-        for (int index = 0; index < 4; index++)
+        var columns = new double[columnCount];
+        for (int index = 0; index < columns.Length; index++)
         {
             if (!double.TryParse(values[index]?.ToString(), NumberStyles.Float,
                     CultureInfo.InvariantCulture, out var value) ||

@@ -4,7 +4,7 @@
 
 A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-**Release: [v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)** · **Development: v0.4.0**
+**Release: [v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)** · **Development: v0.4.1**
 
 [Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
@@ -20,7 +20,7 @@ A Windows desktop planner for Genshin Impact character and weapon upgrades, shar
 - GGScanner GOOD v3 imports for character and weapon progression.
 - Manual inventory editing and planner configuration import/export.
 
-### Miyoushe inventory synchronization (v0.4.0 development)
+### Miyoushe inventory synchronization (v0.4.1 development)
 
 QR login, saved accounts, token refresh, and mainland China Genshin UID selection. Material requests use the complete official character and weapon calculator catalogs.
 

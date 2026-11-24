@@ -115,3 +115,19 @@ test('窗口布局有尺寸保存和列宽读写',()=>{
   for(const name of ['RestoreWindowLayout','SaveColumns','OnClosing','desktop-layout.json',
     'ui.layout.load','ui.layout.save'])assert.ok(source.includes(name));
 });
+
+test('三栏布局的前后端保存协议一致',()=>{
+  const source=readFileSync(new URL('../MainWindow.xaml.cs',import.meta.url),'utf8');
+  const defaults=JSON.parse(js.match(/const DEFAULT_COLUMNS=(\[[^\]]+\])/)[1]);
+  const minimums=JSON.parse(js.match(/const COLUMN_MIN=(\[[^\]]+\])/)[1]);
+  const backend=Number(source.match(/const int columnCount = (\d+);/)[1]);
+  const readCount=Number(js.match(/saved\.columns\.length===(\d+)/)[1]);
+  assert.equal(defaults.length,3);
+  assert.equal(minimums.length,defaults.length);
+  assert.equal(readCount,defaults.length);
+  assert.equal(backend,defaults.length);
+  assert.equal((html.match(/class="column-resizer"/g)||[]).length,backend-1);
+  assert.ok(source.includes('values.Count != columnCount'));
+  assert.ok(source.includes('new double[columnCount]'));
+  assert.ok(source.includes('index < columns.Length'));
+});
