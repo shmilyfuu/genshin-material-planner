@@ -10,6 +10,7 @@ import {importGOOD,validateGOOD} from './good-import.mjs';
 import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
 import {installMiyoushePanel} from './mys-panel.mjs';
+import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory} from './inventory-mode.mjs';
 import {indexBannerReleases,mergeBannerReleases,parseReleaseTable,attachReleaseDates,compareRosterRelease} from './release-order.mjs';
 import {
   saveActivePlannerAccount, selectPlannerAccount, createPlannerAccount,
@@ -557,8 +558,10 @@ async function removeEditorWeapon(){
   }catch(error){toast(error.message);}
 }
 function closeEditor(){$('goalModal').hidden=true;goalEditor=null;}
-function updateMaterialCount(id,value){delete (state.inventoryMinimum||{})[id];if(String(value).trim())state.materialInventory[id]=String(value);
-  else delete state.materialInventory[id];renderResults();renderCalendar();save();}
+function updateMaterialCount(id,value){
+  if(!setManualMaterial(state,id,value))return;
+  renderResults();renderCalendar();save();
+}
 function materialRow(item,shared){
   const row=document.createElement('div');row.className='material-row';
   const image=document.createElement('span');image.className='material-img';image.dataset.rank=String(item.rank);
@@ -568,18 +571,31 @@ function materialRow(item,shared){
   if(shared){const span=document.createElement('div');span.className='material-share';span.textContent='共用 · '+shared;copy.append(span);}
   const controls=document.createElement('span');controls.className='material-number';
   const arrows=document.createElement('div');arrows.className='material-arrows';
-  const input=document.createElement('input');input.type='text';input.inputMode='numeric';input.value=state.materialInventory[item.id]??'';input.placeholder='0';
+  const synced=state.inventoryMode==='synced',inventory=activeMaterialInventory(state);
+  const input=document.createElement('input');input.type='text';input.inputMode='numeric';input.value=inventory[item.id]??'';input.placeholder=synced?'—':'0';
   input.setAttribute('aria-label',item.name+'背包数量');
-  if(state.inventoryMinimum?.[item.id]){input.title='米游社探测下限：实际库存可能更多';input.classList.add('inventory-minimum');}
-  const step=delta=>{input.value=String(Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,safeEval(input.value)+delta)));input.classList.remove('inventory-minimum');input.removeAttribute('title');updateMaterialCount(item.id,input.value);};
-  for(const [delta,text] of [[1,'▲'],[-1,'▼']]){const button=document.createElement('button');button.type='button';button.textContent=text;
-    button.title=delta>0?'增加 1':'减少 1';button.onclick=()=>step(delta);arrows.append(button);}
-  input.oninput=()=>{input.classList.remove('inventory-minimum');input.removeAttribute('title');updateMaterialCount(item.id,input.value);};
-  controls.append(arrows,input);row.append(image,copy,controls);return row;
+  input.readOnly=synced;
+  if(synced&&state.syncedInventoryMinimum?.[item.id]){input.title='米游社探测下限：实际库存可能更多';input.classList.add('inventory-minimum');}
+  if(!synced){
+    const step=delta=>{input.value=String(Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,safeEval(input.value)+delta)));updateMaterialCount(item.id,input.value);};
+    for(const [delta,text] of [[1,'▲'],[-1,'▼']]){const button=document.createElement('button');button.type='button';button.textContent=text;
+      button.title=delta>0?'增加 1':'减少 1';button.onclick=()=>step(delta);arrows.append(button);}
+    input.oninput=()=>updateMaterialCount(item.id,input.value);
+    controls.append(arrows);
+  }
+  controls.append(input);row.append(image,copy,controls);return row;
 }
 const categories=[['basicInventory','基础与专属材料'],['cultInventory','培养素材'],
   ['talentInventory','天赋与角色突破'],['weaponInventory','武器突破材料']];
 function renderInventory(){
+  const synced=state.inventoryMode==='synced';
+  for(const button of document.querySelectorAll('[data-inventory-mode]')){
+    const selected=button.dataset.inventoryMode===state.inventoryMode;
+    button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));
+  }
+  $('inventoryModeNote').textContent=synced
+    ?(Object.keys(state.syncedMaterialInventory).length?'米游社库存 · 只读，虚线表示探测下限。':'尚未同步材料，请通过米游社同步。')
+    :'手动库存 · 输入框左侧可增加或减少 1。';
   const holder=$('inventoryGroups');holder.replaceChildren();
   const id=selectedGoalId||inventoryGoalId;const goal=goalById(id);
   const rosterName=selectedRosterKey?(selectedRosterKey.startsWith('weapon:')
@@ -608,10 +624,10 @@ function renderInventory(){
 }
 function renderResults(){
   const all=entries().filter(e=>e.plan.enabled!==false&&!e.plan.completed);
-  const allResult=calculateMultiPlan(all,state.materialInventory);
+  const allResult=calculateMultiPlan(all,activeMaterialInventory(state));
   const focus=selectedGoal();
   const focusEntry=all.find(e=>e.plan.id===focus?.id);
-  const partial=focusEntry?calculateMultiPlan([focusEntry],state.materialInventory):null;
+  const partial=focusEntry?calculateMultiPlan([focusEntry],activeMaterialInventory(state)):null;
   const target=partial||allResult;
   $('resultTitle').textContent=partial?objName(focus)+' · 材料缺口':'全部培养目标 · 材料缺口';
   $('resultSummary').textContent=partial?'单项目标与全部需求对照':'共用背包统一扣除';
@@ -658,7 +674,7 @@ function renderResults(){
 }
 function renderCalendar(){
   const all=entries().filter(e=>e.plan.enabled!==false&&!e.plan.completed);
-  const result=calculateMultiPlan(all,state.materialInventory);
+  const result=calculateMultiPlan(all,activeMaterialInventory(state));
   const plan=calendarForEntries(all,result);
   const box=$('calendarDays');box.replaceChildren();
   ['周一','周二','周三','周四','周五','周六','周日'].forEach((day,i)=>{
@@ -801,6 +817,9 @@ async function start(){
   };
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)closeModal(false);else if(!$('goalModal').hidden)closeEditor();}});
   $('accountSelect').onchange=e=>switchAccount(e.target.value);
+  for(const button of document.querySelectorAll('[data-inventory-mode]'))button.onclick=()=>{
+    selectInventoryMode(state,button.dataset.inventoryMode);renderInventory();renderResults();renderCalendar();save();
+  };
   $('addAccountButton').onclick=()=>void addAccount();$('renameAccountButton').onclick=()=>void renameAccount();
   $('deleteAccountButton').onclick=()=>void removeAccount();
   $('refreshButton').onclick=()=>void loadLists(true);$('exportButton').onclick=()=>void exportAll();
@@ -812,7 +831,7 @@ async function start(){
   try{const record=await bridge('storage.load');if(record)state=normalizeState(record);}catch(e){toast('读取本地数据失败：'+e.message);}
   initializePlanner(state);renderAll();
   installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,
-    apply:result=>{state.inventoryUid=result.uid;state.inventoryMinimum||={};for(const row of result.materials){state.materialInventory[row.id]=String(row.num);if(row.minimum)state.inventoryMinimum[row.id]=true;else delete state.inventoryMinimum[row.id];}renderInventory();renderResults();renderCalendar();save();}});
+    apply:result=>{applySyncedInventory(state,result);renderInventory();renderResults();renderCalendar();save();}});
   await loadLists();
 }
 void start();

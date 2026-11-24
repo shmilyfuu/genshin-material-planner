@@ -4,7 +4,7 @@
 
 A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-**Release: [v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)** · **Development: v0.4.1**
+**Release: [v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)** · **Development: v0.4.2**
 
 [Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
@@ -20,11 +20,11 @@ A Windows desktop planner for Genshin Impact character and weapon upgrades, shar
 - GGScanner GOOD v3 imports for character and weapon progression.
 - Manual inventory editing and planner configuration import/export.
 
-### Miyoushe inventory synchronization (v0.4.1 development)
+### Miyoushe inventory synchronization (v0.4.2 development)
 
 QR login, saved accounts, token refresh, and mainland China Genshin UID selection. Material requests use the complete official character and weapon calculator catalogs.
 
-Inventory is inferred from `num - lack_num`; the maximum observation is retained across requests. Values that reach the calculation limit are marked as lower bounds. Existing inventory is retained for materials absent from the response. Automated builds have passed; live account login and inventory synchronization require validation.
+Inventory is inferred from `num - lack_num`; the maximum observation is retained across requests. Values that reach the calculation limit are marked as lower bounds. Each planner account stores separate manual and synchronized inventories. The selected mode controls shortages and the weekly schedule. Synchronized inventory is read-only; manual inventory is editable. Materials absent from a response retain their previous synchronized values. Automated builds have passed; live account login and inventory synchronization require validation.
 
 ## Installation and updates
 

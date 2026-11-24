@@ -66,7 +66,9 @@ export const DEFAULT_STATE = Object.freeze({
   ownedCharacters: {},
   weaponInstances: [],
   materialInventory: {},
-  inventoryMinimum: {},
+  inventoryMode: 'manual',
+  syncedMaterialInventory: {},
+  syncedInventoryMinimum: {},
   materialInventoryMigrated: false,
   source: {
     selectedCharacterId: '',
@@ -285,11 +287,21 @@ export function normalizeState(input) {
       if (/^\d{1,12}$/.test(id)) normalized.materialInventory[id] = normalizeString(value);
     }
   }
-  normalized.inventoryMinimum = {};
-  for (const [id,flag] of Object.entries(source.inventoryMinimum || {}).slice(0,1500)) if (/^\d{1,12}$/.test(id) && flag === true && Object.hasOwn(normalized.materialInventory,id)) normalized.inventoryMinimum[id] = true;
+  normalized.inventoryMode = source.inventoryMode === 'synced' ? 'synced' : 'manual';
+  normalized.syncedMaterialInventory = {};
+  if (source.syncedMaterialInventory && typeof source.syncedMaterialInventory === 'object' && !Array.isArray(source.syncedMaterialInventory)) {
+    for (const [id,value] of Object.entries(source.syncedMaterialInventory).slice(0,1500)) {
+      const num = Number(value);
+      if (/^\d{1,12}$/.test(id) && (typeof value==='number'||typeof value==='string') && String(value).trim() && Number.isSafeInteger(num) && num >= 0) normalized.syncedMaterialInventory[id] = String(num);
+    }
+  }
+  normalized.syncedInventoryMinimum = {};
+  for (const [id,flag] of Object.entries(source.syncedInventoryMinimum || {}).slice(0,1500)) {
+    if (flag === true && Object.hasOwn(normalized.syncedMaterialInventory,id)) normalized.syncedInventoryMinimum[id] = true;
+  }
   normalized.materialInventoryMigrated = source.materialInventoryMigrated === true;
   const snapshotKeys = [
-    'plans', 'activePlanId', 'source', 'config', 'materialInventory', 'inventoryMinimum',
+    'plans', 'activePlanId', 'source', 'config', 'materialInventory', 'inventoryMode', 'syncedMaterialInventory', 'syncedInventoryMinimum',
     'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
     'verifiedInventory', 'manualInventoryImportUid', 'ownedCharacters',
     'weaponInstances', 'plannerSchema'

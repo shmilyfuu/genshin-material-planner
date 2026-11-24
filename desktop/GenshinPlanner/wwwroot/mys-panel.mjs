@@ -57,7 +57,7 @@ export function installMiyoushePanel(bridge,options){
     if(options.getPlanningId()!==planningId|| (options.getInventoryUid()&&options.getInventoryUid()!==role.uid))throw Error('查询期间规划账号发生变化。');
     options.apply(result);
     const min=result.materials.filter(m=>m.minimum).length;
-    text(`同步完成 · ${result.characterCount} 名角色 / ${result.weaponCount} 类武器 / ${result.materials.length} 种材料 · ${min} 种达到探测上限。`);
+    text(`同步背包已更新 · ${result.characterCount} 名角色 / ${result.weaponCount} 类武器 / ${result.materials.length} 种材料 · ${min} 种达到探测上限。`);
   });
   controls();
 }

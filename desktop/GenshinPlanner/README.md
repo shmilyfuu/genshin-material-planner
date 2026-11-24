@@ -56,8 +56,8 @@ dotnet publish .\GenshinPlanner.csproj -c Release -r win-x64 --self-contained tr
 - [GachaTracker](https://www.gachatracker.app/games/genshin/)
 - [Snap.Metadata](https://github.com/SnapHutaoRemasteringProject/Snap.Metadata)
 
-### 米游社账号与材料同步（v0.4.1 开发版）
+### 米游社账号与材料同步（v0.4.2 开发版）
 
-点击米游社，通过扫码登录国服账号，读取 UID 后同步全量材料。登录记录使用 Windows DPAPI CurrentUser 加密，存放在 data/Miyoushe，规划导出仅包含培养和库存数据。同步调用官方完整角色及武器目录和 batch_compute，按 num - lack_num 计算库存观测值，跨批次取最大值。达到计算需求上限的材料标记为下限，前瞻对象和未返回材料由现有本地数据补充。任何批次失败时保留原库存。
+点击米游社，通过扫码登录国服账号，读取 UID 后同步全量材料。登录记录使用 Windows DPAPI CurrentUser 加密，存放在 data/Miyoushe，规划导出仅包含培养和库存数据。同步调用官方完整角色及武器目录和 batch_compute，按 num - lack_num 计算库存观测值，跨批次取最大值。达到计算需求上限的材料标记为下限，未返回材料保留同步背包中的已有记录。手动背包与同步背包按规划账号独立保存，通过背包栏切换模式；缺口与日历读取当前模式的数据。同步背包只读。任何批次失败时保留原库存。
 
 参考：[SeelieEx](https://github.com/KeyPJ/seelieEx)。

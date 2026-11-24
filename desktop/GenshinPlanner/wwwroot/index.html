@@ -52,7 +52,8 @@
     <div class="column-resizer" data-divider="0" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整角色与背包列宽"></div>
     <aside class="inventory-rail">
       <div class="inventory-heading"><strong>背包材料</strong><span id="inventoryTarget">选择培养目标</span></div>
-      <p class="inventory-note">同账号按材料 ID 共享库存。输入框左侧可增加或减少 1。</p>
+      <div class="inventory-mode-switch" role="group" aria-label="库存模式"><button type="button" data-inventory-mode="manual" class="active" aria-pressed="true">手动背包</button><button type="button" data-inventory-mode="synced" aria-pressed="false">同步背包</button></div>
+      <p class="inventory-note" id="inventoryModeNote">手动库存 · 输入框左侧可增加或减少 1。</p>
       <div class="inventory-scroll" id="inventoryGroups"></div>
     </aside>
     <div class="column-resizer" data-divider="1" role="separator" tabindex="0" aria-orientation="vertical" aria-label="调整背包与材料缺口列宽"></div>
@@ -83,7 +84,7 @@
     <div id="mysQr" hidden><img id="mysQrImage" width="220" height="220" alt="米游社登录二维码"><div class="modal-actions"><button id="mysPoll" type="button">检查扫码状态</button></div></div>
     <div class="goal-field"><span>原神 UID</span><select id="mysUid"></select></div>
     <div class="modal-actions"><button id="mysReadUid" type="button">读取 UID</button><button id="mysSync" class="primary-btn" type="button">同步全部材料</button></div>
-    <p id="mysStatus" role="status"></p><p>库存由官方养成计算器反推，达到请求上限的材料为估算下限。未返回的材料保留现有库存。</p>
+    <p id="mysStatus" role="status"></p><p>库存由官方养成计算器反推，达到请求上限的材料为估算下限。未返回的材料保留同步背包中的已有库存。</p>
     <div class="modal-actions"><button id="mysClose" type="button">关闭</button></div>
   </div>
 </div>
