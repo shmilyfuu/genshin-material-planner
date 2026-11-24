@@ -798,8 +798,10 @@ async function reloadAllProfiles(force=false){
     const linked=first.linkedWeaponInstanceId?plans.find(g=>g.weaponInstanceId===first.linkedWeaponInstanceId):null;
     const weapon=linked?profiles.get(linked.id)?.weaponProfile:entry.weaponProfile;
     const missing=[];const legacy=migrateLegacyInventory(state.inv,entry.characterProfile,weapon,first.source.mergeRules,missing);
-    if(!missing.length){state.materialInventory={...legacy,...state.materialInventory};state.materialInventoryMigrated=true;}
+    if(!missing.length){state.materialInventory={...legacy,...state.materialInventory};state.materialInventoryMigrated=true;
+      try{await flushSave();}catch(e){if(token===profileLoadToken&&account===state.activeAccountId)state.materialInventoryMigrated=false;setStatus('旧库存迁移保存失败：'+e.message,'error');}}
     else toast('旧库存尚有材料待识别，将在资料完整后继续迁移。');
+    if(token!==profileLoadToken||account!==state.activeAccountId)return;
   }
   renderAll();save();
 }
@@ -926,6 +928,7 @@ function installCompactStripScroll(){
   }
 }
 async function start(){
+  document.querySelector('.app').inert=true;
   installCompactStripScroll();
   installSettingsMenu();
   $('checkUpdateButton').onclick=()=>void checkUpdate(true);
@@ -955,8 +958,7 @@ async function start(){
   for(const tab of document.querySelectorAll('[data-tab]'))tab.onclick=()=>{
     filter=createRosterFilter(tab.dataset.tab);renderFilters();renderRoster();};
   await initializeColumns();
-  document.querySelector('.app').inert=true;
-  try{const record=await bridge('storage.load');if(record!==null){if(!record||typeof record!=='object'||Array.isArray(record))throw Error('规划文件格式错误');state=normalizeState(record);}storageReady=true;document.querySelector('.app').inert=false;}catch(e){setStatus('读取本地数据失败：'+e.message+'。原文件已保留，请关闭程序检查 data/planner.json。','error');return;}
+  try{const record=await bridge('storage.load');if(record!==null){if(!record||typeof record!=='object'||Array.isArray(record))throw Error('规划文件格式错误');state=normalizeState(record);}storageReady=true;}catch(e){setStatus('读取本地数据失败：'+e.message+'。原文件已保留，请关闭程序检查 data/planner.json。','error');return;}
   initializePlanner(state);renderAll();
   mysPanel=installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,getBinding:()=>state.mysBinding,
     listPlanning:()=>state.plannerAccounts.map(a=>({id:a.id,name:a.name,uid:a.id===state.activeAccountId?state.inventoryUid:a.data?.inventoryUid||''})),
@@ -993,6 +995,7 @@ async function start(){
     apply:async result=>{applySyncedInventory(state,result);state.mysSyncedAt=Date.now();renderInventory();renderResults();renderCalendar();await flushSave();}});
   mysPanel.update();
   if(host)await bridge('app.ready');
+  document.querySelector('.app').inert=false;
   await loadLists();
   void checkUpdate();
 }

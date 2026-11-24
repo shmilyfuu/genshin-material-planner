@@ -6,7 +6,7 @@ import {parseWeaponDetail} from '../wwwroot/hakushin.mjs';
 import {initializePlanner,makeGoal,makeWeaponInstance,visibleRoster,setLink,activeGoals,characterGoal} from '../wwwroot/planner-model.mjs';
 import {importGOOD} from '../wwwroot/good-import.mjs';
 import {saveActivePlannerAccount} from '../wwwroot/planner-accounts.mjs';
-import {calculateMultiPlan,materialContributions} from '../wwwroot/multi-planner.mjs';
+import {calculateMultiPlan,materialContributions,singleGoalRows,migrateLegacyInventory} from '../wwwroot/multi-planner.mjs';
 import {calendarForEntries,weeklyMaterialDay} from '../wwwroot/calendar-days.mjs';
 const char=(id,name,en)=>({id:String(id),name,en,goodKey:en,rarity:5,version:'6.3'});
 const weapon=(id,name,en,rarity=4)=>({id:String(id),name,en,goodKey:en,rarity,version:'6.3'});
@@ -178,4 +178,67 @@ test('挪德卡莱刷取日历按系列合并图标并优先显示材料缺口',
   assert.equal(weeklyMaterialDay('贡祭炽心的决绝','weapon'),1);
   assert.equal(weeklyMaterialDay('谵妄圣主的朽败','weapon'),2);
   assert.equal(weeklyMaterialDay('神合秘烟的思绪','weapon'),3);
+});
+
+test('低星武器四次突破、材料识别及需求数量',()=>{
+ for(const [rank,mora,gems,a,b] of [[1,20000,[1,3,1],[5,6],[3,5]],[2,35000,[1,4,1],[6,8],[5,7]]]){
+   const row=weapon(11100+rank,'低星剑','Low Sword',rank);
+   const detail={name:row.name,rank,materials:{ascensions:[{mats:[
+     ...gems.map((count,i)=>({id:3101+i,rank:i+2,count})),
+     ...a.map((count,i)=>({id:3201+i,rank:i+1,count})),
+     ...b.map((count,i)=>({id:3301+i,rank:i+1,count}))
+   ]}]}};
+   const profile=parseWeaponDetail(detail,row);
+   assert.deepEqual(profile.warnings,[]);
+   const plan=makeGoal('weapon',row);
+   assert.deepEqual(plan.config.weapAsc,[0,4]);
+   assert.equal(weaponAscensionTable(rank).length,5);
+   const r=calculateMultiPlan([{plan,weaponProfile:profile}],{});
+   assert.equal(r.incomplete.length,0);assert.equal(r.unavailable.length,0);
+   const counts=Object.fromEntries(r.materials.map(x=>[x.id,x.count]));
+   assert.equal(counts[202],mora);
+   for(const [start,expected] of [[3101,gems],[3201,a],[3301,b]])assert.deepEqual(expected.map((_,i)=>counts[start+i]),expected);
+ }
+});
+test('GOOD 全量精确匹配先于同名回退，导入顺序不改变已有武器关联',()=>{
+ for(const reverse of [false,true]){
+   const state=empty(),old=makeWeaponInstance(sword,{level:90,ascension:6,refinement:5,scanned:true});
+   state.weaponInstances.push(old);
+   const goal=makeGoal('weapon',sword,{instanceId:old.id,current:old});state.plans.push(goal);
+   const fresh=[{key:'FavoniusSword',level:1,ascension:0,refinement:1},{key:'FavoniusSword',level:90,ascension:6,refinement:5}];
+   const result=importGOOD(state,{format:'GOOD',version:3,weapons:reverse?fresh.reverse():fresh},{weapons:[sword]});
+   assert.equal(result.newWeapons,1);assert.equal(state.weaponInstances.length,2);assert.equal(old.level,90);assert.equal(goal.weaponInstanceId,old.id);
+ }
+});
+test('同名重复实例存在不确定练度变化时不凭空增殖',()=>{
+ const state=empty();state.weaponInstances.push(...[1,2].map(()=>makeWeaponInstance(sword,{level:90,ascension:6,refinement:5,scanned:true})));
+ const result=importGOOD(state,{format:'GOOD',version:3,weapons:[{key:'FavoniusSword',level:90,ascension:6,refinement:5},{key:'FavoniusSword',level:80,ascension:5,refinement:5}]},{weapons:[sword]});
+ assert.equal(result.newWeapons,0);assert.equal(state.weaponInstances.length,2);assert.ok(result.ambiguous.length);
+});
+test('单项目标展示合成低阶缺口而不改变计算结果',()=>{
+ const row=weapon(11401,'西风剑','Favonius Sword'),plan=makeGoal('weapon',row);
+ plan.config.weapAsc=[1,2];
+ const profile=fakeWeaponProfile();
+ const inventory={'2101':'8','2102':'1'};
+ const result=calculateMultiPlan([{plan,weaponProfile:profile}],inventory);
+ const group=result.groups.find(g=>g.rows.some(r=>r.id==='2102'));
+ const snapshot=structuredClone(group);
+ const rows=singleGoalRows(group);
+ assert.deepEqual(group,snapshot);
+ assert.equal(rows.some(r=>r.id==='2101'),false); // 2 blue remaining, 8 green cover them
+ assert.equal(rows.find(r=>r.id==='2102').status,'satisfied');
+ const example={family:true,rows:[{id:'1',rank:2,count:0,stock:2,lack:1},{id:'2',rank:3,count:1,stock:0,lack:0}]};
+ assert.deepEqual(singleGoalRows(example).map(r=>[r.id,r.status]),[['1','deficit'],['2','craftPending']]);
+});
+test('异常武器不影响其他目标，明细编号取自全部实例',()=>{
+ const state=empty();const items=[1,2,3].map(()=>makeWeaponInstance(sword));state.weaponInstances.push(...items);
+ const valid=makeGoal('weapon',sword,{instanceId:items[2].id}),bad=makeGoal('weapon',sword,{instanceId:items[1].id});
+ const profile=fakeWeaponProfile(),entries=[{plan:bad,weaponProfile:{...profile,rarity:0}},{plan:valid,weaponProfile:profile}];
+ const result=calculateMultiPlan(entries,{});
+ assert.equal(result.unavailable.length,1);assert.equal(result.materials.find(r=>r.id==='2101').count,3);
+ assert.deepEqual(materialContributions(entries,state).get('2101').map(r=>r.name),['西风剑 #3']);
+});
+test('旧库存资料不完整时保留待迁移记录',()=>{
+ const missing=[];const value=migrateLegacyInventory({gold:'100',spec:'3'},null,null,{},missing);
+ assert.deepEqual(value,{'202':'100'});assert.deepEqual(missing,['3']);
 });

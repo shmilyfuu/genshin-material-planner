@@ -37,9 +37,9 @@ export function importGOOD(state,raw,{characters=[],weapons=[],confirmAmbiguous=
     state.ownedCharacters[match.id]=clean;
     const target=characterGoal(state,match.id);
     if(target){
-      target.config.charAsc[0]=Math.min(target.config.charAsc[1],Math.max(0,Math.min(6,clean.ascension)));
+      target.config.charAsc[0]=Math.min(target.config.charAsc[1],Math.max(0,Math.min(6,Math.trunc(clean.ascension))));
       for(const [part,field] of [['talentA','auto'],['talentE','skill'],['talentQ','burst']]){
-        target.config[part][0]=Math.min(target.config[part][1],Math.max(0,Math.min(9,clean.talent[field]-1)));
+        target.config[part][0]=Math.min(target.config[part][1],Math.max(0,Math.min(9,Math.trunc(clean.talent[field]-1))));
       }
     }
     updatedChars.push(match.id);
@@ -65,7 +65,7 @@ export function importGOOD(state,raw,{characters=[],weapons=[],confirmAmbiguous=
   for(const weaponId of new Set(incoming.map(w=>w.weaponId))){
     const old=existing.filter(w=>w.weaponId===weaponId);
     const fresh=incoming.filter(w=>w.weaponId===weaponId);
-    const unused=new Set(old),pending=new Set(fresh);
+    const unused=new Set(old),pending=new Set(fresh);let reservedAmbiguous=false;
     // Reserve all exact identities before considering changes of level or equipment.
     for(const key of new Set(fresh.map(fingerprint))){
       const a=old.filter(w=>unused.has(w)&&fingerprint(w)===key);
@@ -73,7 +73,7 @@ export function importGOOD(state,raw,{characters=[],weapons=[],confirmAmbiguous=
       if(!a.length)continue;
       if(a.length===1&&b.length===1){update(a[0],b[0]);}
       else{
-        b.forEach(note);
+        b.forEach(note);if(a.length>b.length)reservedAmbiguous=true;
         if(confirmAmbiguous)for(let i=0;i<Math.min(a.length,b.length);i++)update(a[i],b[i]);
         for(let i=a.length;i<b.length;i++)add(b[i]);
       }
@@ -83,8 +83,8 @@ export function importGOOD(state,raw,{characters=[],weapons=[],confirmAmbiguous=
       const a=[...unused].filter(w=>w.location===location),b=[...pending].filter(w=>w.location===location);
       if(a.length===1&&b.length===1){update(a[0],b[0]);unused.delete(a[0]);pending.delete(b[0]);}
     }
-    if(unused.size===1&&pending.size===1){update([...unused][0],[...pending][0]);pending.clear();}
-    if(!unused.size){for(const w of pending)add(w);}
+    if(!reservedAmbiguous&&unused.size===1&&pending.size===1){update([...unused][0],[...pending][0]);pending.clear();}
+    if(!unused.size&&!reservedAmbiguous){for(const w of pending)add(w);}
     else if(pending.size){
       for(const w of pending)note(w);
       // The count is known, but the identities of changed copies are not.

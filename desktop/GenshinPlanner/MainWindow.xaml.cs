@@ -252,8 +252,10 @@ public partial class MainWindow : Window
         try
         {
             _stateLoaded = false;
-            if (!File.Exists(StateFile)) { _stateLoaded = true; return null; }
-            var text = await File.ReadAllTextAsync(StateFile);
+            string text;
+            try { text = await File.ReadAllTextAsync(StateFile); }
+            catch (FileNotFoundException) { _stateLoaded = true; return null; }
+            catch (DirectoryNotFoundException) { _stateLoaded = true; return null; }
             var state = JsonNode.Parse(text) as JsonObject ?? throw new InvalidDataException("规划文件格式错误。");
             if (state.Count == 0 || (!state.ContainsKey("plans") && !state.ContainsKey("config") && !state.ContainsKey("plannerAccounts")))
                 throw new InvalidDataException("规划文件缺少必要数据。");
