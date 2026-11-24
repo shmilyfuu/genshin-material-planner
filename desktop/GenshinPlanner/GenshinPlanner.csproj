@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>GenshinPlanner</AssemblyName>
     <RootNamespace>GenshinPlanner</RootNamespace>
-    <Version>0.4.5</Version>
+    <Version>0.4.6</Version>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>

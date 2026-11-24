@@ -56,12 +56,12 @@ dotnet publish .\GenshinPlanner.csproj -c Release -r win-x64 --self-contained tr
 - [GachaTracker](https://www.gachatracker.app/games/genshin/)
 - [Snap.Metadata](https://github.com/SnapHutaoRemasteringProject/Snap.Metadata)
 
-### 米游社账号与材料同步（v0.4.5 开发版）
+### 米游社账号与材料同步（v0.4.6 开发版）
 
-点击米游社，通过扫码登录国服账号，读取 UID 后同步全量材料。登录记录使用 Windows DPAPI CurrentUser 加密，存放在 data/Miyoushe，规划导出仅包含培养和库存数据。同步调用官方完整角色及武器目录和 batch_compute，按材料系列结合需求、缺口和剩余材料恢复原始库存；可证明的下限单独标记，未知材料留空。手动背包与同步背包按规划账号独立保存，通过背包栏切换模式；缺口与日历读取当前模式的数据。同步背包只读。任何批次失败时保留原库存。
+点击米游社，选择已有登录记录或扫码登录，自动读取 UID 后绑定已有规划账号或新建账号。顶部「同步库存」按当前规划账号的绑定同步全量材料。登录记录使用 Windows DPAPI CurrentUser 加密，存放在 data/Miyoushe，规划导出仅包含培养和库存数据。同步调用官方完整角色及武器目录和 batch_compute，按材料系列结合需求、缺口和剩余材料恢复原始库存；可证明的下限单独标记，未知材料留空。手动背包与同步背包按规划账号独立保存，通过背包栏切换模式；缺口与日历读取当前模式的数据。同步背包只读。任何批次失败时保留原库存。
 
 参考：[SeelieEx](https://github.com/KeyPJ/seelieEx)。
 
 ### 材料诊断
 
-米游社弹窗中选择 UID 后点击「材料诊断」，核对官方已收录的凛雪帝皇系列武器（优先使用凝雪沉心），并执行单把、重复武器、同系列武器及分突破阶段的诊断请求。结果保存在 `data/inventory-diagnostics.json`，记录材料字段、请求等级与覆盖情况，不写入库存。
+米游社弹窗中选择已登录账号及 UID 后点击「材料诊断」，核对官方已收录的凛雪帝皇系列武器（优先使用凝雪沉心），并执行单把、重复武器、同系列武器及分突破阶段的诊断请求。结果保存在 `data/inventory-diagnostics.json`，记录材料字段、请求等级与覆盖情况，不写入库存。

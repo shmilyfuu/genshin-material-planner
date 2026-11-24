@@ -368,9 +368,9 @@ function mysAccountCookie(account) {
   ].join('; ');
 }
 
-async function mysRoles() {
+async function mysRoles(accountId) {
   const accounts = await mysReadAccounts();
-  const account = accounts.entries[accounts.activeId];
+  const account = accounts.entries[accountId || accounts.activeId];
   if (!account) throw new Error('请先选择已登录账号。');
   if (!account.cookieToken || !account.ltoken) throw new Error('短期令牌缺失，请点击刷新凭证。');
 
@@ -401,6 +401,16 @@ async function mysRoles() {
 
 
 'use strict';
+
+async function mysBoundRoles(accountId){
+  const entries=mysPublicAccounts(await mysReadAccounts()).entries;
+  const account=entries.find(row=>row.id===accountId);
+  if(!account)throw Error('本地登录记录缺失，请重新扫码并绑定。');
+  if(!account.hasCookie){await mysRefresh(accountId);return mysRoles(accountId);}
+  try{return await mysRoles(accountId);}
+  catch(e){if(!/接口错误 -(?:100|101)\b|HTTP 401|登录失效|登录过期|未登录/.test(String(e.message)))throw e;}
+  await mysRefresh(accountId);return mysRoles(accountId);
+}
 
 const MYS_CALC_ROOT = MYS.takumi + '/event/e20200928calculate';
 const MYS_CALC_CONTEXT = {
@@ -489,10 +499,10 @@ async function mysAllWeapons(cookie,headers){
   }
   throw Error('武器目录页数超过预期。');
 }
-async function syncInventory(uid,region,progress,loadProfile){
-  const roles=await mysRoles();
+async function syncInventory(accountId,uid,region,progress,loadProfile){
+  const roles=await mysBoundRoles(accountId);
   if(!roles.some(r=>r.uid===uid&&r.region===region))throw Error('所选 UID 与当前账号不匹配。');
-  const accounts=await mysReadAccounts(),id=accounts.activeId,account=accounts.entries[id];
+  const accounts=await mysReadAccounts(),id=accountId,account=accounts.entries[id];
   const cookie=mysAccountCookie(account),device=await mysFingerprint(await mysDevice()),headers=mysCalcHeaders(device);
   progress?.('正在读取官方角色与武器目录…');
   const [avatars,weapons]=await Promise.all([mysAllCalculatorAvatars(cookie,headers),mysAllWeapons(cookie,headers)]);
@@ -547,17 +557,17 @@ async function syncInventory(uid,region,progress,loadProfile){
   }
   const recovered=recoverInventory(catalog,observations);
   const latest=await mysReadAccounts();
-  if(latest.activeId!==id||latest.entries[id]?.stoken!==account.stoken)throw Error('查询期间登录账号发生变化。');
+  if(latest.entries[id]?.stoken!==account.stoken)throw Error('查询期间登录账号发生变化。');
   if(!recovered.materials.length)throw Error('米游社未返回可确认的材料库存。');
   return {uid,region,replace:true,materials:recovered.materials,characterCount:plan.characterCount,weaponCount:plan.weaponCount,
     batches:requests,unresolved:recovered.unresolved,conflicts:recovered.conflicts,profileFailures,probeErrors};
 }
-async function diagnoseInventory(uid,region,progress,loadProfile){
-  const roles=await mysRoles();
+async function diagnoseInventory(accountId,uid,region,progress,loadProfile){
+  const roles=await mysBoundRoles(accountId);
   if(!roles.some(r=>r.uid===uid&&r.region===region))throw Error('所选 UID 与当前账号不匹配。');
-  const accounts=await mysReadAccounts(),id=accounts.activeId,account=accounts.entries[id];
+  const accounts=await mysReadAccounts(),id=accountId,account=accounts.entries[id];
   const cookie=mysAccountCookie(account),device=await mysFingerprint(await mysDevice()),headers=mysCalcHeaders(device);
-  const report={schema:1,version:'0.4.4',startedAt:new Date().toISOString(),familyIds:[...DIAGNOSTIC_FAMILY_IDS],
+  const report={schema:1,version:'0.4.6',startedAt:new Date().toISOString(),familyIds:[...DIAGNOSTIC_FAMILY_IDS],
     reference:{actualStockLowToHigh:[47,36,11,0],note:'此前测试时的库存，请与本次游戏实际背包核对。'},
     directory:{},cases:[]};
   const errorText=e=>String(e?.message||e).slice(0,500);
@@ -606,7 +616,7 @@ async function diagnoseInventory(uid,region,progress,loadProfile){
       if(index<cases.length-1)await new Promise(resolve=>setTimeout(resolve,1000));
     }
     const latest=await mysReadAccounts();
-    if(latest.activeId!==id||latest.entries[id]?.stoken!==account.stoken)throw Error('诊断期间登录账号发生变化。');
+    if(latest.entries[id]?.stoken!==account.stoken)throw Error('诊断期间登录账号发生变化。');
   }catch(e){report.error=errorText(e);}
   report.finishedAt=new Date().toISOString();
   report.successfulCases=report.cases.filter(c=>c.response?.has_user_info===true&&Array.isArray(c.response?.overall_consume)).length;
@@ -615,5 +625,5 @@ async function diagnoseInventory(uid,region,progress,loadProfile){
 export function createMiyousheClient(bridge){
   native=bridge;
   return {accounts:async()=>mysPublicAccounts(await mysReadAccounts()),startQr:mysStartQr,pollQr:mysPollQr,
-    refresh:mysRefresh,switchAccount:mysSwitch,remove:mysRemove,roles:mysRoles,syncInventory,diagnoseInventory};
+    refresh:mysRefresh,switchAccount:mysSwitch,remove:mysRemove,roles:mysBoundRoles,syncInventory,diagnoseInventory};
 }

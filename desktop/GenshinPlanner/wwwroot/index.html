@@ -13,6 +13,7 @@
     <button class="soft-btn" id="renameAccountButton" type="button">重命名</button>
     <button class="soft-btn" id="deleteAccountButton" type="button">删除账号</button>
     <div class="header-spacer"></div><span class="data-status" id="dataStatus" role="status">正在读取本地数据…</span>
+    <button class="soft-btn" id="syncInventoryButton" type="button">同步库存</button>
     <div class="header-actions">
       <button class="soft-btn" id="refreshButton" type="button">刷新资料</button>
       <button class="soft-btn" id="importGoodButton" type="button">导入 GGScanner</button>
@@ -78,12 +79,14 @@
 </div>
 <div class="modal-backdrop" id="mysModal" hidden>
   <div class="modal mys-modal" role="dialog" aria-modal="true" aria-labelledby="mysTitle">
-    <h2 id="mysTitle">米游社账号与背包同步</h2>
+    <h2 id="mysTitle">米游社账号与绑定</h2><p id="mysCurrentBinding"></p>
     <div class="goal-field"><span>米游社账号</span><select id="mysAccount"></select></div>
     <div class="modal-actions"><button id="mysAdd" type="button">添加账号</button><button id="mysRefresh" type="button">刷新凭证</button><button id="mysRemove" type="button">移除账号</button></div>
-    <div id="mysQr" hidden><img id="mysQrImage" width="220" height="220" alt="米游社登录二维码"><div class="modal-actions"><button id="mysPoll" type="button">检查扫码状态</button></div></div>
+    <div id="mysQr" hidden><img id="mysQrImage" width="220" height="220" alt="米游社登录二维码"></div>
     <div class="goal-field"><span>原神 UID</span><select id="mysUid"></select></div>
-    <div class="modal-actions"><button id="mysReadUid" type="button">读取 UID</button><button id="mysSync" class="primary-btn" type="button">同步全部材料</button><button id="mysDiagnose" type="button">材料诊断</button></div>
+    <div class="goal-field"><span>绑定规划账号</span><select id="mysBindingTarget"></select></div>
+    <label class="goal-field" id="mysNewNameField" hidden><span>账号名称</span><input id="mysNewName" type="text" maxlength="32" autocomplete="off"></label>
+    <div class="modal-actions"><button id="mysUnbind" type="button">解除当前绑定</button><button id="mysDiagnose" type="button">材料诊断</button><button id="mysBind" class="primary-btn" type="button">确认绑定</button></div>
     <p id="mysStatus" role="status"></p><p>库存按材料系列反推，虚线表示可确认的原始库存下限。未确定的材料留空；同步成功后更新整个同步背包。</p>
     <div class="modal-actions"><button id="mysClose" type="button">关闭</button></div>
   </div>

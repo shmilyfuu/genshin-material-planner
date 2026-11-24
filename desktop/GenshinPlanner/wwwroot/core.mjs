@@ -1,3 +1,4 @@
+import {normalizeMysBinding} from './mys-binding.mjs';
 export const TALENT_DATA = [
   [0, 0, 0, 0, 0, 0, 0, 0, 0],
   [12500, 3, 0, 0, 6, 0, 0, 0, 0],
@@ -93,6 +94,8 @@ export const DEFAULT_STATE = Object.freeze({
     weapAsc: [0, 0]
   },
   inventoryUid: '',
+  mysBinding: null,
+  mysSyncedAt: 0,
   calculationMode: 'manual',
   hybridInventory: {},
   verifiedInventory: {},
@@ -186,6 +189,8 @@ export function normalizeState(input) {
       lock:!!w.lock,scanned:!!w.scanned
     })) : [],
     inventoryUid: /^\d{6,12}$/.test(String(source.inventoryUid || '')) ? String(source.inventoryUid) : '',
+    mysBinding: normalizeMysBinding(source.mysBinding),
+    mysSyncedAt: Number.isSafeInteger(source.mysSyncedAt)&&source.mysSyncedAt>0?source.mysSyncedAt:0,
     calculationMode: source.calculationMode === 'official' ? 'official' : 'manual',
     hybridInventory: normalizeHybridInventory(source.hybridInventory),
     verifiedInventory: normalizeHybridInventory(source.verifiedInventory),
@@ -300,9 +305,13 @@ export function normalizeState(input) {
     if (flag === true && Object.hasOwn(normalized.syncedMaterialInventory,id)) normalized.syncedInventoryMinimum[id] = true;
   }
   normalized.materialInventoryMigrated = source.materialInventoryMigrated === true;
+  if(normalized.mysBinding){
+    if(normalized.inventoryUid&&normalized.inventoryUid!==normalized.mysBinding.uid)normalized.mysBinding=null;
+    else normalized.inventoryUid=normalized.mysBinding.uid;
+  }
   const snapshotKeys = [
     'plans', 'activePlanId', 'source', 'config', 'materialInventory', 'inventoryMode', 'syncedMaterialInventory', 'syncedInventoryMinimum',
-    'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
+    'materialInventoryMigrated', 'inv', 'inventoryUid', 'mysBinding', 'mysSyncedAt', 'hybridInventory',
     'verifiedInventory', 'manualInventoryImportUid', 'ownedCharacters',
     'weaponInstances', 'plannerSchema'
   ];

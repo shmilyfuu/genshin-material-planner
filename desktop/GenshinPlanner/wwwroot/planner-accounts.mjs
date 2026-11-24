@@ -1,6 +1,6 @@
 const ACCOUNT_FIELDS = [
   'plans', 'activePlanId', 'source', 'config', 'materialInventory', 'inventoryMode', 'syncedMaterialInventory', 'syncedInventoryMinimum',
-  'materialInventoryMigrated', 'inv', 'inventoryUid', 'hybridInventory',
+  'materialInventoryMigrated', 'inv', 'inventoryUid', 'mysBinding', 'mysSyncedAt', 'hybridInventory',
   'verifiedInventory', 'manualInventoryImportUid', 'ownedCharacters',
   'weaponInstances', 'plannerSchema'
 ];

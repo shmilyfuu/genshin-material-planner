@@ -10,6 +10,7 @@ import {importGOOD,validateGOOD} from './good-import.mjs';
 import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
 import {installMiyoushePanel} from './mys-panel.mjs';
+import {bindMysAccount,unbindMysAccount,plannerBindingOwner,normalizeMysBinding} from './mys-binding.mjs';
 import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory} from './inventory-mode.mjs';
 import {indexBannerReleases,mergeBannerReleases,parseReleaseTable,attachReleaseDates,compareRosterRelease} from './release-order.mjs';
 import {
@@ -89,6 +90,7 @@ async function bridge(type,params={}){
 }
 
 let state=normalizeState(cloneDefaultState());
+let mysPanel=null;
 let characterList=[],weaponList=[];
 let profiles=new Map();
 let listVersion={live:'',latest:''};
@@ -213,6 +215,7 @@ function save(){saveActivePlannerAccount(state);scheduleSave();}
 function renderAccounts(){const select=$('accountSelect');select.replaceChildren();
   for(const a of state.plannerAccounts)select.add(new Option(a.name,a.id));
   select.value=state.activeAccountId;$('deleteAccountButton').disabled=state.plannerAccounts.length<=1;
+  mysPanel?.update();
 }
 function thumb(icon,name,css=''){
   const holder=document.createElement('span');holder.className=css;
@@ -830,7 +833,26 @@ async function start(){
   await initializeColumns();
   try{const record=await bridge('storage.load');if(record)state=normalizeState(record);}catch(e){toast('读取本地数据失败：'+e.message);}
   initializePlanner(state);renderAll();
-  installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,
+  mysPanel=installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,getBinding:()=>state.mysBinding,
+    listPlanning:()=>state.plannerAccounts.map(a=>({id:a.id,name:a.name,uid:a.id===state.activeAccountId?state.inventoryUid:a.data?.inventoryUid||''})),
+    setStatus,toast,
+    bind:async(target,raw,label)=>{
+      const binding=normalizeMysBinding(raw);if(!binding)throw Error('绑定信息无效。');
+      const owner=plannerBindingOwner(state,binding.uid,target);
+      if(owner)throw Error('该 UID 已属于规划账号「'+owner.name+'」。');
+      if(target==='@new'){
+        const defaults=normalizeState(cloneDefaultState());initializePlanner(defaults);
+        createPlannerAccount(state,'account-'+newId('local'),label,defaults);
+      }else{
+        const record=state.plannerAccounts.find(a=>a.id===target);
+        if(!record)throw Error('所选规划账号不存在。');
+        const old=target===state.activeAccountId?state.inventoryUid:record.data?.inventoryUid;
+        if(old&&old!==binding.uid&&!window.confirm('将「'+record.name+'」的 UID 从 '+old+' 更换为 '+binding.uid+'？原同步库存将清空，手动库存和培养计划保留。'))return false;
+        if(target!==state.activeAccountId)selectPlannerAccount(state,target);
+      }
+      bindMysAccount(state,binding,{replaceUid:true});resetAccountView();await flushSave();void reloadAllProfiles();return true;
+    },
+    unbind:async()=>{unbindMysAccount(state);renderAccounts();await flushSave();},
     loadInventoryProfile:async(kind,entry)=>{
       const row=kind==='character'?charRow(entry.id):weaponRow(entry.id);
       if(!row)throw Error('Nanoka 目录未匹配');
@@ -843,7 +865,8 @@ async function start(){
       const response=await bridge('data.fetch',{path:`/gi/${encodeURIComponent(row.version)}/zh/weapon/${row.id}.json`,force:false,maxAge:86400000});
       return parseWeaponDetail(response.data,row);
     },
-    apply:result=>{applySyncedInventory(state,result);renderInventory();renderResults();renderCalendar();save();}});
+    apply:async result=>{applySyncedInventory(state,result);state.mysSyncedAt=Date.now();renderInventory();renderResults();renderCalendar();await flushSave();}});
+  mysPanel.update();
   await loadLists();
 }
 void start();

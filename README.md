@@ -4,7 +4,7 @@
 
 面向原神的 Windows 桌面养成规划工具，支持多角色、多武器培养计划、共享材料库存与每周刷取日历。
 
-**正式版：[v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**　|　**开发版：v0.4.5**
+**正式版：[v0.3.7](https://github.com/shmilyfuu/genshin-material-planner/releases/latest)**　|　**开发版：v0.4.6**
 
 [下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/latest) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
@@ -20,9 +20,9 @@
 - 导入 GGScanner GOOD v3 数据，匹配角色及武器的当前练度。
 - 支持材料数量手动输入、微调及规划配置导入导出。
 
-### 米游社材料同步（v0.4.5 开发版）
+### 米游社材料同步（v0.4.6 开发版）
 
-支持扫码登录、账号切换、凭证刷新及国服原神 UID 选择。通过米游社官方养成计算器的角色和武器目录进行全量材料探测，覆盖官方已收录的未拥有角色与武器。
+支持扫码自动确认、自动读取国服 UID，并绑定已有规划账号或新建规划账号。顶部「同步库存」按当前规划账号的绑定执行同步。通过米游社官方养成计算器的角色和武器目录进行全量材料探测，覆盖官方已收录的未拥有角色与武器。
 
 按材料系列结合需求、缺口和剩余材料反推原始库存，对未确定的品质追加请求。可证明的库存下限单独标记，未知材料留空。每个规划账号独立保存手动背包与同步背包，切换模式后按所选库存计算材料缺口和日历。同步背包为只读，手动背包支持编辑。开发版已通过自动化构建，实际账号登录及库存同步仍需验证。
 
