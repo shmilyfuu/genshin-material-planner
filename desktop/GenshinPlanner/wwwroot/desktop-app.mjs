@@ -1,3 +1,4 @@
+import {createWaitTasks} from './wait-tasks.mjs';
 import {CHAR_LEVEL_LABELS, weaponMaxAscension, cloneDefaultState, normalizeState, safeEval} from './core.mjs';
 import {
   normalizeCharacterList, normalizeWeaponList, mergeSourceLists,
@@ -185,16 +186,39 @@ async function initializeColumns(){
 
 
 const statusTasks=new Map();
+let waitState={locked:false,visible:false,text:''},waitFocus=null;
+const waitTasks=createWaitTasks(next=>{
+  if(next.locked&&!waitState.locked)waitFocus=document.activeElement;
+  const wasLocked=waitState.locked;
+  waitState=next;renderWaitState();renderStatus();
+  if(wasLocked&&!next.locked&&!closing&&storageReady){
+    const top=[...document.querySelectorAll('.modal-backdrop:not([hidden])')].at(-1);
+    if(waitFocus?.isConnected&&waitFocus.getClientRects().length&&(!top||top.contains(waitFocus)))waitFocus.focus({preventScroll:true});
+    waitFocus=null;
+  }
+});
+function renderWaitState(){
+  const locked=waitState.locked||closing;
+  document.querySelector('.app').inert=locked||!storageReady;
+  for(const panel of document.querySelectorAll('.modal-backdrop'))panel.inert=locked;
+  $('waitOverlay').hidden=!waitState.locked;
+  $('waitToast').hidden=!waitState.visible;
+  $('waitMessage').textContent=waitState.text;
+}
+function withWait(key,text,priority,fn){return waitTasks.run(key,text,priority,fn);}
+for(const type of ['keydown','keyup','keypress','wheel','contextmenu']){
+  document.addEventListener(type,event=>{if(waitState.locked||closing){event.preventDefault();event.stopImmediatePropagation();}},{capture:true,passive:false});
+}
 let lastStatus={text:'正在读取本地数据…',tone:'busy'};
 function renderStatus(){
-  const active=[...statusTasks.values()].sort((a,b)=>b.priority-a.priority)[0]||lastStatus;
+  const active=waitState.locked?{text:waitState.text,tone:'busy'}:[...statusTasks.values()].sort((a,b)=>b.priority-a.priority)[0]||lastStatus;
   const node=$('dataStatus');node.textContent=active.text;node.title=active.text;node.dataset.tone=active.tone;
   $('statusIndicator').dataset.tone=active.tone;
 }
 function setStatus(text,tone=''){lastStatus={text,tone};renderStatus();}
 function taskStatus(key,text,tone='busy'){
   const priorities={update:30,sync:20,lists:10};
-  if(tone==='busy')statusTasks.set(key,{text,tone,priority:priorities[key]||0});
+  if(tone==='busy'){statusTasks.set(key,{text,tone,priority:priorities[key]||0});waitTasks.update(key,text);}
   else{statusTasks.delete(key);lastStatus={text,tone};}
   renderStatus();
 }
@@ -206,7 +230,7 @@ function snapshot(){
 }
 function flushSave(){clearTimeout(saveTimer);if(!storageReady)return Promise.reject(Error('本地规划尚未成功读取。'));const data=snapshot();const operation=writeChain.catch(()=>{}).then(()=>bridge('storage.save',{state:data}));writeChain=operation;return operation;}
 function scheduleSave(){if(!storageReady||closing)return;clearTimeout(saveTimer);saveTimer=setTimeout(()=>void flushSave().catch(e=>setStatus('保存失败：'+e.message,'error')),300);}
-async function prepareClose(){if(closing)return;closing=true;document.querySelector('.app').inert=true;try{if(storageReady)await flushSave();await saveColumns();await bridge('app.closeReady',{ok:true});}catch(e){await bridge('app.closeReady',{ok:false,error:e.message});closing=false;document.querySelector('.app').inert=!storageReady;}}
+async function prepareClose(){if(closing)return;closing=true;renderWaitState();try{if(storageReady)await flushSave();await saveColumns();await bridge('app.closeReady',{ok:true});}catch(e){try{const accepted=await bridge('app.closeReady',{ok:false,error:e.message});if(accepted)return;}catch(error){setStatus('退出失败：'+error.message,'error');}closing=false;renderWaitState();}}
 
 const goalById=id=>state.plans.find(g=>g.id===id)||null;
 const selectedGoal=()=>goalById(selectedGoalId);
@@ -759,6 +783,7 @@ async function loadReleaseMetadata(force){
   return {bannerIndex:mergeBannerReleases(value(bundled),value(banners)),characterDates:value(characters),weaponDates:value(weapons)};
 }
 async function loadLists(force=false){
+  return withWait('lists',force?'正在更新游戏资料…':'正在加载游戏资料…',20,async()=>{
   taskStatus('lists','正在读取 Nanoka 角色和武器资料…');
   try{
     const manifest=await bridge('data.fetch',{path:'/manifest.json',force,maxAge:21600000});
@@ -775,6 +800,7 @@ async function loadLists(force=false){
     taskStatus('lists',`已载入 ${characterList.length} 名角色、${weaponList.length} 类武器`,'success');
   }catch(e){taskStatus('lists','资料读取失败：'+e.message,'error');toast('检查网络后刷新资料');}
   renderAll();
+  });
 }
 async function loadGoalProfile(plan,force){
   const kind=goalKind(plan),src=plan.source;
@@ -788,6 +814,7 @@ async function loadGoalProfile(plan,force){
     weaponProfile:data[1].status==='fulfilled'?data[1].value:null};
 }
 async function reloadAllProfiles(force=false){
+  return withWait('profiles','正在加载培养资料…',10,async()=>{
   const token=++profileLoadToken,account=state.activeAccountId;
   const plans=[...state.plans];const results=await Promise.all(plans.map(plan=>loadGoalProfile(plan,force)));
   if(token!==profileLoadToken||account!==state.activeAccountId)return;
@@ -804,6 +831,7 @@ async function reloadAllProfiles(force=false){
     if(token!==profileLoadToken||account!==state.activeAccountId)return;
   }
   renderAll();save();
+  });
 }
 function modal({title,description='',confirm='确认',requiresText=true,value=''}){
   $('modalTitle').textContent=title;$('modalDescription').textContent=description;
@@ -830,34 +858,33 @@ function switchAccount(id){if(id===state.activeAccountId)return;selectPlannerAcc
 async function exportAll(){try{const ok=await bridge('storage.export',{state:{type:'material-planner-desktop-config',version:2,exportedAt:new Date().toISOString(),data:snapshot()}});
   if(ok)toast('配置已导出');}catch(e){toast('导出失败：'+e.message);}}
 async function importAll(){try{
-  const result=await bridge('storage.import');if(result===null)return;
-  const next=normalizeState(result?.data||result);initializePlanner(next);
+  const next=await withWait('import','正在读取规划文件…',30,async()=>{const result=await bridge('storage.import');if(result===null)return null;const normalized=normalizeState(result?.data||result);initializePlanner(normalized);return normalized;});if(next===null)return;
   const ok=await modal({title:'导入规划配置',description:'将替换当前全部账号、培养目标与背包数据。',requiresText:false,confirm:'导入'});
-  if(ok===null)return;state=next;resetAccountView();await flushSave();await reloadAllProfiles();toast('规划已导入');
+  if(ok===null)return;await withWait('import','正在导入规划…',30,async()=>{state=next;resetAccountView();await flushSave();await reloadAllProfiles();toast('规划已导入');});
 }catch(e){toast('导入失败：'+e.message);}}
 async function importScanner(){
   try{
     if(!characterList.length||!weaponList.length)return toast('请先载入 Nanoka 角色与武器资料');
-    const raw=await bridge('storage.import');if(raw===null)return;
-    const good=validateGOOD(raw);
+    const good=await withWait('import','正在读取 GGScanner 文件…',30,async()=>{const raw=await bridge('storage.import');return raw===null?null:validateGOOD(raw);});if(good===null)return;
     if(good.metadata?.uid&&state.inventoryUid&&String(good.metadata.uid)!==String(state.inventoryUid)){
       toast('GOOD 文件 UID 与当前规划账号不同，请先切换账号。');return;
     }
-    const draft=structuredClone(state);
-    const result=importGOOD(draft,good,{characters:characterList,weapons:weaponList});
+    const {draft,result}=await withWait('import','正在匹配角色与武器…',30,async()=>{const draft=structuredClone(state);const result=importGOOD(draft,good,{characters:characterList,weapons:weaponList});return {draft,result};});
     const question=[`角色 ${result.characters} 名；新武器 ${result.newWeapons} 把；更新武器 ${result.updatedWeapons} 把。`,
       result.unmatched.length?`未匹配 ${result.unmatched.length} 项，导入后可查看提示。`:'',
       result.ambiguous.length?`有 ${result.ambiguous.length} 把重复武器需要核对，此次保留现有记录。`:''
     ].filter(Boolean).join('\n');
     const ok=await modal({title:'导入 GGScanner',description:question,requiresText:false,confirm:'确认导入'});
     if(ok===null)return;
+    await withWait('import','正在导入 GGScanner 数据…',30,async()=>{
     state.ownedCharacters=draft.ownedCharacters;state.weaponInstances=draft.weaponInstances;
     for(let i=0;i<state.plans.length;i++){
       state.plans[i].config=draft.plans[i].config;
       state.plans[i].linkedWeaponInstanceId=draft.plans[i].linkedWeaponInstanceId;
     }
     if(good.metadata?.uid&&!state.inventoryUid)state.inventoryUid=String(good.metadata.uid);
-    renderAll();save();toast(result.warnings[0]||'GOOD 角色与武器数据已导入');
+    renderAll();await flushSave();toast(result.warnings[0]||'GOOD 角色与武器数据已导入');
+    });
   }catch(e){toast('GOOD 导入失败：'+e.message);}
 }
 function closeSettings(){const menu=$('settingsMenu');menu.hidden=true;$('settingsButton').setAttribute('aria-expanded','false');}
@@ -870,13 +897,14 @@ function installSettingsMenu(){
 async function checkUpdate(manual=false){
   if(!host||updateChecking||updateInstalling)return;
   updateChecking=true;$('checkUpdateButton').disabled=true;
+  const waiting=manual?waitTasks.begin('update','正在检查更新…',30):null;
   try{
     taskStatus('update','正在检查更新…');
     const result=await bridge('update.check');
     $('appVersion').textContent='v'+result.current;
     if(!result.available){taskStatus('update','当前已是最新版本 · v'+result.current,'success');return;}
     updateCandidate=result;taskStatus('update','发现新版本 v'+result.latest,'success');
-    if(mysPanel?.isBusy()||document.querySelector('.modal-backdrop:not([hidden])')){
+    if((!manual&&waitTasks.isLocked())||mysPanel?.isBusy()||document.querySelector('.modal-backdrop:not([hidden])')){
       if(manual)toast('发现新版本 v'+result.latest+'，请关闭当前窗口后检查更新');
       return;
     }
@@ -887,7 +915,7 @@ async function checkUpdate(manual=false){
     $('updateStatus').textContent='更新完成后程序将自动重启，本地规划与账号数据将保留。';
     $('updateLater').disabled=false;$('updateInstall').disabled=false;$('updateModal').hidden=false;
   }catch(e){taskStatus('update','检查更新失败：'+e.message,'error');}
-  finally{updateChecking=false;$('checkUpdateButton').disabled=false;}
+  finally{updateChecking=false;$('checkUpdateButton').disabled=false;waiting?.end();}
 }
 function renderUpdateProgress(progress){
   if(!updateInstalling||!progress)return;
@@ -928,7 +956,6 @@ function installCompactStripScroll(){
   }
 }
 async function start(){
-  document.querySelector('.app').inert=true;
   installCompactStripScroll();
   installSettingsMenu();
   $('checkUpdateButton').onclick=()=>void checkUpdate(true);
@@ -963,6 +990,7 @@ async function start(){
   mysPanel=installMiyoushePanel(bridge,{getPlanningId:()=>state.activeAccountId,getInventoryUid:()=>state.inventoryUid,getBinding:()=>state.mysBinding,
     listPlanning:()=>state.plannerAccounts.map(a=>({id:a.id,name:a.name,uid:a.id===state.activeAccountId?state.inventoryUid:a.data?.inventoryUid||''})),
     setStatus:(text,tone)=>taskStatus('sync',text,tone||'busy'),toast,
+    beginWait:(key,text,priority)=>waitTasks.begin(key,text,priority),isWaiting:()=>waitTasks.isLocked(),
     bind:async(target,raw,label)=>{
       const binding=normalizeMysBinding(raw);if(!binding)throw Error('绑定信息无效。');
       const owner=plannerBindingOwner(state,binding.uid,target);
@@ -995,8 +1023,6 @@ async function start(){
     apply:async result=>{applySyncedInventory(state,result);state.mysSyncedAt=Date.now();renderInventory();renderResults();renderCalendar();await flushSave();}});
   mysPanel.update();
   if(host)await bridge('app.ready');
-  document.querySelector('.app').inert=false;
   await loadLists();
-  void checkUpdate();
 }
-void start();
+void withWait('startup','正在读取本地数据…',1,start).then(()=>{if(storageReady)void checkUpdate();}).catch(e=>{setStatus('初始化失败：'+e.message,'error');});

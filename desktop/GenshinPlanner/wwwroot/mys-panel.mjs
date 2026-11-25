@@ -3,7 +3,7 @@ import {sameMysBinding} from './mys-binding.mjs';
 export function installMiyoushePanel(bridge,options){
   const api=createMiyousheClient(bridge),$=id=>document.getElementById(id);
   const modal=$('mysModal'),account=$('mysAccount'),uid=$('mysUid'),status=$('mysStatus'),qr=$('mysQr'),target=$('mysBindingTarget'),name=$('mysNewName');
-  let roles=[],ticket='',busy=false,pollTimer=null;
+  let roles=[],ticket='',busy=false,pollTimer=null,waiting=null;
   const text=value=>{status.textContent=value;};
   const selectedRole=()=>roles.find(r=>r.uid+'|'+r.region===uid.value);
   function controls(){
@@ -52,13 +52,15 @@ export function installMiyoushePanel(bridge,options){
     if(preferred||roles.length===1){const r=preferred||roles[0];uid.value=r.uid+'|'+r.region;}
     showTargets();text(roles.length?'选择 UID 与规划账号，确认绑定。':'此账号没有国服原神角色。');
   }
-  async function action(fn,{header=false}={}){
+  async function action(fn,{header=false,wait=true,label='正在读取账号信息…'}={}){
     if(busy)return;busy=true;controls();
+    const syncing=header&&Boolean(options.getBinding());
+    if(wait)waiting=options.beginWait(syncing?'sync':'mys',syncing?'正在同步材料库存…':label,syncing?50:40);
     try{await fn();}catch(e){
       const message=String(e.message||e);
       if(header){options.setStatus(message,'error');options.toast(message);if(!modal.hidden)text(message);}
       else text(message);
-    }finally{busy=false;controls();}
+    }finally{busy=false;try{controls();}finally{waiting?.end();waiting=null;}}
   }
   async function open(){
     modal.hidden=false;stopPoll();text('正在读取已保存的账号…');
@@ -71,18 +73,19 @@ export function installMiyoushePanel(bridge,options){
   function schedulePoll(){
     if(!ticket||modal.hidden)return;
     pollTimer=setTimeout(()=>{
-      if(busy){schedulePoll();return;}
+      if(busy||options.isWaiting()){schedulePoll();return;}
       void action(async()=>{
         const current=ticket;
         try{
           const result=await api.pollQr(current);
           if(ticket!==current)return;
           if(result.status==='Confirmed'){
+            waiting=options.beginWait('mys','正在读取账号信息…',40);
             stopPoll();showAccounts(result.accounts,result.accounts.activeId);await loadRoles();
           }else if(result.status==='Expired'){stopPoll();text('二维码已过期，请重新扫码。');}
           else{text(result.status==='Scanned'?'已扫码，等待确认。':'使用米游社扫码确认。');schedulePoll();}
         }catch(e){stopPoll();throw e;}
-      });
+      },{wait:false});
     },1500);
   }
   $('mysAdd').onclick=()=>action(async()=>{
@@ -90,7 +93,7 @@ export function installMiyoushePanel(bridge,options){
     const result=await api.startQr();ticket=result.ticket;
     const code=globalThis.qrcode(0,'M');code.addData(result.url,'Byte');code.make();
     $('mysQrImage').src=code.createDataURL(5,12);qr.hidden=false;text('使用米游社扫码确认。');schedulePoll();
-  });
+  },{label:'正在生成登录二维码…'});
   $('mysRefresh').onclick=()=>action(async()=>{stopPoll();const id=account.value;showAccounts(await api.refresh(id),id);await loadRoles();});
   $('mysRemove').onclick=()=>action(async()=>{
     if(!window.confirm('移除此米游社账号的本地登录记录？相关规划账号需要重新登录后才能同步。'))return;
@@ -130,9 +133,9 @@ export function installMiyoushePanel(bridge,options){
   $('mysDiagnose').onclick=()=>action(async()=>{
     stopPoll();const role=selectedRole();
     if(!role||!account.value)throw Error('请选择米游社账号与 UID。');
-    const report=await api.diagnoseInventory(account.value,role.uid,role.region,text,options.loadDiagnosticWeapon);
+    const report=await api.diagnoseInventory(account.value,role.uid,role.region,value=>{text(value);waiting?.update(value);},options.loadDiagnosticWeapon);
     await bridge('mys.diagnostics.save',{report});
     text(`诊断已保存至 data/inventory-diagnostics.json · 有效响应 ${report.successfulCases}/${report.cases.length}${report.error?' · '+report.error:''}`);
-  });
+  },{label:'正在诊断材料库存…'});
   controls();return {update:controls,isBusy:()=>busy};
 }

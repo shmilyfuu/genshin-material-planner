@@ -23,6 +23,8 @@ jobs:
       - name: Validate JavaScript and planner logic
         shell: pwsh
         run: |
+          node --check desktop/GenshinPlanner/wwwroot/wait-tasks.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check desktop/GenshinPlanner/wwwroot/desktop-app.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --check desktop/GenshinPlanner/wwwroot/mys-client.mjs
@@ -62,11 +64,11 @@ jobs:
           if (-not (Test-Path desktop/publish/resources/wwwroot/icons/inventory.png)) { throw 'Inventory icon missing' }
           if (-not (Test-Path desktop/publish/resources/wwwroot/icons/training-guide.png)) { throw 'Training guide icon missing' }
           if (-not (Test-Path desktop/publish/resources/wwwroot/icons/training-active.png)) { throw 'Active training icon missing' }
-          foreach ($icon in @('character-tab.png', 'weapon-tab.png', 'search.png')) {
+          foreach ($icon in @('character-tab.png', 'weapon-tab.png', 'search.png', 'loading-dot.png')) {
             if (-not (Test-Path "desktop/publish/resources/wwwroot/icons/$icon")) { throw "Missing icon: $icon" }
           }
           $version = (Get-Item desktop/publish/GenshinPlanner.exe).VersionInfo
-          if ("$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)" -ne '0.5.9') { throw 'Executable version mismatch' }
+          if ("$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)" -ne '0.5.10') { throw 'Executable version mismatch' }
           # Package XML documentation is only used by development tooling.
           Get-ChildItem desktop/publish -File -Filter 'Microsoft.Web.WebView2.*.xml' | Remove-Item -Force
           $rootFiles = @(Get-ChildItem desktop/publish -File)
@@ -78,7 +80,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path desktop/dist, desktop/publish/data | Out-Null
           Add-Type -AssemblyName System.IO.Compression.ZipFile
-          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.5.9-win-x64.zip'
+          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.5.10-test-win-x64.zip'
           [System.IO.Compression.ZipFile]::CreateFromDirectory(
             (Resolve-Path desktop/publish).Path,
             $zipPath,
@@ -94,36 +96,9 @@ jobs:
           (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower() | Set-Content ($zipPath + '.sha256')
       - uses: actions/upload-artifact@v4
         with:
-          name: GenshinPlanner-WebView2-v0.5.9-win-x64
+          name: GenshinPlanner-WebView2-v0.5.10-test-win-x64
           path: |
-            desktop/dist/GenshinPlanner-WebView2-v0.5.9-win-x64.zip
-            desktop/dist/GenshinPlanner-WebView2-v0.5.9-win-x64.zip.sha256
+            desktop/dist/GenshinPlanner-WebView2-v0.5.10-test-win-x64.zip
+            desktop/dist/GenshinPlanner-WebView2-v0.5.10-test-win-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14
-
-  publish-release:
-    if: github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release desktop v0.5.9')
-    needs: windows-build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: GenshinPlanner-WebView2-v0.5.9-win-x64
-          path: dist
-      - name: Publish desktop release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TARGET_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          cd dist
-          zip=GenshinPlanner-WebView2-v0.5.9-win-x64.zip
-          test -f "$zip"
-          test -f "$zip.sha256"
-          expected=$(tr -d '[:space:]' < "$zip.sha256")
-          actual=$(sha256sum "$zip" | cut -d ' ' -f 1)
-          test "$expected" = "$actual"
-          gh release create desktop-v0.5.9 "$zip" "$zip.sha256" --target "$TARGET_SHA" --title "原神养成规划桌面版 v0.5.9" --notes "完善一星、二星武器突破，修复单项目标材料缺口显示、GOOD 武器匹配、实例编号、规划保存与旧库存迁移，并改进桌面版自动更新与构建验证。包含角色与武器图鉴界面优化、前瞻星号和原始游戏图标。" --latest

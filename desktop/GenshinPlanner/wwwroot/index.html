@@ -111,6 +111,12 @@
     <div class="modal-actions"><button id="updateLater" type="button">稍后更新</button><button id="updateInstall" class="primary-btn" type="button">立即更新</button></div>
   </div>
 </div>
+<div id="waitOverlay" class="wait-overlay" hidden>
+  <div id="waitToast" class="wait-toast" role="status" aria-live="polite" aria-atomic="true" hidden>
+    <span class="wait-spinner" aria-hidden="true"><span style="--dot:0"></span><span style="--dot:1"></span><span style="--dot:2"></span><span style="--dot:3"></span><span style="--dot:4"></span><span style="--dot:5"></span><span style="--dot:6"></span><span style="--dot:7"></span></span>
+    <span id="waitMessage"></span>
+  </div>
+</div>
 <script src="vendor/qrcode-generator.js"></script>
 <script type="module" src="desktop-app.mjs"></script>
 </body>

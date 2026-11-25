@@ -94,3 +94,12 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 .update-progress progress::-webkit-progress-value{background:var(--cream);border-radius:6px}
 .update-progress progress:indeterminate{appearance:none;background:linear-gradient(90deg,var(--surface) 20%,var(--cream) 50%,var(--surface) 80%);background-size:250% 100%;animation:progress-slide 1.2s linear infinite}
 @keyframes progress-slide{from{background-position:100% 0}to{background-position:0 0}}
+
+.wait-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:transparent;cursor:wait;touch-action:none;overscroll-behavior:contain}
+.wait-overlay[hidden],.wait-toast[hidden]{display:none!important}
+.wait-toast{display:flex;align-items:center;justify-content:center;gap:12px;max-width:calc(100vw - 48px);min-height:44px;padding:9px 19px;border:1px solid #ffffff29;border-radius:7px;background:#202a37f2;color:var(--text);box-shadow:0 4px 16px #0003;font-size:13px;line-height:1.5;text-align:left;animation:wait-enter .14s ease-out}
+.wait-spinner{position:relative;display:block;flex:0 0 32px;width:32px;height:32px;animation:wait-rotate 1.15s linear infinite}
+.wait-spinner span{position:absolute;left:9px;top:9px;width:14px;height:14px;background:url("icons/loading-dot.png") center/contain no-repeat;transform:rotate(calc(var(--dot)*45deg)) translateY(-10px);opacity:calc((var(--dot) + 1)/8)}
+@keyframes wait-rotate{to{transform:rotate(360deg)}}
+@keyframes wait-enter{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.wait-spinner,.wait-toast{animation:none}}

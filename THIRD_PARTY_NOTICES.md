@@ -35,3 +35,5 @@ Additional original sprites used for the desktop roster:
 https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_BtnIcon_AvatarList.png
 https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_BagTabIcon_Weapon.png
 https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_Icon_Search.png
+
+https://github.com/PathOfGenshin/resources/blob/main/resources/gi/Sprite/UI_Img_LoadingDot.png
