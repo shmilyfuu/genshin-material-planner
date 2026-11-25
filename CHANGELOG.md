@@ -1,5 +1,12 @@
 # Changelog
 
+## Desktop 0.6.0
+
+- 新增居中的黄色圆点等待提示，覆盖库存同步、资料加载、账号查询及数据导入。
+- 阻塞任务期间暂停界面操作，任务完成或失败后自动解除限制。
+- 并行任务独立管理等待状态，实时显示主要任务进度。
+- 正式版采用三段式版本号，测试包在当前正式版本后追加第四位，通过 Actions Artifacts 分发。
+
 ## Desktop 0.5.9
 
 - Added one- and two-star weapon ascension and corrected individual crafting deficit presentation.

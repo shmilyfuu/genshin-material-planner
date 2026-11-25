@@ -6,6 +6,10 @@ Directory.CreateDirectory(temp);
 try
 {
     void Require(bool value, string message) { if (!value) throw new Exception(message); }
+    Require(UpdateHost.NormalizeVersion(new Version(0, 6, 0, 0)).ToString() == "0.6.0", "Formal version display");
+    Require(UpdateHost.NormalizeVersion(new Version(0, 6, 0, 1)).ToString() == "0.6.0.1", "Test version display");
+    Require(UpdateHost.NormalizeVersion(new Version(0, 6, 0, 2)) > new Version(0, 6, 0), "Test version ordering");
+    Require(new Version(0, 6, 1) > UpdateHost.NormalizeVersion(new Version(0, 6, 0, 99)), "Next formal version ordering");
     void Write(string root, string path, string text)
     {
         string file = Path.Combine(root, path);

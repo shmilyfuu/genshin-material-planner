@@ -15,8 +15,26 @@ permissions:
 jobs:
   windows-build:
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      package: ${{ steps.version.outputs.package }}
+      formal: ${{ steps.version.outputs.formal }}
     steps:
       - uses: actions/checkout@v4
+      - name: Read desktop version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content desktop/GenshinPlanner/GenshinPlanner.csproj -Raw
+          $version = [string]$project.Project.PropertyGroup.Version
+          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(\.[1-9]\d*)?$') { throw 'Expected a three-part release or four-part test version' }
+          $parts = $version.Split('.')
+          if (@($parts | Where-Object { [long]$_ -gt 65534 }).Count) { throw 'Version component exceeds Windows assembly version limit' }
+          $formal = $parts.Count -eq 3
+          $suffix = if ($formal) { '' } else { '-test' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "formal=$($formal.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "package=GenshinPlanner-WebView2-v$version$suffix-win-x64" >> $env:GITHUB_OUTPUT
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
@@ -68,7 +86,10 @@ jobs:
             if (-not (Test-Path "desktop/publish/resources/wwwroot/icons/$icon")) { throw "Missing icon: $icon" }
           }
           $version = (Get-Item desktop/publish/GenshinPlanner.exe).VersionInfo
-          if ("$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)" -ne '0.5.10') { throw 'Executable version mismatch' }
+          $expected = [version]'${{ steps.version.outputs.version }}'
+          $actual = [version]::new($version.FileMajorPart, $version.FileMinorPart, $version.FileBuildPart, $version.FilePrivatePart)
+          $expectedFull = [version]::new($expected.Major, $expected.Minor, $expected.Build, [Math]::Max(0, $expected.Revision))
+          if ($actual -ne $expectedFull) { throw "Executable version mismatch: $actual vs $expectedFull" }
           # Package XML documentation is only used by development tooling.
           Get-ChildItem desktop/publish -File -Filter 'Microsoft.Web.WebView2.*.xml' | Remove-Item -Force
           $rootFiles = @(Get-ChildItem desktop/publish -File)
@@ -80,7 +101,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path desktop/dist, desktop/publish/data | Out-Null
           Add-Type -AssemblyName System.IO.Compression.ZipFile
-          $zipPath = Join-Path (Resolve-Path desktop/dist).Path 'GenshinPlanner-WebView2-v0.5.10-test-win-x64.zip'
+          $zipPath = Join-Path (Resolve-Path desktop/dist).Path '${{ steps.version.outputs.package }}.zip'
           [System.IO.Compression.ZipFile]::CreateFromDirectory(
             (Resolve-Path desktop/publish).Path,
             $zipPath,
@@ -96,9 +117,41 @@ jobs:
           (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower() | Set-Content ($zipPath + '.sha256')
       - uses: actions/upload-artifact@v4
         with:
-          name: GenshinPlanner-WebView2-v0.5.10-test-win-x64
+          name: ${{ steps.version.outputs.package }}
           path: |
-            desktop/dist/GenshinPlanner-WebView2-v0.5.10-test-win-x64.zip
-            desktop/dist/GenshinPlanner-WebView2-v0.5.10-test-win-x64.zip.sha256
+            desktop/dist/${{ steps.version.outputs.package }}.zip
+            desktop/dist/${{ steps.version.outputs.package }}.zip.sha256
           if-no-files-found: error
           retention-days: 14
+
+  publish-release:
+    if: needs.windows-build.outputs.formal == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == format('Release desktop v{0}', needs.windows-build.outputs.version)
+    needs: windows-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.windows-build.outputs.package }}
+          path: dist
+      - name: Publish desktop release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.windows-build.outputs.version }}
+          PACKAGE: ${{ needs.windows-build.outputs.package }}
+        run: |
+          set -euo pipefail
+          cd dist
+          zip="$PACKAGE.zip"
+          test -f "$zip"
+          test -f "$zip.sha256"
+          expected=$(tr -d '[:space:]' < "$zip.sha256")
+          actual=$(sha256sum "$zip" | cut -d ' ' -f 1)
+          test "$expected" = "$actual"
+          awk -v heading="## Desktop $VERSION" '$0 == heading { found=1; next } found && /^## / { exit } found { print }' ../CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+          gh release create "desktop-v$VERSION" "$zip" "$zip.sha256" --target "$TARGET_SHA" --title "原神养成规划桌面版 v$VERSION" --notes-file release-notes.md --latest

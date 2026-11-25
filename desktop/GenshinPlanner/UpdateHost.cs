@@ -36,9 +36,13 @@ internal sealed class UpdateHost
         get
         {
             var version = Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0, 0);
-            return new Version(version.Major, version.Minor, Math.Max(0, version.Build));
+            return NormalizeVersion(version);
         }
     }
+
+    internal static Version NormalizeVersion(Version version) => version.Revision > 0
+        ? new Version(version.Major, version.Minor, Math.Max(0, version.Build), version.Revision)
+        : new Version(version.Major, version.Minor, Math.Max(0, version.Build));
 
     public async Task<object> CheckAsync()
     {

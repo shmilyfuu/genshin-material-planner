@@ -4,16 +4,16 @@
 
 面向原神的 Windows 桌面养成规划工具，支持多角色、多武器培养计划、共享材料库存与每周刷取日历。
 
-**[下载正式版 v0.5.9](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9)**
+**[下载正式版 v0.6.0](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0)**
 
-[下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
+[下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ## 功能
 
 - 支持一至五星武器突破，低星武器最高培养至 Lv.70。
 - 前瞻角色与武器以名称后星号标识；培养卡片使用游戏原始图标。
 - 单项缺口显示包含材料合成所需的实际低阶缺口。
-
+- 库存同步、游戏资料加载及导入等任务显示居中的黄色圆点等待提示，任务结束后自动恢复界面操作。
 - 角色、武器图鉴，支持名称搜索、星级、元素和武器类型筛选。
 - 独立配置角色等级、突破、天赋和武器等级，支持多项培养计划、暂停及完成状态。
 - 同名武器支持多个独立实例，角色可关联武器实例。
@@ -32,7 +32,7 @@
 
 ## 下载与使用
 
-1. 前往 [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9) 下载 Windows x64 ZIP。
+1. 前往 [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0) 下载 Windows x64 ZIP。
 2. 将压缩包解压到有写入权限的固定目录。
 3. 运行 `GenshinPlanner.exe`。
 
@@ -51,6 +51,7 @@ GenshinPlanner.exe
 resources/wwwroot/
 data/
   planner.json
+  planner.json.bak
   desktop-layout.json
   NanokaCache/
   ReleaseCache/
@@ -81,7 +82,7 @@ node --test desktop/GenshinPlanner/tests/*.test.mjs
 dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish
 ```
 
-主分支为 `main`。Windows 构建通过 GitHub Actions 生成便携 ZIP 及 SHA-256 校验文件。历史浏览器扩展源码归档于 [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1)。
+主分支为 `main`。Windows 构建通过 GitHub Actions 生成便携 ZIP 及 SHA-256 校验文件。正式版本使用三段式版本号（如 `0.6.0`），测试包在当前正式版本后追加第四位（如 `0.6.0.1`、`0.6.0.2`），通过 Actions Artifacts 分发。确认正式发布时才提升前三位版本号并创建 `desktop-vX.Y.Z` Release；程序自动更新仅识别正式版本。历史浏览器扩展源码归档于 [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1)。
 
 ## 反馈与版权
 

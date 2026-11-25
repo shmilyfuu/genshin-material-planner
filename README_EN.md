@@ -4,16 +4,16 @@
 
 A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-**[Download v0.5.9](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9)**
+**[Download v0.6.0](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0)**
 
-[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
+[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ## Features
 
 - Weapon ascension for all five rarities; one- and two-star weapons cap at Lv.70.
 - Preview objects are marked with an asterisk after the centered name.
 - Individual deficits include lower-tier materials required for crafting.
-
+- A centered yellow-dot waiting indicator locks the interface during inventory synchronization, game data loading, and imports until active blocking tasks finish.
 - Character and weapon catalogs with search, rarity, element, and weapon type filters.
 - Multiple independent upgrade goals with level, ascension, talent, pause, and completion settings.
 - Independent instances of identical weapons and character-to-weapon links.
@@ -32,7 +32,7 @@ Raw inventory is recovered per crafting family using demand, shortages and direc
 
 ## Installation and updates
 
-Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.5.9), extract it to a writable folder, and run `GenshinPlanner.exe`.
+Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0), extract it to a writable folder, and run `GenshinPlanner.exe`.
 
 Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. The .NET runtime is included.
 
@@ -61,7 +61,7 @@ node --test desktop/GenshinPlanner/tests/*.test.mjs
 dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish
 ```
 
-The primary development branch is `main`. GitHub Actions produces Windows ZIP archives and SHA-256 checksums. Historical browser extension source is archived at [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1).
+The primary development branch is `main`. GitHub Actions produces Windows ZIP archives and SHA-256 checksums. Formal releases use three-part versions (e.g. `0.6.0`); test builds append a fourth component to the current formal version (e.g. `0.6.0.1`, `0.6.0.2`) and are distributed through Actions artifacts. The first three components advance only for formal releases tagged `desktop-vX.Y.Z`. Automatic updates select formal releases only. Historical browser extension source is archived at [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1).
 
 ## Feedback and copyright
 
