@@ -100,7 +100,7 @@ test('追加浮层采用原生表单确认、独立定位及手动库存范围',
  assert.ok(js.includes("&&state.inventoryMode==='manual'&&!waitState.locked&&!closing"));
  assert.ok(js.includes("controls.append(arrows,add)"));
  assert.ok(js.includes("context.input.value=String(total);updateMaterialCount"));
- assert.ok(js.includes("function renderInventory(){\n  closeMaterialAdd();"));
+ assert.match(js,/function renderInventory\(\)\s*\{\s*closeMaterialAdd\(\);/);
  assert.ok(js.includes("if(locked)closeMaterialAdd();"));
  assert.ok(js.includes("event.key==='Escape'&&materialAddContext"));
  assert.ok(css.includes(".material-row.manual-material-row{grid-template-columns:30px minmax(0,1fr) 116px}"));
