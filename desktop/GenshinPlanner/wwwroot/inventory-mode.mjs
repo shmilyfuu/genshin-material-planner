@@ -12,6 +12,13 @@ export function setManualMaterial(state,id,value){
   else delete state.materialInventory[id];
   return true;
 }
+export function previewManualAddition(value,addition){
+  const current=safeEval(value);
+  const raw=String(addition??'').trim();
+  const delta=/^\d+$/.test(raw)?Number(raw):NaN;
+  const total=current+delta;
+  return {current,total:Number.isSafeInteger(current)&&Number.isSafeInteger(delta)&&delta>0&&Number.isSafeInteger(total)?total:null};
+}
 export function applySyncedInventory(state,result){
   const uid=String(result?.uid||'');
   if(!/^\d{6,12}$/.test(uid)||!Array.isArray(result.materials))throw Error('同步库存格式错误。');

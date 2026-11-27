@@ -73,6 +73,14 @@
       <div class="deficit-content" id="resultContent" aria-live="polite"></div>
     </aside>
   </div>
+  <form id="materialAddPopover" class="material-add-popover" aria-labelledby="materialAddTitle" hidden>
+    <div class="material-add-title" id="materialAddTitle"></div>
+    <div class="material-add-entry">
+      <input id="materialAddInput" type="text" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="增加数量" aria-label="追加材料数量">
+      <button id="materialAddConfirm" type="submit" title="确认追加 (Enter)" aria-label="确认追加" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>
+    </div>
+    <div class="material-add-preview" aria-live="polite"><span id="materialAddCurrent"></span><span aria-hidden="true">→</span><strong id="materialAddResult"></strong></div>
+  </form>
   <footer class="status-bar" aria-label="程序状态"><span class="status-indicator" id="statusIndicator" aria-hidden="true"></span><span class="data-status" id="dataStatus" role="status" aria-live="polite">正在读取本地数据…</span><span class="status-secondary" id="statusNotice" role="status" aria-live="polite"></span></footer>
 </div>
 <div class="modal-backdrop" id="modal" hidden>

@@ -103,3 +103,23 @@ button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.
 @keyframes wait-rotate{to{transform:rotate(360deg)}}
 @keyframes wait-enter{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.wait-spinner,.wait-toast{animation:none}}
+
+.material-row.manual-material-row{grid-template-columns:30px minmax(0,1fr) 116px}
+.manual-material-row .material-number{width:116px}
+.material-add-button{display:grid;place-items:center;flex:0 0 22px;width:22px;height:100%;padding:0;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--text)}
+.material-add-button svg{width:12px;height:12px}
+.material-add-button:hover,.material-add-button:focus-visible{background:var(--surface-hover)}
+.material-add-button[aria-expanded="true"]{background:var(--cream);color:var(--ink)}
+.material-add-button:focus-visible{outline:1px solid var(--gold);outline-offset:-2px}
+.material-add-popover{position:fixed;z-index:90;width:232px;max-width:calc(100vw - 16px);margin:0;padding:10px;display:grid;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:7px;box-shadow:0 8px 24px #10182470}
+.material-add-popover[hidden]{display:none!important}
+.material-add-title{font-size:11px;font-weight:600;overflow-wrap:anywhere}
+.material-add-entry{display:flex;gap:6px;align-items:center}
+.material-add-entry input{flex:1;min-width:0;height:29px;padding:0 7px;border:1px solid var(--line);border-radius:5px;color:var(--text);background:var(--surface);font-size:12px}
+.material-add-entry input:focus{outline:1px solid var(--gold);outline-offset:-1px}
+.material-add-entry button{display:grid;place-items:center;flex:0 0 29px;height:29px;padding:0;border:0;border-radius:5px;color:var(--ink);background:var(--cream)}
+.material-add-entry button svg{width:15px;height:15px}
+.material-add-entry button:hover:not(:disabled){background:#fff}
+.material-add-preview{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:6px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+.material-add-preview span:first-child,.material-add-preview strong{overflow-wrap:anywhere}
+.material-add-preview strong{font-size:11px;text-align:right;color:var(--gold)}

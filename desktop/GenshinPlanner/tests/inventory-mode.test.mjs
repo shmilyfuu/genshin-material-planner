@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cloneDefaultState,normalizeState} from '../wwwroot/core.mjs';
 import {createPlannerAccount,saveActivePlannerAccount,selectPlannerAccount} from '../wwwroot/planner-accounts.mjs';
-import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory,compareInventoryMaterial,summarizeInventoryApplication,applyInventoryToManual} from '../wwwroot/inventory-mode.mjs';
+import {activeMaterialInventory,selectInventoryMode,setManualMaterial,previewManualAddition,applySyncedInventory,compareInventoryMaterial,summarizeInventoryApplication,applyInventoryToManual} from '../wwwroot/inventory-mode.mjs';
 import {readFileSync} from 'node:fs';
 const fresh=()=>normalizeState(cloneDefaultState());
 const uid='123456789';
@@ -74,4 +74,35 @@ test('只有下限时禁止应用，其他规划账号不受影响',()=>{
  createPlannerAccount(s,'other','Other',fresh());
  applySyncedInventory(s,{uid:'987654321',materials:[{id:1,num:7}]});applyInventoryToManual(s);
  selectPlannerAccount(s,'account-1');assert.equal(s.materialInventory['1'],'9');assert.equal(s.syncedMaterialInventory['1'],'2');
+});
+
+test('追加数量沿用表达式库存计算，接受正整数并拒绝溢出',()=>{
+ const s=fresh();setManualMaterial(s,'202','30+6');setManualMaterial(s,'1','5');
+ applySyncedInventory(s,{uid,materials:[{id:202,num:50}]});
+ assert.deepEqual(previewManualAddition(s.materialInventory['202'],'12'),{current:36,total:48});
+ assert.deepEqual(previewManualAddition(undefined,'8'),{current:0,total:8});
+ assert.deepEqual(previewManualAddition('3',' 001 '),{current:3,total:4});
+ for(const invalid of ['', '0','-1','1.5','1e3','2+3','NaN','9007199254740992'])assert.equal(previewManualAddition('36',invalid).total,null,invalid);
+ assert.equal(previewManualAddition(String(Number.MAX_SAFE_INTEGER),'1').total,null);
+ assert.equal(previewManualAddition('1',String(Number.MAX_SAFE_INTEGER-1)).total,Number.MAX_SAFE_INTEGER);
+ const total=previewManualAddition(s.materialInventory['202'],'12').total;
+ setManualMaterial(s,'202',String(total));
+ assert.deepEqual(s.materialInventory,{'202':'48','1':'5'});
+ assert.deepEqual(s.syncedMaterialInventory,{'202':'50'});
+ selectInventoryMode(s,'synced');assert.equal(setManualMaterial(s,'202','100'),false);
+});
+test('追加浮层采用原生表单确认、独立定位及手动库存范围',()=>{
+ const read=name=>readFileSync(new URL('../wwwroot/'+name,import.meta.url),'utf8');
+ const html=read('index.html'),js=read('desktop-app.mjs'),css=read('desktop.css');
+ assert.match(html,/<form id="materialAddPopover"[\s\S]*?<button id="materialAddConfirm" type="submit"[\s\S]*?<\/form>/);
+ assert.ok(js.includes("panel.addEventListener('submit'"));
+ assert.ok(js.includes("state.activeAccountId===context.accountId"));
+ assert.ok(js.includes("&&state.inventoryMode==='manual'&&!waitState.locked&&!closing"));
+ assert.ok(js.includes("controls.append(arrows,add)"));
+ assert.ok(js.includes("context.input.value=String(total);updateMaterialCount"));
+ assert.ok(js.includes("function renderInventory(){\n  closeMaterialAdd();"));
+ assert.ok(js.includes("if(locked)closeMaterialAdd();"));
+ assert.ok(js.includes("event.key==='Escape'&&materialAddContext"));
+ assert.ok(css.includes(".material-row.manual-material-row{grid-template-columns:30px minmax(0,1fr) 116px}"));
+ assert.ok(css.includes(".material-add-popover{position:fixed"));
 });

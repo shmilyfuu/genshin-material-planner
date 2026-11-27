@@ -12,7 +12,7 @@ import {calendarForEntries} from './calendar-days.mjs';
 import {createRosterFilter,toggleRosterFilter,matchesRosterFilter} from './roster-filters.mjs';
 import {installMiyoushePanel} from './mys-panel.mjs';
 import {bindMysAccount,unbindMysAccount,plannerBindingOwner,normalizeMysBinding} from './mys-binding.mjs';
-import {activeMaterialInventory,selectInventoryMode,setManualMaterial,applySyncedInventory,compareInventoryMaterial,summarizeInventoryApplication,applyInventoryToManual} from './inventory-mode.mjs';
+import {activeMaterialInventory,selectInventoryMode,setManualMaterial,previewManualAddition,applySyncedInventory,compareInventoryMaterial,summarizeInventoryApplication,applyInventoryToManual} from './inventory-mode.mjs';
 import {indexBannerReleases,mergeBannerReleases,parseReleaseTable,attachReleaseDates,compareRosterRelease} from './release-order.mjs';
 import {
   saveActivePlannerAccount, selectPlannerAccount, createPlannerAccount,
@@ -199,6 +199,7 @@ const waitTasks=createWaitTasks(next=>{
 });
 function renderWaitState(){
   const locked=waitState.locked||closing;
+  if(locked)closeMaterialAdd();
   document.querySelector('.app').inert=locked||!storageReady;
   for(const panel of document.querySelectorAll('.modal-backdrop'))panel.inert=locked;
   $('waitOverlay').hidden=!waitState.locked;
@@ -611,6 +612,75 @@ function updateMaterialCount(id,value){
   if(!setManualMaterial(state,id,value))return;
   renderResults();renderCalendar();save();
 }
+let materialAddContext=null;
+function closeMaterialAdd(restoreFocus=false){
+  if(!materialAddContext)return;
+  const {button}=materialAddContext;materialAddContext=null;
+  button.setAttribute('aria-expanded','false');
+  $('materialAddPopover').hidden=true;$('materialAddInput').value='';$('materialAddConfirm').disabled=true;
+  if(restoreFocus&&button.isConnected&&!waitState.locked&&!closing)button.focus({preventScroll:true});
+}
+function currentMaterialAdd(){
+  const context=materialAddContext;
+  return context&&context.button.isConnected&&context.input.isConnected&&state.activeAccountId===context.accountId
+    &&state.inventoryMode==='manual'&&!waitState.locked&&!closing?context:null;
+}
+function positionMaterialAdd(){
+  const context=currentMaterialAdd();
+  if(!context){closeMaterialAdd();return;}
+  const panel=$('materialAddPopover'),anchor=context.button.getBoundingClientRect();
+  const control=context.button.parentElement.getBoundingClientRect();
+  const scroll=$('inventoryGroups').getBoundingClientRect();
+  if(anchor.bottom<=scroll.top||anchor.top>=scroll.bottom||anchor.right<=scroll.left||anchor.left>=scroll.right){closeMaterialAdd();return;}
+  const margin=8,gap=5,width=panel.offsetWidth,height=panel.offsetHeight;
+  const left=Math.max(margin,Math.min(window.innerWidth-width-margin,control.right-width));
+  const below=anchor.bottom+gap,above=anchor.top-height-gap;
+  const top=below+height<=window.innerHeight-margin?below:above>=margin?above:Math.max(margin,window.innerHeight-height-margin);
+  panel.style.left=left+'px';panel.style.top=top+'px';
+}
+function refreshMaterialAdd(){
+  const context=currentMaterialAdd();
+  if(!context){closeMaterialAdd();return null;}
+  const {current,total}=previewManualAddition(state.materialInventory[context.id],$('materialAddInput').value);
+  $('materialAddCurrent').textContent='当前 '+displayNum(current);
+  $('materialAddResult').textContent=total===null?'—':displayNum(total);
+  $('materialAddConfirm').disabled=total===null;
+  positionMaterialAdd();
+  return total;
+}
+function openMaterialAdd(item,button,input){
+  if(materialAddContext?.button===button){closeMaterialAdd(true);return;}
+  closeMaterialAdd();
+  if(state.inventoryMode!=='manual'||waitState.locked||closing)return;
+  materialAddContext={id:String(item.id),accountId:state.activeAccountId,button,input};
+  button.setAttribute('aria-expanded','true');
+  $('materialAddTitle').textContent=item.name;
+  $('materialAddInput').value='';
+  $('materialAddPopover').hidden=false;refreshMaterialAdd();
+  if(materialAddContext)$('materialAddInput').focus({preventScroll:true});
+}
+function installMaterialAdd(){
+  const panel=$('materialAddPopover'),entry=$('materialAddInput');
+  entry.addEventListener('input',refreshMaterialAdd);
+  panel.addEventListener('submit',event=>{
+    event.preventDefault();
+    const context=currentMaterialAdd();if(!context){closeMaterialAdd();return;}
+    const total=refreshMaterialAdd();if(total===null||!currentMaterialAdd())return;
+    closeMaterialAdd(true);
+    context.input.value=String(total);updateMaterialCount(context.id,context.input.value);
+  });
+  document.addEventListener('pointerdown',event=>{
+    if(materialAddContext&&!panel.contains(event.target)&&!materialAddContext.button.contains(event.target))closeMaterialAdd();
+  },true);
+  document.addEventListener('focusin',event=>{
+    if(materialAddContext&&!panel.contains(event.target)&&!materialAddContext.button.contains(event.target))closeMaterialAdd();
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&materialAddContext){event.preventDefault();event.stopImmediatePropagation();closeMaterialAdd(true);}
+  },true);
+  document.addEventListener('scroll',()=>{if(materialAddContext)positionMaterialAdd();},true);
+  window.addEventListener('resize',()=>{if(materialAddContext)positionMaterialAdd();});
+}
 function materialRow(item,shared){
   const row=document.createElement('div');row.className='material-row';
   const image=document.createElement('span');image.className='material-img';image.dataset.rank=String(item.rank);
@@ -637,17 +707,22 @@ function materialRow(item,shared){
   }
   if(synced&&state.syncedInventoryMinimum?.[item.id]){input.title='米游社探测下限：实际库存可能更多';input.classList.add('inventory-minimum');}
   if(!synced){
+    row.classList.add('manual-material-row');
     const step=delta=>{input.value=String(Math.min(Number.MAX_SAFE_INTEGER,Math.max(0,safeEval(input.value)+delta)));updateMaterialCount(item.id,input.value);};
     for(const [delta,text] of [[1,'▲'],[-1,'▼']]){const button=document.createElement('button');button.type='button';button.textContent=text;
       button.title=delta>0?'增加 1':'减少 1';button.onclick=()=>step(delta);arrows.append(button);}
     input.oninput=()=>updateMaterialCount(item.id,input.value);
-    controls.append(arrows);
+    const add=document.createElement('button');add.type='button';add.className='material-add-button';add.innerHTML=svg('plus');
+    add.title='追加数量';add.setAttribute('aria-label',item.name+'追加数量');add.setAttribute('aria-controls','materialAddPopover');add.setAttribute('aria-expanded','false');
+    add.onclick=()=>openMaterialAdd(item,add,input);
+    controls.append(arrows,add);
   }
   controls.append(input);row.append(image,copy,controls);return row;
 }
 const categories=[['basicInventory','基础与专属材料'],['cultInventory','培养素材'],
   ['talentInventory','天赋与角色突破'],['weaponInventory','武器突破材料']];
 function renderInventory(){
+  closeMaterialAdd();
   const synced=state.inventoryMode==='synced';
   for(const button of document.querySelectorAll('[data-inventory-mode]')){
     const selected=button.dataset.inventoryMode===state.inventoryMode;
@@ -655,7 +730,7 @@ function renderInventory(){
   }
   $('inventoryModeNote').textContent=synced
     ?(Object.keys(state.syncedMaterialInventory).length?'米游社库存 · 虚线表示下限，未知库存按 0 估算缺口。':'尚未同步材料，请通过米游社同步。')
-    :'手动库存 · 输入框左侧可增加或减少 1。';
+    :'手动库存 · 上下箭头微调，+ 追加数量。';
   const apply=$('applyInventoryButton');apply.hidden=!synced;
   apply.disabled=!Object.keys(state.syncedMaterialInventory).some(id=>state.syncedInventoryMinimum[id]!==true);
   const holder=$('inventoryGroups');holder.replaceChildren();
@@ -834,6 +909,7 @@ async function reloadAllProfiles(force=false){
   });
 }
 function modal({title,description='',confirm='确认',requiresText=true,value=''}){
+  closeMaterialAdd();
   $('modalTitle').textContent=title;$('modalDescription').textContent=description;
   $('modalInput').hidden=!requiresText;$('modalInput').value=value;$('modalConfirm').textContent=confirm;
   $('modal').hidden=false;if(requiresText)$('modalInput').focus();else $('modalConfirm').focus();
@@ -908,7 +984,7 @@ async function checkUpdate(manual=false){
       if(manual)toast('发现新版本 v'+result.latest+'，请关闭当前窗口后检查更新');
       return;
     }
-    closeSettings();$('updateVersions').textContent='v'+result.current+' → v'+result.latest;
+    closeMaterialAdd();closeSettings();$('updateVersions').textContent='v'+result.current+' → v'+result.latest;
     $('updateNotes').textContent=result.notes||'';
     $('updateNotes').hidden=!result.notes;
     $('updateProgress').hidden=true;$('updateTitle').textContent='发现新版本';
@@ -956,6 +1032,7 @@ function installCompactStripScroll(){
   }
 }
 async function start(){
+  installMaterialAdd();
   installCompactStripScroll();
   installSettingsMenu();
   $('checkUpdateButton').onclick=()=>void checkUpdate(true);
