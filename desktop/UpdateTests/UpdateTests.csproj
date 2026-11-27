@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../GenshinPlanner/UpdateHost.cs" Link="UpdateHost.cs" />
+    <Compile Include="../GenshinPlanner/ResourceCache.cs" Link="ResourceCache.cs" />
     <Compile Include="../GenshinPlanner/InstanceCoordinator.cs" Link="InstanceCoordinator.cs" />
   </ItemGroup>
 </Project>

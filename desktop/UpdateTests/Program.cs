@@ -145,6 +145,7 @@ try
             Require(replacement.TryAcquire(), "Replacement instance not acquired after release");
         }).GetAwaiter().GetResult();
     }
+    await CacheTests.RunAsync(temp);
     Console.WriteLine("Update and instance tests passed.");
 }
 finally { Directory.Delete(temp, true); }

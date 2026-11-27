@@ -4,9 +4,9 @@
 
 A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-**[Download v0.6.0](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0)**
+**[Download v0.6.1](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1)**
 
-[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
+[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ## Features
 
@@ -14,6 +14,8 @@ A Windows desktop planner for Genshin Impact character and weapon upgrades, shar
 - Preview objects are marked with an asterisk after the centered name.
 - Individual deficits include lower-tier materials required for crafting.
 - A centered yellow-dot waiting indicator locks the interface during inventory synchronization, game data loading, and imports until active blocking tasks finish.
+- Quick-add material quantities with a confirmation button or Enter and a live inventory preview.
+- Load cached game data first, validate remote changes in the background, and apply updated data when the interface is idle. Existing caches remain available offline.
 - Character and weapon catalogs with search, rarity, element, and weapon type filters.
 - Multiple independent upgrade goals with level, ascension, talent, pause, and completion settings.
 - Independent instances of identical weapons and character-to-weapon links.
@@ -32,7 +34,7 @@ Raw inventory is recovered per crafting family using demand, shortages and direc
 
 ## Installation and updates
 
-Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.0), extract it to a writable folder, and run `GenshinPlanner.exe`.
+Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1), extract it to a writable folder, and run `GenshinPlanner.exe`.
 
 Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. The .NET runtime is included.
 

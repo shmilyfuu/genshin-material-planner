@@ -79,6 +79,7 @@ async function bridge(type,params={}){
   if(type==='storage.load')return JSON.parse(localStorage.getItem('genshin-planner-desktop')||'null');
   if(type==='storage.save'){localStorage.setItem('genshin-planner-desktop',JSON.stringify(params.state));return true;}
   if(type==='data.fetch'){
+    if(params.mode==='local')throw Error('本地缓存不可用');
     const response=await fetch('https://static.nanoka.cc'+params.path);
     if(!response.ok)throw new Error('HTTP '+response.status);
     return {data:await response.json(),source:'network'};
@@ -96,6 +97,7 @@ let updateCandidate=null,updateChecking=false,updateInstalling=false;
 let characterList=[],weaponList=[];
 let profiles=new Map();
 let listVersion={live:'',latest:''};
+let catalogGeneration=0,lastUserInput=0,backgroundChecking=false;
 let profileLoadToken=0;
 let filter=createRosterFilter();
 let selectedGoalId=null,inventoryGoalId=null,selectedRosterKey=null,goalEditor=null;
@@ -212,7 +214,7 @@ for(const type of ['keydown','keyup','keypress','wheel','contextmenu']){
 }
 let lastStatus={text:'正在读取本地数据…',tone:'busy'};
 function renderStatus(){
-  const active=waitState.locked?{text:waitState.text,tone:'busy'}:[...statusTasks.values()].sort((a,b)=>b.priority-a.priority)[0]||lastStatus;
+  const active=waitState.locked?{text:waitState.text,tone:'busy'}:[...statusTasks.values()].sort((a,b)=>b.priority-a.priority)[0]||(backgroundChecking?{text:'正在后台检查游戏资料…',tone:'busy'}:lastStatus);
   const node=$('dataStatus');node.textContent=active.text;node.title=active.text;node.dataset.tone=active.tone;
   $('statusIndicator').dataset.tone=active.tone;
 }
@@ -847,53 +849,71 @@ function renderCalendar(){
   heading.title=plan.unknown.length?`${plan.unknown.length} 种材料的开放日待核对：${plan.unknown.map(item=>item.name||item.id).join('、')}`:'按当前培养目标显示秘境材料';
 }
 function renderAll(){renderAccounts();renderGoals();renderFilters();renderRoster();renderInventory();renderResults();renderCalendar();}
-async function loadReleaseMetadata(force){
+// Each refresh builds a separate catalog/profile snapshot before changing the displayed data.
+function dataReader(mode,strict=false){
+  const requests=new Map();
+  return path=>{
+    if(!requests.has(path))requests.set(path,bridge('data.fetch',{path,mode,maxAge:path==='/manifest.json'?21600000:path.endsWith('/character.json')||path.endsWith('/weapon.json')?43200000:86400000}).then(r=>{
+      if(strict&&r.source==='stale-cache')throw Error('远程资料暂时无法校验');
+      return r.data;
+    }));
+    return requests.get(path);
+  };
+}
+async function loadReleaseMetadata(mode){
   const [bundled,banners,characters,weapons]=await Promise.allSettled([
     fetch('./release-index.json').then(r=>{if(!r.ok)throw Error('release index');return r.json();}),
-    bridge('release.fetch',{source:'banners',force}).then(r=>indexBannerReleases(JSON.parse(r.content))),
-    bridge('release.fetch',{source:'characters',force}).then(r=>parseReleaseTable(r.content)),
-    bridge('release.fetch',{source:'weapons',force}).then(r=>parseReleaseTable(r.content))
+    bridge('release.fetch',{source:'banners',mode}).then(r=>indexBannerReleases(JSON.parse(r.content))),
+    bridge('release.fetch',{source:'characters',mode}).then(r=>parseReleaseTable(r.content)),
+    bridge('release.fetch',{source:'weapons',mode}).then(r=>parseReleaseTable(r.content))
   ]);
   const value=r=>r.status==='fulfilled'?r.value:undefined;
   return {bannerIndex:mergeBannerReleases(value(bundled),value(banners)),characterDates:value(characters),weaponDates:value(weapons)};
 }
-async function loadLists(force=false){
-  return withWait('lists',force?'正在更新游戏资料…':'正在加载游戏资料…',20,async()=>{
-  taskStatus('lists','正在读取 Nanoka 角色和武器资料…');
-  try{
-    const manifest=await bridge('data.fetch',{path:'/manifest.json',force,maxAge:21600000});
-    const versions=readManifestVersions(manifest.data);
-    const reqs=await Promise.all([
-      ['character',versions.live],['character',versions.latest],['weapon',versions.live],['weapon',versions.latest]
-    ].map(async([type,version])=>({version,data:(await bridge('data.fetch',{path:`/gi/${encodeURIComponent(version)}/${type}.json`,force,maxAge:43200000})).data})));
-    characterList=mergeSourceLists(normalizeCharacterList(reqs[0].data).map(x=>({...x,version:versions.live})),normalizeCharacterList(reqs[1].data).map(x=>({...x,version:versions.latest})));
-    weaponList=mergeSourceLists(normalizeWeaponList(reqs[2].data).map(x=>({...x,version:versions.live})),normalizeWeaponList(reqs[3].data).map(x=>({...x,version:versions.latest})));
-    const release=await loadReleaseMetadata(force);
-    characterList=attachReleaseDates(characterList,'character',release.characterDates,release.bannerIndex);
-    weaponList=attachReleaseDates(weaponList,'weapon',release.weaponDates,release.bannerIndex);
-    await reloadAllProfiles(force);
-    taskStatus('lists',`已载入 ${characterList.length} 名角色、${weaponList.length} 类武器`,'success');
-  }catch(e){taskStatus('lists','资料读取失败：'+e.message,'error');toast('检查网络后刷新资料');}
-  renderAll();
-  });
+function planSelection(){
+  return {account:state.activeAccountId,token:profileLoadToken,plans:state.plans.map(plan=>({id:plan.id,kind:goalKind(plan),source:structuredClone(plan.source)}))};
 }
-async function loadGoalProfile(plan,force){
-  const kind=goalKind(plan),src=plan.source;
-  const char=kind==='character'?charRow(src.selectedCharacterId):null;
-  const wp=kind==='weapon'?weaponRow(src.selectedWeaponId):null;
+function selectionCurrent(selection){
+  return selection.account===state.activeAccountId&&selection.token===profileLoadToken
+    &&JSON.stringify(selection.plans)===JSON.stringify(planSelection().plans);
+}
+async function loadCatalog(mode,strict=false){
+  const read=dataReader(mode,strict);
+  const versions=readManifestVersions(await read('/manifest.json'));
+  // The same version may be both live and latest.
+  versions.live=versions.live||versions.latest;
+  const reqs=await Promise.all([
+    ['character',versions.live],['character',versions.latest],['weapon',versions.live],['weapon',versions.latest]
+  ].map(async([kind,version])=>({version,data:await read('/gi/'+encodeURIComponent(version)+'/'+kind+'.json')})));
+  const chars=mergeSourceLists(normalizeCharacterList(reqs[0].data).map(x=>({...x,version:versions.live})),normalizeCharacterList(reqs[1].data).map(x=>({...x,version:versions.latest})));
+  const weapons=mergeSourceLists(normalizeWeaponList(reqs[2].data).map(x=>({...x,version:versions.live})),normalizeWeaponList(reqs[3].data).map(x=>({...x,version:versions.latest})));
+  if(!chars.length||!weapons.length)throw Error('游戏资料目录为空');
+  const release=await loadReleaseMetadata(mode);
+  return {versions,characters:attachReleaseDates(chars,'character',release.characterDates,release.bannerIndex),weapons:attachReleaseDates(weapons,'weapon',release.weaponDates,release.bannerIndex),read};
+}
+async function loadGoalProfile(plan,read,characters=characterList,weapons=weaponList,strict=false){
+  const kind=plan.kind||goalKind(plan),src=plan.source;
+  const char=kind==='character'?characters.find(x=>x.id===String(src.selectedCharacterId)):null;
+  const wp=kind==='weapon'?weapons.find(x=>x.id===String(src.selectedWeaponId)):null;
   const data=await Promise.allSettled([
-    char?bridge('data.fetch',{path:`/gi/${encodeURIComponent(char.version)}/zh/character/${char.id}.json`,force,maxAge:86400000}).then(r=>parseCharacterDetail(r.data,char)):Promise.resolve(null),
-    wp?bridge('data.fetch',{path:`/gi/${encodeURIComponent(wp.version)}/zh/weapon/${wp.id}.json`,force,maxAge:86400000}).then(r=>parseWeaponDetail(r.data,wp)):Promise.resolve(null)
+    char?read('/gi/'+encodeURIComponent(char.version)+'/zh/character/'+char.id+'.json').then(r=>parseCharacterDetail(r,char)):Promise.resolve(null),
+    wp?read('/gi/'+encodeURIComponent(wp.version)+'/zh/weapon/'+wp.id+'.json').then(r=>parseWeaponDetail(r,wp)):Promise.resolve(null)
   ]);
-  return {characterProfile:data[0].status==='fulfilled'?data[0].value:null,
-    weaponProfile:data[1].status==='fulfilled'?data[1].value:null};
+  if(strict){const failed=data.find(r=>r.status==='rejected');if(failed)throw failed.reason;}
+  return {characterProfile:data[0].status==='fulfilled'?data[0].value:null,weaponProfile:data[1].status==='fulfilled'?data[1].value:null};
 }
-async function reloadAllProfiles(force=false){
-  return withWait('profiles','正在加载培养资料…',10,async()=>{
-  const token=++profileLoadToken,account=state.activeAccountId;
-  const plans=[...state.plans];const results=await Promise.all(plans.map(plan=>loadGoalProfile(plan,force)));
+async function loadSnapshot(mode,strict=false){
+  const catalog=await loadCatalog(mode,strict),selection=planSelection();
+  const results=await Promise.all(selection.plans.map(plan=>loadGoalProfile(plan,catalog.read,catalog.characters,catalog.weapons,strict||mode==='local')));
+  return {...catalog,selection,profiles:new Map(selection.plans.map((p,i)=>[p.id,results[i]]))};
+}
+function snapshotChanged(next){
+  return JSON.stringify([listVersion,characterList,weaponList,[...profiles]])!==JSON.stringify([next.versions,next.characters,next.weapons,[...next.profiles]]);
+}
+async function commitProfiles(next,token,account){
   if(token!==profileLoadToken||account!==state.activeAccountId)return;
-  profiles=new Map(plans.map((p,i)=>[p.id,results[i]]));
+  profiles=next;
+  const plans=state.plans;
   for(const plan of state.plans){if(goalKind(plan)!=='weapon')continue;const row=weaponRow(goalObjectId(plan));if(!row)continue;const max=weaponMaxAscension(row.rarity);plan.config.weapAsc=plan.config.weapAsc.map(n=>Math.min(max,n));}
   if(!state.materialInventoryMigrated&&plans.length){
     const first=plans[0],entry=profiles.get(first.id);
@@ -906,6 +926,67 @@ async function reloadAllProfiles(force=false){
     if(token!==profileLoadToken||account!==state.activeAccountId)return;
   }
   renderAll();save();
+}
+async function applyCatalog(snapshot){
+  const token=++profileLoadToken,account=state.activeAccountId;
+  listVersion=snapshot.versions;characterList=snapshot.characters;weaponList=snapshot.weapons;
+  await commitProfiles(snapshot.profiles,token,account);
+}
+async function loadLists(force=false){
+  const generation=++catalogGeneration;
+  return withWait('lists',force?'正在更新游戏资料…':'正在加载游戏资料…',20,async()=>{
+    taskStatus('lists','正在读取 Nanoka 角色和武器资料…');
+    try{
+      let snapshot;
+      if(force)snapshot=await loadSnapshot('check',true);
+      else{
+        try{snapshot=await loadSnapshot('local',true);}
+        catch{snapshot=await loadSnapshot('prefer');}
+      }
+      if(generation!==catalogGeneration||closing)return false;
+      await applyCatalog(snapshot);
+      taskStatus('lists','已载入 '+characterList.length+' 名角色、'+weaponList.length+' 类武器','success');
+      return true;
+    }catch(e){taskStatus('lists','资料读取失败：'+e.message,'error');toast('检查网络后刷新资料');return false;}
+  });
+}
+function canApplyBackground(){
+  const focus=document.activeElement;
+  return !closing&&!waitTasks.isLocked()&&!mysPanel?.isBusy()&&!updateInstalling
+    &&!materialAddContext&&!document.querySelector('.modal-backdrop:not([hidden])')
+    &&$('settingsMenu').hidden&&!document.body.classList.contains('resizing-columns')
+    &&!focus?.matches('input,textarea,select,[contenteditable="true"]')
+    &&Date.now()-lastUserInput>=600;
+}
+async function checkCatalogInBackground(){
+  if(!host||backgroundChecking||closing)return;
+  const generation=catalogGeneration;
+  backgroundChecking=true;renderStatus();
+  try{
+    let snapshot=await loadSnapshot('check',true);
+    while(!closing&&generation===catalogGeneration){
+      if(!selectionCurrent(snapshot.selection)){
+        // A different account or goal may have been selected during the network request.
+        const selection=planSelection(),read=dataReader('check',true);
+        const results=await Promise.all(selection.plans.map(plan=>loadGoalProfile(plan,read,snapshot.characters,snapshot.weapons,true)));
+        snapshot={...snapshot,selection,profiles:new Map(selection.plans.map((p,i)=>[p.id,results[i]]))};
+        continue;
+      }
+      if(!snapshotChanged(snapshot)){setStatus('游戏资料已是最新','success');return;}
+      if(!canApplyBackground()){await new Promise(resolve=>setTimeout(resolve,250));continue;}
+      await withWait('lists','正在应用新游戏资料…',20,()=>applyCatalog(snapshot));
+      setStatus('游戏资料已更新','success');return;
+    }
+  }catch(e){if(generation===catalogGeneration&&!closing)setStatus('资料校验暂未完成，继续使用本地缓存','');}
+  finally{backgroundChecking=false;renderStatus();}
+}
+async function reloadAllProfiles(force=false){
+  return withWait('profiles','正在加载培养资料…',10,async()=>{
+    const token=++profileLoadToken,account=state.activeAccountId;
+    const plans=[...state.plans],read=dataReader(force?'check':'normal');
+    const results=await Promise.all(plans.map(plan=>loadGoalProfile(plan,read)));
+    if(token!==profileLoadToken||account!==state.activeAccountId||closing)return;
+    await commitProfiles(new Map(plans.map((p,i)=>[p.id,results[i]])),token,account);
   });
 }
 function modal({title,description='',confirm='确认',requiresText=true,value=''}){
@@ -1033,6 +1114,7 @@ function installCompactStripScroll(){
 }
 async function start(){
   installMaterialAdd();
+  for(const type of ['pointerdown','keydown','input','wheel'])document.addEventListener(type,()=>{lastUserInput=Date.now();},{capture:true,passive:true});
   installCompactStripScroll();
   installSettingsMenu();
   $('checkUpdateButton').onclick=()=>void checkUpdate(true);
@@ -1100,6 +1182,6 @@ async function start(){
     apply:async result=>{applySyncedInventory(state,result);state.mysSyncedAt=Date.now();renderInventory();renderResults();renderCalendar();await flushSave();}});
   mysPanel.update();
   if(host)await bridge('app.ready');
-  await loadLists();
+  return await loadLists();
 }
-void withWait('startup','正在读取本地数据…',1,start).then(()=>{if(storageReady)void checkUpdate();}).catch(e=>{setStatus('初始化失败：'+e.message,'error');});
+void withWait('startup','正在读取本地数据…',1,start).then(loaded=>{if(storageReady){void checkUpdate();if(loaded)void checkCatalogInBackground();}}).catch(e=>{setStatus('初始化失败：'+e.message,'error');});

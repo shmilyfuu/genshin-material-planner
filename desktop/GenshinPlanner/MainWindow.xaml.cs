@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private readonly SemaphoreSlim _stateGate = new(1, 1);
     private bool _stateLoaded, _uiReady, _closePending, _allowClose;
     private string CacheDir => Path.Combine(_dataDir, "NanokaCache");
+    private readonly ResourceCache _resourceCache = new();
 
     public MainWindow()
     {
@@ -290,30 +291,26 @@ public partial class MainWindow : Window
         if (path.Contains("..", StringComparison.Ordinal) ||
             !Regex.IsMatch(path, @"^/(?:manifest\.json|gi/[A-Za-z0-9_./-]+\.json)$"))
             throw new InvalidOperationException("数据资源路径无效。");
-
-        Directory.CreateDirectory(CacheDir);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path))).ToLowerInvariant();
-        var cacheFile = Path.Combine(CacheDir, hash + ".json");
-        var force = data?["force"]?.GetValue<bool>() ?? false;
-        var maxAge = data?["maxAge"]?.GetValue<double>() ?? 86400000;
-        if (!force && File.Exists(cacheFile) &&
-            (DateTime.UtcNow - File.GetLastWriteTimeUtc(cacheFile)).TotalMilliseconds < maxAge)
+        var file = Path.Combine(CacheDir, hash + ".json");
+        var mode = data?["mode"]?.GetValue<string>() ?? (data?["force"]?.GetValue<bool>() == true ? "check" : "normal");
+        var age = TimeSpan.FromMilliseconds(data?["maxAge"]?.GetValue<double>() ?? 86400000);
+        bool Valid(string content)
         {
-            return new JsonObject { ["data"] = JsonNode.Parse(await File.ReadAllTextAsync(cacheFile)), ["source"] = "cache" };
+            if (JsonNode.Parse(content) is not JsonObject root || root.Count == 0 || root.ContainsKey("error")) return false;
+            var body = root["data"] as JsonObject ?? root;
+            if (path == "/manifest.json")
+            {
+                var gi = body["gi"] as JsonObject;
+                return gi is not null && new[] {"live_version", "liveVersion", "live", "latest_version", "latestVersion", "latest"}
+                    .Any(key => gi[key] is JsonValue v && v.TryGetValue<string>(out var value) && !string.IsNullOrWhiteSpace(value));
+            }
+            if (path.EndsWith("/character.json", StringComparison.Ordinal) || path.EndsWith("/weapon.json", StringComparison.Ordinal))
+                return body.Any(entry => Regex.IsMatch(entry.Key, @"^\d+$") && entry.Value is JsonObject);
+            return body.ContainsKey("materials") || body.ContainsKey("upgrade_materials");
         }
-        try
-        {
-            using var response = await Http.GetAsync(path.TrimStart('/'));
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync();
-            var parsed = JsonNode.Parse(content) ?? throw new InvalidDataException("空的数据响应。");
-            await File.WriteAllTextAsync(cacheFile, content);
-            return new JsonObject { ["data"] = parsed, ["source"] = "network" };
-        }
-        catch when (File.Exists(cacheFile))
-        {
-            return new JsonObject { ["data"] = JsonNode.Parse(await File.ReadAllTextAsync(cacheFile)), ["source"] = "stale-cache" };
-        }
+        var result = await _resourceCache.ReadAsync(Http, path.TrimStart('/'), file, mode, age, Valid);
+        return new JsonObject { ["data"] = JsonNode.Parse(result.Content), ["source"] = result.Source, ["hash"] = result.Hash };
     }
 
     private static readonly HttpClient ReleaseHttp = new() { Timeout = TimeSpan.FromSeconds(8) };
@@ -328,36 +325,16 @@ public partial class MainWindow : Window
             "weapons" => "https://www.gachatracker.app/games/genshin/weapons/",
             _ => throw new InvalidOperationException("发布时间数据来源无效。")
         };
-        var dir = Path.Combine(_dataDir, "ReleaseCache");
-        Directory.CreateDirectory(dir);
-        var cache = Path.Combine(dir, key + ".txt");
-        var force = data?["force"]?.GetValue<bool>() ?? false;
+        var file = Path.Combine(_dataDir, "ReleaseCache", key + ".txt");
+        var mode = data?["mode"]?.GetValue<string>() ?? (data?["force"]?.GetValue<bool>() == true ? "check" : "normal");
         bool Valid(string content)
         {
             if (key == "banners") return JsonNode.Parse(content) is JsonArray { Count: > 0 };
             return content.Contains("Release Date", StringComparison.OrdinalIgnoreCase)
                 && content.Contains("<table", StringComparison.OrdinalIgnoreCase);
         }
-        if (!force && File.Exists(cache) && DateTime.UtcNow - File.GetLastWriteTimeUtc(cache) < TimeSpan.FromHours(12))
-        {
-            var cached = await File.ReadAllTextAsync(cache);
-            if (Valid(cached)) return new JsonObject { ["content"] = cached };
-        }
-        try
-        {
-            using var response = await ReleaseHttp.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-            var content = await response.Content.ReadAsStringAsync();
-            if (!Valid(content)) throw new InvalidDataException("发布时间资料格式无效。");
-            await File.WriteAllTextAsync(cache, content);
-            return new JsonObject { ["content"] = content };
-        }
-        catch when (File.Exists(cache))
-        {
-            var cached = await File.ReadAllTextAsync(cache);
-            if (!Valid(cached)) throw;
-            return new JsonObject { ["content"] = cached };
-        }
+        var result = await _resourceCache.ReadAsync(ReleaseHttp, url, file, mode, TimeSpan.FromHours(12), Valid);
+        return new JsonObject { ["content"] = result.Content, ["source"] = result.Source, ["hash"] = result.Hash };
     }
 
     private async Task<bool> SaveInventoryDiagnosticsAsync(JsonObject? data)
