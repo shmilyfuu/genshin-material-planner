@@ -4,9 +4,9 @@
 
 A Windows desktop planner for Genshin Impact character and weapon upgrades, shared material inventory, and weekly domain schedules.
 
-**[Download v0.6.1](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1)**
+**[Download v0.6.2](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2)**
 
-[Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
+[GitHub download](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2) · [Gitee download](https://gitee.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ![Genshin Material Planner desktop interface](docs/images/screenshot.png)
 
@@ -36,11 +36,13 @@ Raw inventory is recovered per crafting family using demand, shortages and direc
 
 ## Installation and updates
 
-Download the Windows x64 ZIP from [Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1), extract it to a writable folder, and run `GenshinPlanner.exe`.
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2) or [Gitee Releases](https://gitee.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2), extract it to a writable folder, and run `GenshinPlanner.exe`.
 
 Requires Windows 10/11 x64 and Microsoft Edge WebView2 Runtime. The .NET runtime is included.
 
 Click a catalog card to view its materials, and use the upgrade button on the card to configure its goal.
+
+The app checks for formal updates on startup or from Settings. GitHub is preferred; Gitee is used on timeout or request failure. Failed downloads can be retried from the other source for the same version. Updates are verified using SHA-256.
 
 Back up the `data/` folder before updating. Replace application files with the new release while retaining this folder.
 
@@ -65,7 +67,7 @@ node --test desktop/GenshinPlanner/tests/*.test.mjs
 dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish
 ```
 
-The primary development branch is `main`. GitHub Actions produces Windows ZIP archives and SHA-256 checksums. Formal releases use three-part versions (e.g. `0.6.0`); test builds append a fourth component to the current formal version (e.g. `0.6.0.1`, `0.6.0.2`) and are distributed through Actions artifacts. The first three components advance only for formal releases tagged `desktop-vX.Y.Z`. Automatic updates select formal releases only. Historical browser extension source is archived at [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1).
+The primary development branch is `main`. GitHub Actions produces Windows ZIP archives and SHA-256 checksums. Formal releases mirror the main branch, release tag, and identical assets to Gitee, retaining the five latest formal desktop releases there. Formal releases use three-part versions (e.g. `0.6.0`); test builds append a fourth component to the current formal version (e.g. `0.6.0.1`, `0.6.0.2`) and are distributed through Actions artifacts. The first three components advance only for formal releases tagged `desktop-vX.Y.Z`. Automatic updates select formal releases only. Historical browser extension source is archived at [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1).
 
 ## Feedback and copyright
 

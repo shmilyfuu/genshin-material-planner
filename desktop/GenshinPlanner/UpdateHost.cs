@@ -16,19 +16,19 @@ internal sealed class UpdateHost
     private const string StagePrefix = ".planner-update-";
     private const long MaxPackageSize = 512L * 1024 * 1024;
     private const long MaxExtractSize = 1024L * 1024 * 1024;
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(5) };
+    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(10) };
     private static readonly Regex TagPattern = new(@"^desktop-v(\d+\.\d+\.\d+)$", RegexOptions.CultureInvariant);
     private static readonly Regex StagePattern = new(@"^\.planner-update-[0-9a-f]{32}$", RegexOptions.CultureInvariant);
     private Release? _candidate;
     private bool _preparing;
 
-    private sealed record Release(Version Version, string ZipUrl, string HashUrl, long Size, string Notes);
+    internal sealed record Release(Version Version, string ZipUrl, string HashUrl, long Size, string Notes, bool Gitee);
     internal sealed record Progress(string phase, long completed = 0, long total = 0, double bytesPerSecond = 0);
 
     static UpdateHost()
     {
         Http.DefaultRequestHeaders.UserAgent.ParseAdd("GenshinPlanner/desktop-updater");
-        Http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+        Http.DefaultRequestHeaders.Accept.ParseAdd("application/json");
     }
 
     internal static Version CurrentVersion
@@ -44,26 +44,14 @@ internal sealed class UpdateHost
         ? new Version(version.Major, version.Minor, Math.Max(0, version.Build), version.Revision)
         : new Version(version.Major, version.Minor, Math.Max(0, version.Build));
 
+    private static string Api(bool gitee) => gitee
+        ? "https://gitee.com/api/v5/repos/" + Repository
+        : "https://api.github.com/repos/" + Repository;
+
     public async Task<object> CheckAsync()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         _candidate = null;
-        var candidates = new List<JsonObject>();
-        for (int page = 1; ; page++)
-        {
-            using var response = await Http.GetAsync("https://api.github.com/repos/" + Repository + "/releases?per_page=100&page=" + page, timeout.Token);
-            response.EnsureSuccessStatusCode();
-            var releases = JsonNode.Parse(await response.Content.ReadAsStringAsync(timeout.Token)) as JsonArray
-                ?? throw new InvalidDataException("更新信息格式无效。");
-            candidates.AddRange(releases.OfType<JsonObject>());
-            if (releases.Count < 100) break;
-        }
-        var release = candidates.Where(r => r["draft"]?.GetValue<bool>() == false && r["prerelease"]?.GetValue<bool>() == false)
-            .Select(r => (Node: r, Match: TagPattern.Match(r["tag_name"]?.GetValue<string>() ?? "")))
-            .Where(r => r.Match.Success && Version.TryParse(r.Match.Groups[1].Value, out _))
-            .OrderByDescending(r => Version.Parse(r.Match.Groups[1].Value))
-            .Select(r => r.Node).FirstOrDefault();
-        if (release is not null) _candidate = ParseRelease(release, CurrentVersion);
+        _candidate = await CheckSourcesAsync(Http, CurrentVersion);
         return new
         {
             current = CurrentVersion.ToString(),
@@ -73,14 +61,84 @@ internal sealed class UpdateHost
         };
     }
 
-    private static Release? ParseRelease(JsonObject release, Version current)
+    internal static async Task<Release?> CheckSourcesAsync(HttpClient client, Version current)
     {
-        if (release["draft"]?.GetValue<bool>() != false || release["prerelease"]?.GetValue<bool>() != false)
-            return null;
-        var tag = release["tag_name"]?.GetValue<string>() ?? "";
-        var match = TagPattern.Match(tag);
-        if (!match.Success || !Version.TryParse(match.Groups[1].Value, out var version) || version <= current)
-            return null;
+        try { return await FindReleaseAsync(client, false, current); }
+        catch (Exception primary) when (IsRemoteFailure(primary))
+        {
+            try { return await FindReleaseAsync(client, true, current); }
+            catch (Exception fallback) when (IsRemoteFailure(fallback))
+            {
+                throw new InvalidOperationException($"GitHub：{primary.Message}；Gitee：{fallback.Message}", fallback);
+            }
+        }
+    }
+
+    private static bool IsRemoteFailure(Exception error) => error is HttpRequestException
+        or HttpIOException or OperationCanceledException or InvalidDataException
+        or System.Text.Json.JsonException or InvalidOperationException or FormatException;
+
+    private static async Task<JsonNode> GetJsonAsync(HttpClient client, string url, CancellationToken token)
+    {
+        using var response = await client.GetAsync(url, token);
+        response.EnsureSuccessStatusCode();
+        return JsonNode.Parse(await response.Content.ReadAsStringAsync(token))
+            ?? throw new InvalidDataException("更新信息格式无效。");
+    }
+
+    private static bool IsFormal(JsonObject release, bool gitee) =>
+        (gitee ? release["draft"]?.GetValue<bool>() != true : release["draft"]?.GetValue<bool>() == false)
+        && (gitee ? release["prerelease"]?.GetValue<bool>() != true : release["prerelease"]?.GetValue<bool>() == false);
+
+    private static Version? ReleaseVersion(JsonObject release, bool gitee)
+    {
+        var match = TagPattern.Match(release["tag_name"]?.GetValue<string>() ?? "");
+        return IsFormal(release, gitee) && match.Success && Version.TryParse(match.Groups[1].Value, out var version)
+            ? version : null;
+    }
+
+    internal static async Task<Release?> FindReleaseAsync(HttpClient client, bool gitee, Version current, Version? target = null)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        var token = timeout.Token;
+        var api = Api(gitee);
+        JsonObject? selected;
+        if (target is not null)
+        {
+            selected = await GetJsonAsync(client, $"{api}/releases/tags/desktop-v{target}", token) as JsonObject
+                ?? throw new InvalidDataException("更新信息格式无效。");
+            if (ReleaseVersion(selected, gitee) != target)
+                throw new InvalidDataException("备用线路未提供目标版本。");
+        }
+        else
+        {
+            var candidates = new List<JsonObject>();
+            for (int page = 1; ; page++)
+            {
+                var releases = await GetJsonAsync(client, $"{api}/releases?per_page=100&page={page}", token) as JsonArray
+                    ?? throw new InvalidDataException("更新信息格式无效。");
+                candidates.AddRange(releases.OfType<JsonObject>());
+                if (releases.Count < 100) break;
+            }
+            selected = candidates.Where(r => ReleaseVersion(r, gitee) is Version v && v > current)
+                .OrderByDescending(r => ReleaseVersion(r, gitee)).FirstOrDefault();
+            if (selected is null) return null;
+        }
+        if (gitee)
+        {
+            var id = selected["id"]?.GetValue<long>() ?? 0;
+            if (id <= 0) throw new InvalidDataException("Gitee Release ID 无效。");
+            selected["assets"] = await GetJsonAsync(client, $"{api}/releases/{id}/attach_files", token);
+        }
+        return ParseRelease(selected, current, gitee);
+    }
+
+    private static Release ParseRelease(JsonObject release, Version current, bool gitee)
+    {
+        var version = ReleaseVersion(release, gitee);
+        if (version is null || version <= current)
+            throw new InvalidDataException("更新版本无效。");
+        var tag = $"desktop-v{version}";
         var filename = $"GenshinPlanner-WebView2-v{version}-win-x64.zip";
         var assets = release["assets"] as JsonArray ?? throw new InvalidDataException("更新文件列表缺失。");
         JsonNode FindAsset(string name) =>
@@ -88,24 +146,32 @@ internal sealed class UpdateHost
             ?? throw new InvalidDataException("更新文件缺失：" + name);
         string AssetUrl(JsonNode asset, string name)
         {
+            var raw = asset["browser_download_url"]?.GetValue<string>() ?? "";
             var expected = $"https://github.com/{Repository}/releases/download/{tag}/{name}";
-            if (asset["browser_download_url"]?.GetValue<string>() != expected)
-                throw new InvalidDataException("更新文件地址无效。");
-            return expected;
+            if (!gitee && raw == expected) return raw;
+            if (gitee && Uri.TryCreate(raw, UriKind.Absolute, out var uri)
+                && uri.Scheme == Uri.UriSchemeHttps && uri.Host == "gitee.com" && uri.IsDefaultPort
+                && string.IsNullOrEmpty(uri.UserInfo)
+                && (uri.AbsolutePath.StartsWith($"/{Repository}/releases/download/{tag}/", StringComparison.Ordinal)
+                    || uri.AbsolutePath.StartsWith($"/{Repository}/attach_files/", StringComparison.Ordinal)))
+                return raw;
+            throw new InvalidDataException("更新文件地址无效。");
         }
         var zip = FindAsset(filename);
         var checksum = FindAsset(filename + ".sha256");
         long size = zip["size"]?.GetValue<long>() ?? 0;
-        if (size <= 0 || size > MaxPackageSize)
+        if (size < 0 || (!gitee && size == 0) || size > MaxPackageSize)
             throw new InvalidDataException("更新包大小超出范围。");
         var notes = release["body"]?.GetValue<string>() ?? "";
         return new Release(version, AssetUrl(zip, filename), AssetUrl(checksum, filename + ".sha256"),
-            size, notes[..Math.Min(notes.Length, 12000)]);
+            size, notes[..Math.Min(notes.Length, 12000)], gitee);
     }
 
     private static async Task DownloadAsync(string url, string path, long limit, CancellationToken token, Action<Progress>? progress = null)
     {
-        using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+        using var connectTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+        connectTimeout.CancelAfter(TimeSpan.FromSeconds(15));
+        using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, connectTimeout.Token);
         response.EnsureSuccessStatusCode();
         if (response.RequestMessage?.RequestUri?.Scheme != Uri.UriSchemeHttps)
             throw new InvalidDataException("更新下载必须使用 HTTPS。");
@@ -117,20 +183,27 @@ internal sealed class UpdateHost
         long total = 0, previous = 0;
         var watch = Stopwatch.StartNew();
         double previousTime = 0;
-        progress?.Invoke(new Progress("download", 0, limit));
-        int count;
-        while ((count = await source.ReadAsync(buffer, token)) > 0)
+        long expectedLength = response.Content.Headers.ContentLength ?? (limit < MaxPackageSize ? limit : 0);
+        progress?.Invoke(new Progress("download", 0, expectedLength));
+        while (true)
         {
+            using var idleTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            idleTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+            int count = await source.ReadAsync(buffer, idleTimeout.Token);
+            if (count == 0) break;
             total += count;
             if (total > limit) throw new InvalidDataException("更新文件大小超出范围。");
             await output.WriteAsync(buffer.AsMemory(0, count), token);
             double now = watch.Elapsed.TotalSeconds;
-            if (now - previousTime >= .2 || total == limit)
+            if (now - previousTime >= .2 || total == expectedLength)
             {
-                progress?.Invoke(new Progress("download", total, limit, (total - previous) / Math.Max(.001, now - previousTime)));
+                progress?.Invoke(new Progress("download", total, expectedLength, (total - previous) / Math.Max(.001, now - previousTime)));
                 previous = total; previousTime = now;
             }
         }
+        if (expectedLength > 0 && response.Content.Headers.ContentLength is not null && total != expectedLength)
+            throw new InvalidDataException("更新文件下载不完整。");
+        progress?.Invoke(new Progress("download", total, total));
     }
 
     public async Task<bool> PrepareAsync(string requestedVersion, Action<Progress>? progress = null)
@@ -149,22 +222,27 @@ internal sealed class UpdateHost
         try
         {
             Directory.CreateDirectory(stage);
-            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
             var package = Path.Combine(stage, "package.zip");
             var checksum = Path.Combine(stage, "package.sha256");
-            await DownloadAsync(release.HashUrl, checksum, 1024, timeout.Token);
-            var expected = (await File.ReadAllTextAsync(checksum, timeout.Token)).Trim();
-            if (!Regex.IsMatch(expected, @"^[0-9a-fA-F]{64}$"))
-                throw new InvalidDataException("SHA256 校验文件格式无效。");
-            await DownloadAsync(release.ZipUrl, package, Math.Min(release.Size, MaxPackageSize), timeout.Token, progress);
-            if (new FileInfo(package).Length != release.Size)
-                throw new InvalidDataException("更新包下载不完整。");
-            await using (var stream = File.OpenRead(package))
+            try { await DownloadVerifiedAsync(release, package, checksum, progress); }
+            catch (Exception primary) when (IsRemoteFailure(primary))
             {
-                var actual = Convert.ToHexString(await HashWithProgressAsync(stream, timeout.Token, progress));
-                if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("更新包 SHA256 校验失败。");
+                File.Delete(package);
+                File.Delete(checksum);
+                progress?.Invoke(new Progress(release.Gitee ? "fallback-github" : "fallback-gitee"));
+                try
+                {
+                    var fallback = await FindReleaseAsync(Http, !release.Gitee, CurrentVersion, release.Version)
+                        ?? throw new InvalidDataException("备用线路未提供目标版本。");
+                    await DownloadVerifiedAsync(fallback, package, checksum, progress);
+                }
+                catch (Exception secondary) when (IsRemoteFailure(secondary))
+                {
+                    throw new InvalidOperationException(
+                        $"{(release.Gitee ? "Gitee" : "GitHub")}：{primary.Message}；{(release.Gitee ? "GitHub" : "Gitee")}：{secondary.Message}", secondary);
+                }
             }
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
             var payload = Path.Combine(stage, "payload");
             await Task.Run(() => ExtractPackage(package, payload, progress), timeout.Token);
             var published = FileVersionInfo.GetVersionInfo(Path.Combine(payload, ExeName));
@@ -204,6 +282,23 @@ internal sealed class UpdateHost
             _preparing = false;
             if (!handedOff) TryDelete(stage);
         }
+    }
+
+    private static async Task DownloadVerifiedAsync(Release release, string package, string checksum, Action<Progress>? progress)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        await DownloadAsync(release.HashUrl, checksum, 1024, timeout.Token);
+        var expected = (await File.ReadAllTextAsync(checksum, timeout.Token)).Trim();
+        if (!Regex.IsMatch(expected, @"^[0-9a-fA-F]{64}$"))
+            throw new InvalidDataException("SHA256 校验文件格式无效。");
+        await DownloadAsync(release.ZipUrl, package, release.Size > 0 ? release.Size : MaxPackageSize, timeout.Token, progress);
+        var actualSize = new FileInfo(package).Length;
+        if (actualSize <= 0 || (release.Size > 0 && actualSize != release.Size))
+            throw new InvalidDataException("更新包下载不完整。");
+        await using var stream = File.OpenRead(package);
+        var actual = Convert.ToHexString(await HashWithProgressAsync(stream, timeout.Token, progress));
+        if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("更新包 SHA256 校验失败。");
     }
 
     internal static async Task<byte[]> HashWithProgressAsync(Stream stream, CancellationToken token, Action<Progress>? progress = null)

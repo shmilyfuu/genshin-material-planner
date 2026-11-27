@@ -1077,7 +1077,7 @@ async function checkUpdate(manual=false){
 function renderUpdateProgress(progress){
   if(!updateInstalling||!progress)return;
   const {phase,completed=0,total=0,bytesPerSecond=0}=progress;
-  const labels={prepare:'正在准备更新',download:'正在下载更新包',verify:'正在校验更新包',extract:'正在解压更新文件',handoff:'正在启动安装进程'};
+  const labels={prepare:'正在准备更新','fallback-gitee':'GitHub 下载失败，正在切换 Gitee','fallback-github':'Gitee 下载失败，正在切换 GitHub',download:'正在下载更新包',verify:'正在校验更新包',extract:'正在解压更新文件',handoff:'正在启动安装进程'};
   const label=labels[phase]||'正在更新';
   $('updateProgress').hidden=false;$('updateTitle').textContent='正在更新';
   $('updatePhase').textContent=label;

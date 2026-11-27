@@ -4,9 +4,9 @@
 
 面向原神的 Windows 桌面养成规划工具，支持多角色、多武器培养计划、共享材料库存与每周刷取日历。
 
-**[下载正式版 v0.6.1](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1)**
+**[下载正式版 v0.6.2](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2)**
 
-[下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
+[GitHub 下载](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2) · [Gitee 下载](https://gitee.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
 ![原神养成规划桌面版界面](docs/images/screenshot.png)
 
@@ -36,7 +36,7 @@
 
 ## 下载与使用
 
-1. 前往 [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1) 下载 Windows x64 ZIP。
+1. 前往 [GitHub Releases](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2) 或 [Gitee Releases](https://gitee.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.2) 下载 Windows x64 ZIP。
 2. 将压缩包解压到有写入权限的固定目录。
 3. 运行 `GenshinPlanner.exe`。
 
@@ -46,7 +46,7 @@
 
 ## 更新与本地数据
 
-程序启动时自动检查 GitHub Releases 的新正式版本，也可通过「设置 → 检查更新」手动检查。确认后下载、校验并安装更新，保留 `data/` 目录，更新后自动重启。
+程序启动时自动检查新正式版本，也可通过「设置 → 检查更新」手动检查。优先使用 GitHub，连接超时或请求失败时切换 Gitee；下载失败时尝试从另一线路获取相同版本。确认后下载、校验并安装更新，保留 `data/` 目录，更新后自动重启。
 
 升级前备份 `data/`，将新版文件覆盖到原程序目录，并保留原有 `data/`。
 
@@ -86,7 +86,7 @@ node --test desktop/GenshinPlanner/tests/*.test.mjs
 dotnet publish desktop/GenshinPlanner/GenshinPlanner.csproj -c Release -r win-x64 --self-contained true -o desktop/publish
 ```
 
-主分支为 `main`。Windows 构建通过 GitHub Actions 生成便携 ZIP 及 SHA-256 校验文件。正式版本使用三段式版本号（如 `0.6.0`），测试包在当前正式版本后追加第四位（如 `0.6.0.1`、`0.6.0.2`），通过 Actions Artifacts 分发。确认正式发布时才提升前三位版本号并创建 `desktop-vX.Y.Z` Release；程序自动更新仅识别正式版本。历史浏览器扩展源码归档于 [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1)。
+主分支为 `main`。Windows 构建通过 GitHub Actions 生成便携 ZIP 及 SHA-256 校验文件，正式发布时同步主分支、版本标签及同一份构建产物到 Gitee，Gitee 保留最近五个正式桌面版本。正式版本使用三段式版本号（如 `0.6.0`），测试包在当前正式版本后追加第四位（如 `0.6.0.1`、`0.6.0.2`），通过 Actions Artifacts 分发。确认正式发布时才提升前三位版本号并创建 `desktop-vX.Y.Z` Release；程序自动更新仅识别正式版本。历史浏览器扩展源码归档于 [release/v1.5.1](https://github.com/shmilyfuu/genshin-material-planner/tree/release/v1.5.1)。
 
 ## 反馈与版权
 

@@ -7,6 +7,7 @@ on:
     paths:
       - 'desktop/**'
       - '.github/workflows/build-webview2.yml'
+      - '.github/scripts/publish-gitee-release.sh'
   workflow_dispatch:
 
 permissions:
@@ -132,6 +133,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: ${{ needs.windows-build.outputs.package }}
@@ -154,4 +157,31 @@ jobs:
           test "$expected" = "$actual"
           awk -v heading="## Desktop $VERSION" '$0 == heading { found=1; next } found && /^## / { exit } found { print }' ../CHANGELOG.md > release-notes.md
           test -s release-notes.md
-          gh release create "desktop-v$VERSION" "$zip" "$zip.sha256" --target "$TARGET_SHA" --title "原神养成规划桌面版 v$VERSION" --notes-file release-notes.md --latest
+          tag="desktop-v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$tag:refs/tags/$tag"
+            test "$(git rev-list -n 1 "$tag")" = "$TARGET_SHA"
+            gh release upload "$tag" "$zip" "$zip.sha256" --clobber
+            gh release edit "$tag" --notes-file release-notes.md --latest
+          else
+            gh release create "$tag" "$zip" "$zip.sha256" --target "$TARGET_SHA" --title "原神养成规划桌面版 v$VERSION" --notes-file release-notes.md --latest
+          fi
+      - name: Mirror release commit and tag to Gitee
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          TARGET_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.windows-build.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${GITEE_TOKEN:?GITEE_TOKEN is required}"
+          git push --atomic "https://oauth2:${GITEE_TOKEN}@gitee.com/shmilyfuu/genshin-material-planner.git" "$TARGET_SHA:refs/heads/main" "$TARGET_SHA:refs/tags/desktop-v$VERSION"
+      - name: Publish Gitee Release
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          VERSION: ${{ needs.windows-build.outputs.version }}
+          PACKAGE: ${{ needs.windows-build.outputs.package }}
+        shell: bash
+        run: |
+          cd dist
+          bash ../.github/scripts/publish-gitee-release.sh
