@@ -8,6 +8,8 @@
 
 [下载 Windows x64 便携版](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1) · [开发版构建](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
+![原神养成规划桌面版界面](docs/images/screenshot.png)
+
 ## 功能
 
 - 支持一至五星武器突破，低星武器最高培养至 Lv.70。

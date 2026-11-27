@@ -8,6 +8,8 @@ A Windows desktop planner for Genshin Impact character and weapon upgrades, shar
 
 [Download Windows x64 portable release](https://github.com/shmilyfuu/genshin-material-planner/releases/tag/desktop-v0.6.1) · [Development builds](https://github.com/shmilyfuu/genshin-material-planner/actions/workflows/build-webview2.yml)
 
+![Genshin Material Planner desktop interface](docs/images/screenshot.png)
+
 ## Features
 
 - Weapon ascension for all five rarities; one- and two-star weapons cap at Lv.70.
